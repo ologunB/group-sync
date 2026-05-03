@@ -92,7 +92,7 @@ export class EmailService {
         let html = EmailService.loadTemplate(templateName);
 
         // Interpolate {{data.nested.key}} — walks the data object
-        html = html.replace(/\{\{data\.([^}]+)\}\}/g, (_match, keyPath: string) => {
+        html = html.replace(/\{\{data\.([^}]+)}}/g, (_match, keyPath: string) => {
             const value = keyPath
                 .trim()
                 .split('.')
@@ -106,7 +106,7 @@ export class EmailService {
         });
 
         // Interpolate top-level {{key}}
-        html = html.replace(/\{\{([^}]+)\}\}/g, (_match, key: string) => {
+        html = html.replace(/\{\{([^}]+)}}/g, (_match, key: string) => {
             const value = data[key.trim()];
             return value != null ? String(value) : '';
         });

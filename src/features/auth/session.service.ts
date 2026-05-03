@@ -60,7 +60,7 @@ export class SessionService {
     static async incrementFailedLogin(userId: string): Promise<number> {
         const key = Keys.loginFailed(userId);
         const count = await redis.incr(key);
-        // Set TTL only on first failure (so the window starts from the first bad attempt)
+        // Set TTL only on the first failure (so the window starts from the first bad attempt)
         if (count === 1) {
             await redis.expire(key, TTL.LOGIN_FAILED);
         }
