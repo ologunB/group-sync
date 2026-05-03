@@ -1,0 +1,122 @@
+// ─── Group ────────────────────────────────────────────────────────────────────
+
+model Group {
+  id                     String                                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                   String                                @db.VarChar(150)
+  slug                   String                                @unique @db.VarChar(170)
+  category               String                                @db.VarChar(80)
+  subcategory            String?                               @db.VarChar(80)
+  description            String?
+  coverImageUrl          String?                               @map("cover_image_url")
+  logoUrl                String?                               @map("logo_url")
+  city                   String?                               @db.VarChar(100)
+  state                  String?                               @db.VarChar(100)
+  country                String?                               @default("NG") @db.VarChar(100)
+  location               Unsupported("geometry(Point, 4326)")?
+  membershipType         String                                @default("open") @map("membership_type") @db.VarChar(20)
+  membershipFee          Decimal?                              @map("membership_fee") @db.Decimal(12, 2)
+  membershipFeeCurrency  String?                               @default("NGN") @map("membership_fee_currency") @db.VarChar(10)
+  membershipFeeFrequency String?                               @map("membership_fee_frequency") @db.VarChar(20)
+  howToJoinContent       String?                               @map("how_to_join_content")
+  rules                  String?
+  foundingDate           DateTime?                             @map("founding_date") @db.Date
+  isVerified             Boolean                               @default(false) @map("is_verified")
+  isDiscoverable         Boolean                               @default(true) @map("is_discoverable")
+  memberCount            Int                                   @default(0) @map("member_count")
+  createdBy              String                                @map("created_by") @db.Uuid
+  status                 String                                @default("active") @db.VarChar(20) @map("status")
+  createdAt              DateTime                              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime                              @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt              DateTime?                             @map("deleted_at") @db.Timestamptz
+
+  creator      User          @relation("GroupCreator", fields: [createdBy], references: [id])
+  memberships  Membership[]
+  applications Application[]
+  inviteLinks  InviteLink[]
+  groupForm    GroupForm?
+
+  @@index([category], map: "idx_groups_category")
+  @@index([slug], map: "idx_groups_slug")
+  @@index([status, isDiscoverable], map: "idx_groups_status")
+  @@index([createdBy], map: "idx_groups_created_by")
+  @@map("groups")
+}
+
+// ─── Membership ───────────────────────────────────────────────────────────────
+
+model Membership {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  groupId   String   @map("group_id") @db.Uuid
+  role      String   @default("member") @db.VarChar(20)
+  status    String   @default("active") @db.VarChar(20)
+  joinedAt  DateTime @default(now()) @map("joined_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@index([groupId, status], map: "idx_memberships_group")
+  @@index([userId, status], map: "idx_memberships_user")
+  @@index([groupId, role], map: "idx_memberships_role")
+  @@map("memberships")
+}
+
+// ─── Application Form (schema configured by group admins) ─────────────────────
+
+model GroupForm {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  groupId   String   @unique @map("group_id") @db.Uuid
+  fields    Json     @default("[]")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@map("group_forms")
+}
+
+// ─── Application ──────────────────────────────────────────────────────────────
+
+model Application {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  groupId         String    @map("group_id") @db.Uuid
+  status          String    @default("pending") @db.VarChar(20)
+  formResponses   Json      @default("{}") @map("form_responses")
+  rejectionReason String?   @map("rejection_reason")
+  reviewedBy      String?   @map("reviewed_by") @db.Uuid
+  submittedAt     DateTime  @default(now()) @map("submitted_at") @db.Timestamptz
+  reviewedAt      DateTime? @map("reviewed_at") @db.Timestamptz
+
+  user     User  @relation("ApplicationUser", fields: [userId], references: [id], onDelete: Cascade)
+  group    Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  reviewer User? @relation("ApplicationReviewer", fields: [reviewedBy], references: [id])
+
+  @@unique([userId, groupId])
+  @@index([groupId, status], map: "idx_applications_group_status")
+  @@index([userId], map: "idx_applications_user")
+  @@map("applications")
+}
+
+// ─── Invite Links ─────────────────────────────────────────────────────────────
+
+model InviteLink {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  groupId   String    @map("group_id") @db.Uuid
+  token     String    @unique @db.VarChar(64)
+  createdBy String    @map("created_by") @db.Uuid
+  maxUses   Int?      @map("max_uses")
+  useCount  Int       @default(0) @map("use_count")
+  expiresAt DateTime? @map("expires_at") @db.Timestamptz
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  creator User  @relation("InviteLinkCreator", fields: [createdBy], references: [id])
+
+  @@index([token], map: "idx_invite_token")
+  @@index([groupId], map: "idx_invite_group")
+  @@map("invite_links")
+}

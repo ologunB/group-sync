@@ -25,10 +25,17 @@ model User {
   updatedAt            DateTime                              @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt            DateTime?                             @map("deleted_at") @db.Timestamptz
 
-  refreshTokens RefreshToken[]
-  sessions      Session[]
-  auditLogs     AuditLog[]
-  providers     UserProvider[]
+  refreshTokens        RefreshToken[]
+  sessions             Session[]
+  auditLogs            AuditLog[]
+  providers            UserProvider[]
+  blocksGiven          UserBlock[]    @relation("BlockerRelation")
+  blocksReceived       UserBlock[]    @relation("BlockedRelation")
+  groupsCreated        Group[]        @relation("GroupCreator")
+  memberships          Membership[]
+  applications         Application[]  @relation("ApplicationUser")
+  applicationsReviewed Application[]  @relation("ApplicationReviewer")
+  inviteLinksCreated   InviteLink[]   @relation("InviteLinkCreator")
 
   @@index([status], map: "idx_users_status")
   @@index([idVerificationStatus], map: "idx_users_verification")
@@ -49,4 +56,19 @@ model UserProvider {
   @@unique([provider, providerId])
   @@index([userId], map: "idx_providers_user")
   @@map("user_providers")
+}
+
+model UserBlock {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  blockerId String   @map("blocker_id") @db.Uuid
+  blockedId String   @map("blocked_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  blocker User @relation("BlockerRelation", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlockedRelation", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId], map: "idx_blocks_blocker")
+  @@index([blockedId], map: "idx_blocks_blocked")
+  @@map("user_blocks")
 }
