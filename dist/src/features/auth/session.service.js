@@ -47,7 +47,7 @@ class SessionService {
     static async incrementFailedLogin(userId) {
         const key = Keys.loginFailed(userId);
         const count = await connection_1.redis.incr(key);
-        // Set TTL only on first failure (so the window starts from the first bad attempt)
+        // Set TTL only on the first failure (so the window starts from the first bad attempt)
         if (count === 1) {
             await connection_1.redis.expire(key, TTL.LOGIN_FAILED);
         }

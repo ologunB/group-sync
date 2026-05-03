@@ -35,6 +35,10 @@ exports.LogActions = {
     GROUP_INVITE_ACCEPT: 'group.invite_accept',
     GROUP_MEMBER_UPDATE: 'group.member_update',
     GROUP_MEMBER_REMOVE: 'group.member_remove',
+    GROUP_VIEW: 'group.view',
+    GROUP_APPLICATION_WITHDRAW: 'group.application_withdraw',
+    GROUP_INVITE_REVOKE: 'group.invite_revoke',
+    GROUP_FORM_UPSERT: 'group.form_upsert',
 };
 // ─── Resource type constants ──────────────────────────────────────────────────
 exports.ResourceTypes = {
@@ -49,6 +53,7 @@ exports.ResourceTypes = {
     INVITE_LINK: 'invite_link',
     NOTIFICATION: 'notification',
     REPORT: 'report',
+    GROUP_FORM: 'group_form',
 };
 // ─── AuditLogger ──────────────────────────────────────────────────────────────
 class AuditLogger {

@@ -68,7 +68,7 @@ class EmailService {
     static renderTemplate(templateName, data) {
         let html = EmailService.loadTemplate(templateName);
         // Interpolate {{data.nested.key}} — walks the data object
-        html = html.replace(/\{\{data\.([^}]+)\}\}/g, (_match, keyPath) => {
+        html = html.replace(/\{\{data\.([^}]+)}}/g, (_match, keyPath) => {
             const value = keyPath
                 .trim()
                 .split('.')
@@ -81,7 +81,7 @@ class EmailService {
             return value != null ? String(value) : '';
         });
         // Interpolate top-level {{key}}
-        html = html.replace(/\{\{([^}]+)\}\}/g, (_match, key) => {
+        html = html.replace(/\{\{([^}]+)}}/g, (_match, key) => {
             const value = data[key.trim()];
             return value != null ? String(value) : '';
         });

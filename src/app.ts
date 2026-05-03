@@ -15,6 +15,8 @@ import { asLogger } from './shared/utils/asLogger';
 // Feature routers
 import authRoutes from './features/auth/auth.routes';
 import userRoutes from "./features/users/user.routes";
+import groupRoutes from "./features/group/group.routes";
+import membershipRoutes from "./features/membership/membership.routes";
 
 export class App {
     public readonly app: Application;
@@ -62,7 +64,8 @@ export class App {
         // Feature routes
         this.app.use(`${apiPrefix}/auth`, authRoutes);
         this.app.use(`${apiPrefix}/users`, userRoutes);
-        // this.app.use(`${apiPrefix}/groups`, groupRoutes);
+        this.app.use(`${apiPrefix}/groups`, groupRoutes);
+        this.app.use(`${apiPrefix}/memberships`, membershipRoutes);
         // this.app.use(`${apiPrefix}/notifications`, notificationRoutes);
         // this.app.use(`${apiPrefix}/admin`, adminRoutes);
     }

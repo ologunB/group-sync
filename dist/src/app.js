@@ -20,6 +20,8 @@ const asLogger_1 = require("./shared/utils/asLogger");
 // Feature routers
 const auth_routes_1 = __importDefault(require("./features/auth/auth.routes"));
 const user_routes_1 = __importDefault(require("./features/users/user.routes"));
+const group_routes_1 = __importDefault(require("./features/group/group.routes"));
+const membership_routes_1 = __importDefault(require("./features/membership/membership.routes"));
 class App {
     app;
     httpServer;
@@ -56,7 +58,8 @@ class App {
         // Feature routes
         this.app.use(`${apiPrefix}/auth`, auth_routes_1.default);
         this.app.use(`${apiPrefix}/users`, user_routes_1.default);
-        // this.app.use(`${apiPrefix}/groups`, groupRoutes);
+        this.app.use(`${apiPrefix}/groups`, group_routes_1.default);
+        this.app.use(`${apiPrefix}/memberships`, membership_routes_1.default);
         // this.app.use(`${apiPrefix}/notifications`, notificationRoutes);
         // this.app.use(`${apiPrefix}/admin`, adminRoutes);
     }
