@@ -1,6 +1,7 @@
 import { prisma } from '../../database/connection';
 import { asLogger } from './asLogger';
 import { TokenPayload } from '../types/common.types';
+import {Prisma} from "@prisma/client";
 
 // ─── Action constants ─────────────────────────────────────────────────────────
 
@@ -89,7 +90,7 @@ export class AuditLogger {
                     entityType,
                     entityId: entityId ?? undefined,
                     status,
-                    metadata,
+                    metadata: metadata as Prisma.InputJsonValue,
                     ipAddress: ipAddress ?? null,
                 },
             });
