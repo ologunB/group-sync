@@ -1,0 +1,52 @@
+model User {
+  id                   String                                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                String                                @unique @db.VarChar(255)
+  phone                String?
+  phoneIv              String?                               @map("phone_iv")
+  passwordHash         String?                               @map("password_hash")
+  displayName          String                                @map("display_name") @db.VarChar(100)
+  username             String?                               @unique @db.VarChar(50)
+  profilePhotoUrl      String?                               @map("profile_photo_url")
+  bio                  String?
+  city                 String?                               @db.VarChar(100)
+  state                String?                               @db.VarChar(100)
+  country              String?                               @default("NG") @db.VarChar(100)
+  location             Unsupported("geometry(Point, 4326)")?
+  interests            String[]                              @default([]) @db.Text
+  emailVerifiedAt      DateTime?                             @map("email_verified_at") @db.Timestamptz
+  idVerificationStatus String                                @default("unsubmitted") @map("id_verification_status") @db.VarChar(20)
+  idDocumentUrl        String?                               @map("id_document_url")
+  idDocumentIv         String?                               @map("id_document_iv")
+  idVerifiedAt         DateTime?                             @map("id_verified_at") @db.Timestamptz
+  status               String                                @default("active") @db.VarChar(20)
+  lastLoginAt          DateTime?                             @map("last_login_at") @db.Timestamptz
+  preferredLanguage    String?                               @default("en") @map("preferred_language") @db.VarChar(10)
+  createdAt            DateTime                              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime                              @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt            DateTime?                             @map("deleted_at") @db.Timestamptz
+
+  refreshTokens RefreshToken[]
+  sessions      Session[]
+  auditLogs     AuditLog[]
+  providers     UserProvider[]
+
+  @@index([status], map: "idx_users_status")
+  @@index([idVerificationStatus], map: "idx_users_verification")
+  @@index([email], map: "idx_users_email")
+  @@map("users")
+}
+
+model UserProvider {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  provider   String   @db.VarChar(30)
+  providerId String   @map("provider_id")
+  email      String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@index([userId], map: "idx_providers_user")
+  @@map("user_providers")
+}
