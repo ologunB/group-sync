@@ -201,8 +201,8 @@ export class MembershipService {
                 }
             }
 
-            // Delete rejected application if exists (allow re-application)
-            if (existingApp?.status === 'rejected') {
+            // Delete rejected or withdrawn application if exists (allow re-application)
+            if (existingApp?.status === 'rejected' || existingApp?.status === 'withdrawn') {
                 await prisma.application.delete({ where: { id: existingApp.id } });
             }
 
