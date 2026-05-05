@@ -781,23 +781,23 @@ async function runFeaturesSuite(): Promise<void> {
 
     section('3. Memberships — Join / Leave');
 
-    await test('POST /memberships/groups/:id/join without auth returns 401', async () => {
-        const { status } = await post(`/memberships/groups/${openGroupId}/join`, {});
+    await test('POST /groups/:id/join without auth returns 401', async () => {
+        const { status } = await post(`/groups/${openGroupId}/join`, {});
         assertStatus(status, 401);
     });
 
-    await test('POST /memberships/groups/:id/join open group (201)', async () => {
-        const { status } = await post(`/memberships/groups/${openGroupId}/join`, {}, memberToken);
+    await test('POST /groups/:id/join open group (201)', async () => {
+        const { status } = await post(`/groups/${openGroupId}/join`, {}, memberToken);
         assertStatus(status, 201);
     });
 
-    await test('POST /memberships/groups/:id/join again returns 409 (already member)', async () => {
-        const { status } = await post(`/memberships/groups/${openGroupId}/join`, {}, memberToken);
+    await test('POST /groups/:id/join again returns 409 (already member)', async () => {
+        const { status } = await post(`/groups/${openGroupId}/join`, {}, memberToken);
         assertStatus(status, 409);
     });
 
-    await test('POST /memberships/groups/:id/join application group returns 403 (wrong type)', async () => {
-        const { status } = await post(`/memberships/groups/${appGroupId}/join`, {}, memberToken);
+    await test('POST /groups/:id/join application group returns 403 (wrong type)', async () => {
+        const { status } = await post(`/groups/${appGroupId}/join`, {}, memberToken);
         assertStatus(status, 403);
     });
 
@@ -819,18 +819,18 @@ async function runFeaturesSuite(): Promise<void> {
         assert(found, 'joined group should appear in /me/groups');
     });
 
-    await test('DELETE /memberships/groups/:id/leave leaves group (200)', async () => {
-        const { status } = await del(`/memberships/groups/${openGroupId}/leave`, memberToken);
+    await test('DELETE /groups/:id/leave leaves group (200)', async () => {
+        const { status } = await del(`/groups/${openGroupId}/leave`, memberToken);
         assertStatus(status, 200);
     });
 
-    await test('DELETE /memberships/groups/:id/leave when not a member returns 403', async () => {
-        const { status } = await del(`/memberships/groups/${openGroupId}/leave`, memberToken);
+    await test('DELETE /groups/:id/leave when not a member returns 403', async () => {
+        const { status } = await del(`/groups/${openGroupId}/leave`, memberToken);
         assertStatus(status, 403);
     });
 
-    await test('DELETE /memberships/groups/:id/leave without auth returns 401', async () => {
-        const { status } = await del(`/memberships/groups/${openGroupId}/leave`);
+    await test('DELETE /groups/:id/leave without auth returns 401', async () => {
+        const { status } = await del(`/groups/${openGroupId}/leave`);
         assertStatus(status, 401);
     });
 
@@ -838,38 +838,38 @@ async function runFeaturesSuite(): Promise<void> {
 
     section('4. Memberships — Applications');
 
-    await test('POST /memberships/groups/:id/apply to application group (201)', async () => {
-        const { status, data } = await post(`/memberships/groups/${appGroupId}/apply`, {}, memberToken);
+    await test('POST /groups/:id/apply to application group (201)', async () => {
+        const { status, data } = await post(`/groups/${appGroupId}/apply`, {}, memberToken);
         assertStatus(status, 201);
         const app = data.data as Record<string, unknown>;
         applicationId = app.applicationId as string;
         assert(applicationId?.length > 0, `applicationId empty: ${JSON.stringify(app)}`);
     });
 
-    await test('POST /memberships/groups/:id/apply again returns 409 (pending exists)', async () => {
-        const { status } = await post(`/memberships/groups/${appGroupId}/apply`, {}, memberToken);
+    await test('POST /groups/:id/apply again returns 409 (pending exists)', async () => {
+        const { status } = await post(`/groups/${appGroupId}/apply`, {}, memberToken);
         assertStatus(status, 409);
     });
 
-    await test('POST /memberships/groups/:id/apply to open group returns 403 (wrong type)', async () => {
-        const { status } = await post(`/memberships/groups/${openGroupId}/apply`, {}, outsiderToken);
+    await test('POST /groups/:id/apply to open group returns 403 (wrong type)', async () => {
+        const { status } = await post(`/groups/${openGroupId}/apply`, {}, outsiderToken);
         assertStatus(status, 403);
     });
 
-    await test('GET /memberships/groups/:id/applications as admin returns list (200)', async () => {
-        const { status, data } = await get(`/memberships/groups/${appGroupId}/applications`, creatorToken);
+    await test('GET /groups/:id/applications as admin returns list (200)', async () => {
+        const { status, data } = await get(`/groups/${appGroupId}/applications`, creatorToken);
         assertStatus(status, 200);
         const apps = extractList(data.data);
         assert(apps.length >= 1, `expected at least 1 application, got ${apps.length}`);
     });
 
-    await test('GET /memberships/groups/:id/applications as non-admin returns 403', async () => {
-        const { status } = await get(`/memberships/groups/${appGroupId}/applications`, memberToken);
+    await test('GET /groups/:id/applications as non-admin returns 403', async () => {
+        const { status } = await get(`/groups/${appGroupId}/applications`, memberToken);
         assertStatus(status, 403);
     });
 
-    await test('GET /memberships/groups/:id/applications without auth returns 401', async () => {
-        const { status } = await get(`/memberships/groups/${appGroupId}/applications`);
+    await test('GET /groups/:id/applications without auth returns 401', async () => {
+        const { status } = await get(`/groups/${appGroupId}/applications`);
         assertStatus(status, 401);
     });
 
@@ -883,27 +883,27 @@ async function runFeaturesSuite(): Promise<void> {
         assertStatus(status, 200);
     });
 
-    await test('PATCH /memberships/applications/:id rejects application (200)', async () => {
+    await test('PATCH /groups/applications/:id rejects application (200)', async () => {
         const { status } = await patch(
-            `/memberships/applications/${applicationId}`,
+            `/groups/applications/${applicationId}`,
             { action: 'reject', rejection_reason: 'Not a good fit for now.' },
             creatorToken,
         );
         assertStatus(status, 200);
     });
 
-    await test('PATCH /memberships/applications/:id as non-admin returns 403', async () => {
+    await test('PATCH /groups/applications/:id as non-admin returns 403', async () => {
         const { status } = await patch(
-            `/memberships/applications/${applicationId}`,
+            `/groups/applications/${applicationId}`,
             { action: 'approve' },
             outsiderToken,
         );
         assertStatus(status, 403);
     });
 
-    await test('PATCH /memberships/applications/:id invalid action returns 422', async () => {
+    await test('PATCH /groups/applications/:id invalid action returns 422', async () => {
         const { status } = await patch(
-            `/memberships/applications/${applicationId}`,
+            `/groups/applications/${applicationId}`,
             { action: 'vanish' },
             creatorToken,
         );
@@ -911,35 +911,35 @@ async function runFeaturesSuite(): Promise<void> {
     });
 
     await test('POST apply after rejection allows re-application (201)', async () => {
-        const { status, data } = await post(`/memberships/groups/${appGroupId}/apply`, {}, memberToken);
+        const { status, data } = await post(`/groups/${appGroupId}/apply`, {}, memberToken);
         assertStatus(status, 201);
         applicationId = (data.data as any).applicationId as string;
         assert(applicationId?.length > 0, 'new applicationId should be set');
     });
 
-    await test('DELETE /memberships/applications/:id withdraws own pending application (200)', async () => {
-        const { status } = await del(`/memberships/applications/${applicationId}`, memberToken);
+    await test('DELETE /groups/applications/:id withdraws own pending application (200)', async () => {
+        const { status } = await del(`/groups/applications/${applicationId}`, memberToken);
         assertStatus(status, 200);
     });
 
-    await test('DELETE /memberships/applications/:id again returns 409 (already withdrawn)', async () => {
-        const { status } = await del(`/memberships/applications/${applicationId}`, memberToken);
+    await test('DELETE /groups/applications/:id again returns 409 (already withdrawn)', async () => {
+        const { status } = await del(`/groups/applications/${applicationId}`, memberToken);
         assertStatus(status, 409);
     });
 
-    await test('DELETE /memberships/applications/:id by non-owner returns 403', async () => {
-        const { status } = await del(`/memberships/applications/${applicationId}`, outsiderToken);
+    await test('DELETE /groups/applications/:id by non-owner returns 403', async () => {
+        const { status } = await del(`/groups/applications/${applicationId}`, outsiderToken);
         assertStatus(status, 403);
     });
 
     await test('POST apply + PATCH approve → member becomes active (201 + 200)', async () => {
-        const { status: s1, data: d1 } = await post(`/memberships/groups/${appGroupId}/apply`, {}, memberToken);
+        const { status: s1, data: d1 } = await post(`/groups/${appGroupId}/apply`, {}, memberToken);
         assertStatus(s1, 201);
         const freshAppId = (d1.data as any).applicationId as string;
         assert(freshAppId?.length > 0, 'freshAppId should be set');
 
         const { status: s2 } = await patch(
-            `/memberships/applications/${freshAppId}`,
+            `/groups/applications/${freshAppId}`,
             { action: 'approve' },
             creatorToken,
         );
@@ -956,30 +956,30 @@ async function runFeaturesSuite(): Promise<void> {
 
     section('5. Memberships — Group Form');
 
-    await test('GET /memberships/groups/:id/form with no form returns 200', async () => {
-        const { status } = await get(`/memberships/groups/${appGroupId}/form`);
+    await test('GET /groups/:id/form with no form returns 200', async () => {
+        const { status } = await get(`/groups/${appGroupId}/form`);
         assertStatus(status, 200);
     });
 
-    await test('PUT /memberships/groups/:id/form without auth returns 401', async () => {
-        const { status } = await put(`/memberships/groups/${appGroupId}/form`, {
+    await test('PUT /groups/:id/form without auth returns 401', async () => {
+        const { status } = await put(`/groups/${appGroupId}/form`, {
             fields: [{ id: 'q1', type: 'text', label: 'Why join?', required: true }],
         });
         assertStatus(status, 401);
     });
 
-    await test('PUT /memberships/groups/:id/form as non-admin returns 403', async () => {
+    await test('PUT /groups/:id/form as non-admin returns 403', async () => {
         const { status } = await put(
-            `/memberships/groups/${appGroupId}/form`,
+            `/groups/${appGroupId}/form`,
             { fields: [{ id: 'q1', type: 'text', label: 'Why?', required: true }] },
             outsiderToken,
         );
         assertStatus(status, 403);
     });
 
-    await test('PUT /memberships/groups/:id/form creates form with 2 fields (200)', async () => {
+    await test('PUT /groups/:id/form creates form with 2 fields (200)', async () => {
         const { status, data } = await put(
-            `/memberships/groups/${appGroupId}/form`,
+            `/groups/${appGroupId}/form`,
             {
                 fields: [
                     { id: 'q1', type: 'text',   label: 'Why do you want to join?',   required: true  },
@@ -995,8 +995,8 @@ async function runFeaturesSuite(): Promise<void> {
         assert(fields.length === 2, `expected 2 fields, got ${fields.length}`);
     });
 
-    await test('GET /memberships/groups/:id/form returns saved form with fields (200)', async () => {
-        const { status, data } = await get(`/memberships/groups/${appGroupId}/form`);
+    await test('GET /groups/:id/form returns saved form with fields (200)', async () => {
+        const { status, data } = await get(`/groups/${appGroupId}/form`);
         assertStatus(status, 200);
         const form = data.data as Record<string, unknown> | null;
         if (form) {
@@ -1005,9 +1005,9 @@ async function runFeaturesSuite(): Promise<void> {
         }
     });
 
-    await test('PUT /memberships/groups/:id/form replaces form (1 field) (200)', async () => {
+    await test('PUT /groups/:id/form replaces form (1 field) (200)', async () => {
         const { status, data } = await put(
-            `/memberships/groups/${appGroupId}/form`,
+            `/groups/${appGroupId}/form`,
             { fields: [{ id: 'q1', type: 'textarea', label: 'Tell us about yourself', required: true }] },
             creatorToken,
         );
@@ -1016,18 +1016,18 @@ async function runFeaturesSuite(): Promise<void> {
         assert(fields.length === 1, `expected 1 field after replace, got ${fields.length}`);
     });
 
-    await test('PUT /memberships/groups/:id/form with invalid field type returns 422', async () => {
+    await test('PUT /groups/:id/form with invalid field type returns 422', async () => {
         const { status } = await put(
-            `/memberships/groups/${appGroupId}/form`,
+            `/groups/${appGroupId}/form`,
             { fields: [{ id: 'q1', type: 'invalid_type', label: 'Bad', required: true }] },
             creatorToken,
         );
         assert(status >= 400 && status < 500, `Expected 4xx, got ${status}`);
     });
 
-    await test('PUT /memberships/groups/:id/form with 21 fields returns 422', async () => {
+    await test('PUT /groups/:id/form with 21 fields returns 422', async () => {
         const tooMany = Array.from({ length: 21 }, (_, i) => ({ id: `q${i}`, type: 'text', label: `Field ${i}`, required: false }));
-        const { status } = await put(`/memberships/groups/${appGroupId}/form`, { fields: tooMany }, creatorToken);
+        const { status } = await put(`/groups/${appGroupId}/form`, { fields: tooMany }, creatorToken);
         assert(status >= 400 && status < 500, `Expected 4xx, got ${status}`);
     });
 
@@ -1036,63 +1036,63 @@ async function runFeaturesSuite(): Promise<void> {
     section('6. Memberships — Member Management');
 
     await test('member re-joins openGroup for role management tests (201)', async () => {
-        const { status } = await post(`/memberships/groups/${openGroupId}/join`, {}, memberToken);
+        const { status } = await post(`/groups/${openGroupId}/join`, {}, memberToken);
         assertStatus(status, 201);
     });
 
-    await test('PATCH /memberships/groups/:id/members/:userId promotes to moderator (200)', async () => {
+    await test('PATCH /groups/:id/members/:userId promotes to moderator (200)', async () => {
         const { status } = await patch(
-            `/memberships/groups/${openGroupId}/members/${memberId}`,
+            `/groups/${openGroupId}/members/${memberId}`,
             { role: 'moderator' },
             creatorToken,
         );
         assertStatus(status, 200);
     });
 
-    await test('PATCH /memberships/groups/:id/members/:userId without auth returns 401', async () => {
-        const { status } = await patch(`/memberships/groups/${openGroupId}/members/${memberId}`, { role: 'member' });
+    await test('PATCH /groups/:id/members/:userId without auth returns 401', async () => {
+        const { status } = await patch(`/groups/${openGroupId}/members/${memberId}`, { role: 'member' });
         assertStatus(status, 401);
     });
 
-    await test('PATCH /memberships/groups/:id/members/:userId as non-admin returns 403', async () => {
+    await test('PATCH /groups/:id/members/:userId as non-admin returns 403', async () => {
         const { status } = await patch(
-            `/memberships/groups/${openGroupId}/members/${memberId}`,
+            `/groups/${openGroupId}/members/${memberId}`,
             { role: 'member' },
             outsiderToken,
         );
         assertStatus(status, 403);
     });
 
-    await test('PATCH /memberships/groups/:id/members/:userId suspends member (200)', async () => {
+    await test('PATCH /groups/:id/members/:userId suspends member (200)', async () => {
         const { status } = await patch(
-            `/memberships/groups/${openGroupId}/members/${memberId}`,
+            `/groups/${openGroupId}/members/${memberId}`,
             { status: 'suspended' },
             creatorToken,
         );
         assertStatus(status, 200);
     });
 
-    await test('PATCH /memberships/groups/:id/members/:userId restores member to active (200)', async () => {
+    await test('PATCH /groups/:id/members/:userId restores member to active (200)', async () => {
         const { status } = await patch(
-            `/memberships/groups/${openGroupId}/members/${memberId}`,
+            `/groups/${openGroupId}/members/${memberId}`,
             { status: 'active' },
             creatorToken,
         );
         assertStatus(status, 200);
     });
 
-    await test('DELETE /memberships/groups/:id/members/:userId removes member (200)', async () => {
-        const { status } = await del(`/memberships/groups/${openGroupId}/members/${memberId}`, creatorToken);
+    await test('DELETE /groups/:id/members/:userId removes member (200)', async () => {
+        const { status } = await del(`/groups/${openGroupId}/members/${memberId}`, creatorToken);
         assertStatus(status, 200);
     });
 
-    await test('DELETE /memberships/groups/:id/members/:userId twice returns 404 (not found)', async () => {
-        const { status } = await del(`/memberships/groups/${openGroupId}/members/${memberId}`, creatorToken);
+    await test('DELETE /groups/:id/members/:userId twice returns 404 (not found)', async () => {
+        const { status } = await del(`/groups/${openGroupId}/members/${memberId}`, creatorToken);
         assertStatus(status, 404);
     });
 
-    await test('DELETE /memberships/groups/:id/members/:userId without auth returns 401', async () => {
-        const { status } = await del(`/memberships/groups/${openGroupId}/members/${outsiderId}`);
+    await test('DELETE /groups/:id/members/:userId without auth returns 401', async () => {
+        const { status } = await del(`/groups/${openGroupId}/members/${outsiderId}`);
         assertStatus(status, 401);
     });
 
@@ -1100,19 +1100,19 @@ async function runFeaturesSuite(): Promise<void> {
 
     section('7. Memberships — Invite Links');
 
-    await test('POST /memberships/groups/:id/invite without auth returns 401', async () => {
-        const { status } = await post(`/memberships/groups/${openGroupId}/invite`, {});
+    await test('POST /groups/:id/invite without auth returns 401', async () => {
+        const { status } = await post(`/groups/${openGroupId}/invite`, {});
         assertStatus(status, 401);
     });
 
-    await test('POST /memberships/groups/:id/invite as non-admin returns 403', async () => {
-        const { status } = await post(`/memberships/groups/${openGroupId}/invite`, {}, outsiderToken);
+    await test('POST /groups/:id/invite as non-admin returns 403', async () => {
+        const { status } = await post(`/groups/${openGroupId}/invite`, {}, outsiderToken);
         assertStatus(status, 403);
     });
 
-    await test('POST /memberships/groups/:id/invite generates link (201)', async () => {
+    await test('POST /groups/:id/invite generates link (201)', async () => {
         const { status, data } = await post(
-            `/memberships/groups/${openGroupId}/invite`,
+            `/groups/${openGroupId}/invite`,
             { max_uses: 10, expires_in_hours: 48 },
             creatorToken,
         );
@@ -1126,59 +1126,59 @@ async function runFeaturesSuite(): Promise<void> {
         assert(inviteId.length    > 0, 'inviteId empty');
     });
 
-    await test('POST /memberships/groups/:id/invite with expires_in_hours > 8760 returns 422', async () => {
+    await test('POST /groups/:id/invite with expires_in_hours > 8760 returns 422', async () => {
         const { status } = await post(
-            `/memberships/groups/${openGroupId}/invite`,
+            `/groups/${openGroupId}/invite`,
             { expires_in_hours: 99999 },
             creatorToken,
         );
         assert(status >= 400 && status < 500, `Expected 4xx, got ${status}`);
     });
 
-    await test('GET /memberships/groups/:id/invites lists active links (200)', async () => {
-        const { status, data } = await get(`/memberships/groups/${openGroupId}/invites`, creatorToken);
+    await test('GET /groups/:id/invites lists active links (200)', async () => {
+        const { status, data } = await get(`/groups/${openGroupId}/invites`, creatorToken);
         assertStatus(status, 200);
         const links = extractList(data.data);
         assert(links.length >= 1, `expected at least 1 invite, got ${links.length}`);
     });
 
-    await test('GET /memberships/groups/:id/invites without auth returns 401', async () => {
-        const { status } = await get(`/memberships/groups/${openGroupId}/invites`);
+    await test('GET /groups/:id/invites without auth returns 401', async () => {
+        const { status } = await get(`/groups/${openGroupId}/invites`);
         assertStatus(status, 401);
     });
 
-    await test('POST /memberships/invites/:token/accept joins group (201)', async () => {
-        const { status } = await post(`/memberships/invites/${inviteToken}/accept`, {}, memberToken);
+    await test('POST /groups/invites/:token/accept joins group (201)', async () => {
+        const { status } = await post(`/groups/invites/${inviteToken}/accept`, {}, memberToken);
         assertStatus(status, 201);
     });
 
-    await test('POST /memberships/invites/:token/accept again returns 409 (already member)', async () => {
-        const { status } = await post(`/memberships/invites/${inviteToken}/accept`, {}, memberToken);
+    await test('POST /groups/invites/:token/accept again returns 409 (already member)', async () => {
+        const { status } = await post(`/groups/invites/${inviteToken}/accept`, {}, memberToken);
         assertStatus(status, 409);
     });
 
-    await test('POST /memberships/invites/invalid-token/accept returns 404', async () => {
-        const { status } = await post('/memberships/invites/definitely-not-a-real-token-xyz/accept', {}, outsiderToken);
+    await test('POST /groups/invites/invalid-token/accept returns 404', async () => {
+        const { status } = await post('/groups/invites/definitely-not-a-real-token-xyz/accept', {}, outsiderToken);
         assertStatus(status, 404);
     });
 
-    await test('POST /memberships/invites/:token/accept without auth returns 401', async () => {
-        const { status } = await post(`/memberships/invites/${inviteToken}/accept`, {});
+    await test('POST /groups/invites/:token/accept without auth returns 401', async () => {
+        const { status } = await post(`/groups/invites/${inviteToken}/accept`, {});
         assertStatus(status, 401);
     });
 
-    await test('DELETE /memberships/invites/:id revokes invite (200)', async () => {
-        const { status } = await del(`/memberships/invites/${inviteId}`, creatorToken);
+    await test('DELETE /groups/invites/:id revokes invite (200)', async () => {
+        const { status } = await del(`/groups/invites/${inviteId}`, creatorToken);
         assertStatus(status, 200);
     });
 
-    await test('DELETE /memberships/invites/:id again returns 409 (already revoked)', async () => {
-        const { status } = await del(`/memberships/invites/${inviteId}`, creatorToken);
+    await test('DELETE /groups/invites/:id again returns 409 (already revoked)', async () => {
+        const { status } = await del(`/groups/invites/${inviteId}`, creatorToken);
         assertStatus(status, 409);
     });
 
-    await test('POST /memberships/invites/:token/accept after revoke returns 410 (Gone)', async () => {
-        const { status } = await post(`/memberships/invites/${inviteToken}/accept`, {}, outsiderToken);
+    await test('POST /groups/invites/:token/accept after revoke returns 410 (Gone)', async () => {
+        const { status } = await post(`/groups/invites/${inviteToken}/accept`, {}, outsiderToken);
         assertStatus(status, 410);
     });
 

@@ -27,7 +27,7 @@ const controller = new MembershipController();
 
 // Join open group — verified users only
 router.post(
-    '/groups/:id/join',
+    '/:id/join',
     authenticateVerified,
     validateRequest(groupIdParamValidator),
     controller.joinGroup,
@@ -35,7 +35,7 @@ router.post(
 
 // Apply to application-based group — verified users only
 router.post(
-    '/groups/:id/apply',
+    '/:id/apply',
     authenticateVerified,
     validateRequest(groupIdParamValidator),
     validateRequest(applyToGroupValidator),
@@ -44,7 +44,7 @@ router.post(
 
 // Leave a group — any authenticated member
 router.delete(
-    '/groups/:id/leave',
+    '/:id/leave',
     authenticate,
     validateRequest(groupIdParamValidator),
     controller.leaveGroup,
@@ -54,7 +54,7 @@ router.delete(
 
 // List applications — admin only
 router.get(
-    '/groups/:id/applications',
+    '/:id/applications',
     authenticate,
     validateRequest(listApplicationsValidator),
     authorizeGroupRole('super_admin', 'admin'),
@@ -83,14 +83,14 @@ router.delete(
 
 // Get form schema — public (needed to render form before applying)
 router.get(
-    '/groups/:id/form',
+    '/:id/form',
     validateRequest(groupIdParamValidator),
     controller.getGroupForm,
 );
 
 // Create or replace form — admin only
 router.put(
-    '/groups/:id/form',
+    '/:id/form',
     authenticate,
     validateRequest(groupIdParamValidator),
     authorizeGroupRole('super_admin', 'admin'),
@@ -102,7 +102,7 @@ router.put(
 
 // Update member role / status — admin or super_admin
 router.patch(
-    '/groups/:id/members/:userId',
+    '/:id/members/:userId',
     authenticate,
     validateRequest([...groupIdParamValidator, ...userIdParamValidator]),
     authorizeGroupRole('super_admin', 'admin'),
@@ -112,7 +112,7 @@ router.patch(
 
 // Remove a member — admin or super_admin
 router.delete(
-    '/groups/:id/members/:userId',
+    '/:id/members/:userId',
     authenticate,
     validateRequest([...groupIdParamValidator, ...userIdParamValidator]),
     authorizeGroupRole('super_admin', 'admin'),
@@ -123,7 +123,7 @@ router.delete(
 
 // Generate an invite link — admin only
 router.post(
-    '/groups/:id/invite',
+    '/:id/invite',
     authenticate,
     validateRequest(groupIdParamValidator),
     authorizeGroupRole('super_admin', 'admin'),
@@ -133,7 +133,7 @@ router.post(
 
 // List active invite links — admin only
 router.get(
-    '/groups/:id/invites',
+    '/:id/invites',
     authenticate,
     validateRequest(groupIdParamValidator),
     authorizeGroupRole('super_admin', 'admin'),
