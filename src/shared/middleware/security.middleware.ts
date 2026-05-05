@@ -47,6 +47,7 @@ const apiLimiter = rateLimit({
         data: null,
         error: null,
     },
+    skip: () => !config.server.isProduction,
 });
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────

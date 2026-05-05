@@ -14,7 +14,8 @@
     "db:studio":    "prisma studio --schema=prisma/schemas",
     "db:pull":      "prisma db pull --schema=prisma/schemas",
     "db:seed":      "tsx src/database/seeders/initial.seeder.ts",
-    "start-fresh":  "npm install && npm run db:push && npm run db:generate && npm run build"
+    "start-fresh":  "npm install && npm run db:push && npm run db:generate && npm run build",
+    "test":         "npx tsx src/__tests__/index.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.1.0",

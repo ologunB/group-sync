@@ -1,8 +1,11 @@
 /**
- * Features integration tests — users, groups, memberships.
- * Runs against a live server on localhost:3000.
+ * Full integration test suite — Auth · Users · Groups · Memberships
  *
- * Usage: tsx src/__tests__/features.integration.ts
+ * Requires a running server on localhost:3000.
+ *
+ * Usage:
+ *   1. Start the server:  npm run dev   (or: npx tsx src/server.ts)
+ *   2. Run tests:         npx tsx src/__tests__/index.ts
  */
 
 import { redis, prisma } from '../database/connection';
@@ -10,34 +13,7 @@ import { redis, prisma } from '../database/connection';
 const BASE = 'http://localhost:3000/api/v1';
 const ts = Date.now();
 
-// ─── Test actors ──────────────────────────────────────────────────────────────
-
-const CREATOR_EMAIL = `creator${ts}@test.io`;
-const CREATOR_PASS = 'Creator123!';
-
-const MEMBER_EMAIL = `member${ts}@test.io`;
-const MEMBER_PASS = 'Member123!';
-
-const OUTSIDER_EMAIL = `outsider${ts}@test.io`;
-const OUTSIDER_PASS = 'Outsider123!';
-
-// Mutable shared state
-let creatorToken = '';
-let memberToken = '';
-let outsiderToken = '';
-let creatorId = '';
-let memberId = '';
-let outsiderId = '';
-
-let openGroupId = '';
-let openGroupSlug = '';
-let appGroupId = '';
-let appGroupSlug = '';
-let applicationId = '';
-let inviteToken = '';
-let inviteId = '';
-
-// ─── Assertion helpers ────────────────────────────────────────────────────────
+// ─── Shared assertion helpers ─────────────────────────────────────────────────
 
 function assert(condition: boolean, message: string): void {
     if (!condition) throw new Error(message);
@@ -54,7 +30,7 @@ function assertHas(obj: Record<string, unknown>, key: string): void {
     assert(key in obj, `Expected response to have key "${key}"`);
 }
 
-// ─── HTTP helpers ─────────────────────────────────────────────────────────────
+// ─── Shared HTTP helpers ──────────────────────────────────────────────────────
 
 type ApiResponse = { status: number; data: Record<string, unknown> };
 
@@ -75,18 +51,13 @@ async function request(
     return { status: res.status, data };
 }
 
-const get = (path: string, token?: string) =>
-    request('GET', path, undefined, token);
-const post = (path: string, body: object, token?: string) =>
-    request('POST', path, body, token);
-const patch = (path: string, body: object, token?: string) =>
-    request('PATCH', path, body, token);
-const put = (path: string, body: object, token?: string) =>
-    request('PUT', path, body, token);
-const del = (path: string, token?: string, body?: object) =>
-    request('DELETE', path, body, token);
+const get  = (path: string, token?: string)                  => request('GET',    path, undefined, token);
+const post = (path: string, body: object,  token?: string)   => request('POST',   path, body,      token);
+const patch= (path: string, body: object,  token?: string)   => request('PATCH',  path, body,      token);
+const put  = (path: string, body: object,  token?: string)   => request('PUT',    path, body,      token);
+const del  = (path: string, token?: string, body?: object)   => request('DELETE', path, body,      token);
 
-// ─── Test runner ──────────────────────────────────────────────────────────────
+// ─── Shared test runner ───────────────────────────────────────────────────────
 
 type Result = { name: string; passed: boolean; error?: string };
 const results: Result[] = [];
@@ -109,7 +80,16 @@ async function test(name: string, fn: () => Promise<void>): Promise<void> {
     }
 }
 
-// ─── Setup helpers ─────────────────────────────────────────────────────────────
+// ─── Redis OTP helper (auth suite) ───────────────────────────────────────────
+
+async function getOtp(prefix: 'verify:email' | 'verify:forgot', email: string): Promise<string> {
+    const key = `${prefix}:${email}`;
+    const otp = await redis.get(key);
+    assert(otp !== null, `OTP not found in Redis at key "${key}"`);
+    return otp!;
+}
+
+// ─── Setup helpers (features suite) ──────────────────────────────────────────
 
 async function registerAndLogin(
     email: string,
@@ -121,19 +101,18 @@ async function registerAndLogin(
         throw new Error(`Registration failed for ${email}: ${JSON.stringify(reg.data)}`);
     }
     const payload = reg.data.data as Record<string, unknown>;
-    const tokens = payload.tokens as Record<string, unknown>;
-    const user = payload.user as Record<string, unknown>;
+    const tokens  = payload.tokens as Record<string, unknown>;
+    const user    = payload.user   as Record<string, unknown>;
     return { token: tokens.accessToken as string, userId: user.id as string };
 }
 
 async function setVerified(userId: string): Promise<void> {
     await prisma.user.update({
         where: { id: userId },
-        data: { idVerificationStatus: 'verified' },
+        data:  { idVerificationStatus: 'verified' },
     });
 }
 
-// Safely extract a paginated list from various response shapes
 function extractList(data: unknown): unknown[] {
     if (!data || typeof data !== 'object') return [];
     const d = data as Record<string, unknown>;
@@ -144,27 +123,318 @@ function extractList(data: unknown): unknown[] {
     return [];
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+//  AUTH SUITE
+// ═══════════════════════════════════════════════════════════════════════════════
 
-async function run(): Promise<void> {
+async function runAuthSuite(): Promise<void> {
+    console.log('\n══════════════════════════════════════════════════');
+    console.log('  Suite 1 — Auth Flow');
+    console.log('══════════════════════════════════════════════════');
+
+    const EMAIL    = `tester${ts}@test.io`;
+    const PASSWORD = 'TestPass123';
+
+    let accessToken  = '';
+    let refreshToken = '';
+    let forgotOtp    = '';
+
+    // ── 1. Registration ───────────────────────────────────────────────────────
+
+    section('1. Registration');
+
+    await test('valid registration returns 201 with user + tokens', async () => {
+        const { status, data } = await post('/auth/register', {
+            email: EMAIL, password: PASSWORD, display_name: 'Auth Tester',
+        });
+        assertStatus(status, 201);
+        assert(data.success === true, 'success should be true');
+        const payload = data.data as Record<string, unknown>;
+        assertHas(payload, 'user');
+        assertHas(payload, 'tokens');
+        const tokens = payload.tokens as Record<string, unknown>;
+        assertHas(tokens, 'accessToken');
+        assertHas(tokens, 'refreshToken');
+        accessToken  = tokens.accessToken  as string;
+        refreshToken = tokens.refreshToken as string;
+    });
+
+    await test('duplicate email returns 409', async () => {
+        const { status } = await post('/auth/register', {
+            email: EMAIL, password: PASSWORD, display_name: 'Auth Tester',
+        });
+        assertStatus(status, 409);
+    });
+
+    await test('missing required fields returns 422', async () => {
+        const { status } = await post('/auth/register', { email: 'not-an-email' });
+        assert(status >= 400 && status < 500, `Expected 4xx, got ${status}`);
+    });
+
+    await test('weak password (no uppercase) returns 422', async () => {
+        const { status } = await post('/auth/register', {
+            email: `weak${ts}@test.io`, password: 'alllowercase1', display_name: 'Weak Pass',
+        });
+        assert(status >= 400 && status < 500, `Expected 4xx, got ${status}`);
+    });
+
+    // ── 2. Login ──────────────────────────────────────────────────────────────
+
+    section('2. Login');
+
+    await test('valid credentials return 200 with tokens', async () => {
+        const { status, data } = await post('/auth/login', { email: EMAIL, password: PASSWORD });
+        assertStatus(status, 200);
+        const tokens = (data.data as Record<string, unknown>).tokens as Record<string, unknown>;
+        accessToken  = tokens.accessToken  as string;
+        refreshToken = tokens.refreshToken as string;
+    });
+
+    await test('wrong password returns 401', async () => {
+        const { status } = await post('/auth/login', { email: EMAIL, password: 'WrongPass999' });
+        assertStatus(status, 401);
+    });
+
+    await test('non-existent email returns 401 (no enumeration)', async () => {
+        const { status } = await post('/auth/login', { email: `ghost${ts}@test.io`, password: PASSWORD });
+        assertStatus(status, 401);
+    });
+
+    await test('missing password returns 422', async () => {
+        const { status } = await post('/auth/login', { email: EMAIL });
+        assert(status >= 400 && status < 500, `Expected 4xx, got ${status}`);
+    });
+
+    // ── 3. Email Verification ─────────────────────────────────────────────────
+
+    section('3. Email Verification');
+
+    await test('resend-verification always returns 200', async () => {
+        const { status } = await post('/auth/resend-verification', { email: EMAIL });
+        assertStatus(status, 200);
+    });
+
+    await test('invalid OTP returns 400', async () => {
+        const { status } = await post('/auth/verify-email', { email: EMAIL, otp: '000000' });
+        assertStatus(status, 400);
+    });
+
+    await test('valid OTP from Redis verifies email (200)', async () => {
+        const otp = await getOtp('verify:email', EMAIL);
+        const { status } = await post('/auth/verify-email', { email: EMAIL, otp });
+        assertStatus(status, 200);
+    });
+
+    await test('replaying the same OTP after consumption returns 400', async () => {
+        const { status } = await post('/auth/verify-email', { email: EMAIL, otp: '123456' });
+        assertStatus(status, 400);
+    });
+
+    // ── 4. Token Refresh ──────────────────────────────────────────────────────
+
+    section('4. Token Refresh');
+
+    await test('valid refresh token returns new token pair', async () => {
+        const { status, data } = await post('/auth/refresh', { refresh_token: refreshToken });
+        assertStatus(status, 200);
+        const tokens = (data.data as Record<string, unknown>).tokens as Record<string, unknown>;
+        accessToken  = tokens.accessToken  as string;
+        refreshToken = tokens.refreshToken as string;
+    });
+
+    await test('old refresh token after rotation returns 401 (rotation enforced)', async () => {
+        const { status } = await post('/auth/refresh', { refresh_token: 'definitely-fake-token' });
+        assertStatus(status, 401);
+    });
+
+    await test('missing refresh_token field returns 422', async () => {
+        const { status } = await post('/auth/refresh', {});
+        assert(status >= 400 && status < 500, `Expected 4xx, got ${status}`);
+    });
+
+    // ── 5. Forgot / Reset Password ────────────────────────────────────────────
+
+    section('5. Forgot / Reset Password');
+
+    await test('forgot-password always returns 200 (no email enumeration)', async () => {
+        const { status } = await post('/auth/forgot-password', { email: EMAIL });
+        assertStatus(status, 200);
+    });
+
+    await test('forgot-password for non-existent email also returns 200', async () => {
+        const { status } = await post('/auth/forgot-password', { email: `ghost${ts}@test.io` });
+        assertStatus(status, 200);
+    });
+
+    await test('verify-forgot-otp with wrong OTP returns 400', async () => {
+        const { status } = await post('/auth/verify-forgot-otp', { email: EMAIL, otp: '000000' });
+        assertStatus(status, 400);
+    });
+
+    await test('verify-forgot-otp with correct OTP returns 200', async () => {
+        forgotOtp = await getOtp('verify:forgot', EMAIL);
+        const { status } = await post('/auth/verify-forgot-otp', { email: EMAIL, otp: forgotOtp });
+        assertStatus(status, 200);
+    });
+
+    const NEW_PASSWORD = 'NewPass456!';
+
+    await test('reset-password with wrong OTP returns 400', async () => {
+        const { status } = await post('/auth/reset-password', {
+            email: EMAIL, otp: '000000', password: NEW_PASSWORD,
+        });
+        assertStatus(status, 400);
+    });
+
+    await test('reset-password with correct OTP returns 200', async () => {
+        const { status } = await post('/auth/reset-password', {
+            email: EMAIL, otp: forgotOtp, password: NEW_PASSWORD,
+        });
+        assertStatus(status, 200);
+    });
+
+    await test('login with old password after reset returns 401', async () => {
+        const { status } = await post('/auth/login', { email: EMAIL, password: PASSWORD });
+        assertStatus(status, 401);
+    });
+
+    await test('login with new password after reset returns 200', async () => {
+        const { status, data } = await post('/auth/login', { email: EMAIL, password: NEW_PASSWORD });
+        assertStatus(status, 200);
+        const tokens = (data.data as Record<string, unknown>).tokens as Record<string, unknown>;
+        accessToken  = tokens.accessToken  as string;
+        refreshToken = tokens.refreshToken as string;
+    });
+
+    // ── 6. Change Password ────────────────────────────────────────────────────
+
+    section('6. Change Password');
+
+    const CHANGED_PASSWORD = 'Changed789!';
+
+    await test('change-password without auth returns 401', async () => {
+        const { status } = await post('/auth/change-password', {
+            old_password: NEW_PASSWORD, new_password: CHANGED_PASSWORD,
+        });
+        assertStatus(status, 401);
+    });
+
+    await test('change-password with wrong old password returns 400', async () => {
+        const { status } = await post(
+            '/auth/change-password',
+            { old_password: 'WrongOld123', new_password: CHANGED_PASSWORD },
+            accessToken,
+        );
+        assertStatus(status, 400);
+    });
+
+    await test('change-password with correct credentials returns 200', async () => {
+        const { status } = await post(
+            '/auth/change-password',
+            { old_password: NEW_PASSWORD, new_password: CHANGED_PASSWORD },
+            accessToken,
+        );
+        assertStatus(status, 200);
+    });
+
+    await test('login with changed password returns 200', async () => {
+        const { status, data } = await post('/auth/login', {
+            email: EMAIL, password: CHANGED_PASSWORD,
+        });
+        assertStatus(status, 200);
+        const tokens = (data.data as Record<string, unknown>).tokens as Record<string, unknown>;
+        accessToken  = tokens.accessToken  as string;
+        refreshToken = tokens.refreshToken as string;
+    });
+
+    // ── 7. Logout ─────────────────────────────────────────────────────────────
+
+    section('7. Logout');
+
+    await test('logout without auth returns 401', async () => {
+        const { status } = await post('/auth/logout', { refresh_token: refreshToken });
+        assertStatus(status, 401);
+    });
+
+    await test('logout with valid auth returns 200', async () => {
+        const { status } = await post('/auth/logout', { refresh_token: refreshToken }, accessToken);
+        assertStatus(status, 200);
+    });
+
+    await test('refresh with revoked token after logout returns 401', async () => {
+        const { status } = await post('/auth/refresh', { refresh_token: refreshToken });
+        assertStatus(status, 401);
+    });
+
+    await test('logout is idempotent (second call still returns 200)', async () => {
+        const { status } = await post('/auth/logout', { refresh_token: refreshToken }, accessToken);
+        assertStatus(status, 200);
+    });
+
+    // ── 8. Account Lock ───────────────────────────────────────────────────────
+
+    section('8. Account Lock (brute force protection)');
+
+    const LOCK_EMAIL = `locktest${ts}@test.io`;
+
+    await test('register a second user for lock testing', async () => {
+        const { status } = await post('/auth/register', {
+            email: LOCK_EMAIL, password: PASSWORD, display_name: 'Lock Tester',
+        });
+        assertStatus(status, 201);
+    });
+
+    await test('5 consecutive bad passwords lock the account (429)', async () => {
+        for (let i = 0; i < 5; i++) {
+            await post('/auth/login', { email: LOCK_EMAIL, password: 'WrongPass999' });
+        }
+        const { status } = await post('/auth/login', { email: LOCK_EMAIL, password: PASSWORD });
+        assertStatus(status, 429);
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  FEATURES SUITE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function runFeaturesSuite(): Promise<void> {
     console.log('\n══════════════════════════════════════════════════════════════');
-    console.log('  Features Integration Tests — Users · Groups · Memberships');
+    console.log('  Suite 2 — Users · Groups · Memberships');
     console.log('══════════════════════════════════════════════════════════════');
+
+    const CREATOR_EMAIL  = `creator${ts}@test.io`;
+    const CREATOR_PASS   = 'Creator123!';
+    const MEMBER_EMAIL   = `member${ts}@test.io`;
+    const MEMBER_PASS    = 'Member123!';
+    const OUTSIDER_EMAIL = `outsider${ts}@test.io`;
+    const OUTSIDER_PASS  = 'Outsider123!';
+
+    let creatorToken  = '';
+    let memberToken   = '';
+    let outsiderToken = '';
+    let creatorId     = '';
+    let memberId      = '';
+    let outsiderId    = '';
+
+    let openGroupId   = '';
+    let openGroupSlug = '';
+    let appGroupId    = '';
+    let appGroupSlug  = '';
+    let applicationId = '';
+    let inviteToken   = '';
+    let inviteId      = '';
 
     // ── 0. Setup ──────────────────────────────────────────────────────────────
 
     section('0. Setup');
 
     await test('register creator, member, outsider', async () => {
-        const c = await registerAndLogin(CREATOR_EMAIL, CREATOR_PASS, 'Group Creator');
-        const m = await registerAndLogin(MEMBER_EMAIL, MEMBER_PASS, 'Test Member');
+        const c = await registerAndLogin(CREATOR_EMAIL,  CREATOR_PASS,  'Group Creator');
+        const m = await registerAndLogin(MEMBER_EMAIL,   MEMBER_PASS,   'Test Member');
         const o = await registerAndLogin(OUTSIDER_EMAIL, OUTSIDER_PASS, 'Outsider');
-        creatorToken = c.token;
-        creatorId = c.userId;
-        memberToken = m.token;
-        memberId = m.userId;
-        outsiderToken = o.token;
-        outsiderId = o.userId;
+        creatorToken  = c.token; creatorId  = c.userId;
+        memberToken   = m.token; memberId   = m.userId;
+        outsiderToken = o.token; outsiderId = o.userId;
     });
 
     await test('set id_verification_status = verified for all actors', async () => {
@@ -174,14 +444,14 @@ async function run(): Promise<void> {
     });
 
     await test('re-login all actors to get fresh tokens reflecting DB change', async () => {
-        const { data: cd } = await post('/auth/login', { email: CREATOR_EMAIL, password: CREATOR_PASS });
-        const { data: md } = await post('/auth/login', { email: MEMBER_EMAIL, password: MEMBER_PASS });
+        const { data: cd } = await post('/auth/login', { email: CREATOR_EMAIL,  password: CREATOR_PASS  });
+        const { data: md } = await post('/auth/login', { email: MEMBER_EMAIL,   password: MEMBER_PASS   });
         const { data: od } = await post('/auth/login', { email: OUTSIDER_EMAIL, password: OUTSIDER_PASS });
-        creatorToken = ((cd.data as any).tokens as any).accessToken;
-        memberToken = ((md.data as any).tokens as any).accessToken;
+        creatorToken  = ((cd.data as any).tokens as any).accessToken;
+        memberToken   = ((md.data as any).tokens as any).accessToken;
         outsiderToken = ((od.data as any).tokens as any).accessToken;
-        assert(creatorToken.length > 0, 'creatorToken empty');
-        assert(memberToken.length > 0, 'memberToken empty');
+        assert(creatorToken.length  > 0, 'creatorToken empty');
+        assert(memberToken.length   > 0, 'memberToken empty');
         assert(outsiderToken.length > 0, 'outsiderToken empty');
     });
 
@@ -230,8 +500,7 @@ async function run(): Promise<void> {
     });
 
     await test('PATCH /users/me with duplicate username returns 409', async () => {
-        const username = `creator_${ts}`;
-        const { status } = await patch('/users/me', { username }, memberToken);
+        const { status } = await patch('/users/me', { username: `creator_${ts}` }, memberToken);
         assertStatus(status, 409);
     });
 
@@ -242,8 +511,7 @@ async function run(): Promise<void> {
             creatorToken,
         );
         assertStatus(status, 200);
-        const user = data.data as Record<string, unknown>;
-        const interests = user.interests as string[];
+        const interests = (data.data as Record<string, unknown>).interests as string[];
         assert(Array.isArray(interests) && interests.includes('cooking'), 'interests not set');
     });
 
@@ -328,11 +596,7 @@ async function run(): Promise<void> {
     });
 
     await test('POST /groups with unverified user returns 403', async () => {
-        const { token } = await registerAndLogin(
-            `unverf${ts}@test.io`,
-            'Unverf123!',
-            'Unverified',
-        );
+        const { token } = await registerAndLogin(`unverf${ts}@test.io`, 'Unverf123!', 'Unverified');
         const { status } = await post('/groups', { name: 'Test', category: 'Tech' }, token);
         assertStatus(status, 403);
     });
@@ -350,38 +614,28 @@ async function run(): Promise<void> {
     await test('POST /groups creates open group (201)', async () => {
         const { status, data } = await post(
             '/groups',
-            {
-                name: `OpenGroup ${ts}`,
-                category: 'Technology',
-                description: 'An open group for integration testing',
-                membership_type: 'open',
-            },
+            { name: `OpenGroup ${ts}`, category: 'Technology', description: 'An open group for integration testing', membership_type: 'open' },
             creatorToken,
         );
         assertStatus(status, 201);
         const group = data.data as Record<string, unknown>;
         assertHas(group, 'id');
         assertHas(group, 'slug');
-        openGroupId = group.id as string;
+        openGroupId   = group.id   as string;
         openGroupSlug = group.slug as string;
-        assert(openGroupId.length > 0, 'openGroupId empty');
+        assert(openGroupId.length > 0,   'openGroupId empty');
         assert(openGroupSlug.length > 0, 'openGroupSlug empty');
     });
 
     await test('POST /groups creates application group (201)', async () => {
         const { status, data } = await post(
             '/groups',
-            {
-                name: `AppGroup ${ts}`,
-                category: 'Lifestyle',
-                description: 'Application-based group for testing',
-                membership_type: 'application',
-            },
+            { name: `AppGroup ${ts}`, category: 'Lifestyle', description: 'Application-based group for testing', membership_type: 'application' },
             creatorToken,
         );
         assertStatus(status, 201);
         const group = data.data as Record<string, unknown>;
-        appGroupId = group.id as string;
+        appGroupId   = group.id   as string;
         appGroupSlug = group.slug as string;
         assert(appGroupId.length > 0, 'appGroupId empty');
     });
@@ -394,10 +648,7 @@ async function run(): Promise<void> {
         );
         assertStatus(status, 201);
         const group = data.data as Record<string, unknown>;
-        assert(
-            group.isDiscoverable === false,
-            `invite_only group should not be discoverable: ${group.isDiscoverable}`,
-        );
+        assert(group.isDiscoverable === false, `invite_only group should not be discoverable: ${group.isDiscoverable}`);
     });
 
     await test('GET /groups returns paginated list (200)', async () => {
@@ -407,7 +658,7 @@ async function run(): Promise<void> {
     });
 
     await test('GET /groups?q= full-text search returns results (200)', async () => {
-        const { status } = await get(`/groups?q=OpenGroup`);
+        const { status } = await get('/groups?q=OpenGroup');
         assertStatus(status, 200);
     });
 
@@ -440,8 +691,8 @@ async function run(): Promise<void> {
         const { status, data } = await get(`/groups/${openGroupSlug}`);
         assertStatus(status, 200);
         const result = data.data as Record<string, unknown>;
-        const group = result.group as Record<string, unknown>;
-        assert(group.id === openGroupId, `id mismatch: ${group.id}`);
+        const group  = result.group as Record<string, unknown>;
+        assert(group.id   === openGroupId,   `id mismatch: ${group.id}`);
         assert(group.slug === openGroupSlug, `slug mismatch: ${group.slug}`);
     });
 
@@ -451,8 +702,8 @@ async function run(): Promise<void> {
         const result = data.data as Record<string, unknown>;
         assertHas(result, 'callerMembershipStatus');
         const cms = result.callerMembershipStatus as Record<string, unknown>;
-        assert(cms.isMember === true, 'creator should be a member of their own group');
-        assert(cms.role === 'super_admin', `creator should be super_admin, got ${cms.role}`);
+        assert(cms.isMember === true,          'creator should be a member of their own group');
+        assert(cms.role     === 'super_admin', `creator should be super_admin, got ${cms.role}`);
     });
 
     await test('GET /groups/:slug without auth returns null callerMembershipStatus (200)', async () => {
@@ -475,10 +726,7 @@ async function run(): Promise<void> {
         );
         assertStatus(status, 200);
         const group = data.data as Record<string, unknown>;
-        assert(
-            group.description === 'Updated via integration test',
-            `description not updated: ${group.description}`,
-        );
+        assert(group.description === 'Updated via integration test', `description not updated: ${group.description}`);
     });
 
     await test('PATCH /groups/:id without auth returns 401', async () => {
@@ -487,11 +735,7 @@ async function run(): Promise<void> {
     });
 
     await test('PATCH /groups/:id as non-member returns 403', async () => {
-        const { status } = await patch(
-            `/groups/${openGroupId}`,
-            { description: 'unauthorized' },
-            memberToken,
-        );
+        const { status } = await patch(`/groups/${openGroupId}`, { description: 'unauthorized' }, memberToken);
         assertStatus(status, 403);
     });
 
@@ -500,9 +744,7 @@ async function run(): Promise<void> {
         assertStatus(status, 200);
         const members = extractList(data.data);
         assert(Array.isArray(members) && members.length >= 1, 'creator should be in the member list');
-        const found = members.some(
-            (m: any) => m.userId === creatorId || m.user_id === creatorId,
-        );
+        const found = members.some((m: any) => m.userId === creatorId || m.user_id === creatorId);
         assert(found, 'creator should appear as super_admin member');
     });
 
@@ -555,7 +797,6 @@ async function run(): Promise<void> {
     });
 
     await test('POST /memberships/groups/:id/join application group returns 403 (wrong type)', async () => {
-        // application groups require POST /apply — join returns 403
         const { status } = await post(`/memberships/groups/${appGroupId}/join`, {}, memberToken);
         assertStatus(status, 403);
     });
@@ -564,9 +805,7 @@ async function run(): Promise<void> {
         const { status, data } = await get(`/groups/${openGroupId}/members`, creatorToken);
         assertStatus(status, 200);
         const members = extractList(data.data);
-        const found = members.some(
-            (m: any) => m.userId === memberId || m.user_id === memberId,
-        );
+        const found = members.some((m: any) => m.userId === memberId || m.user_id === memberId);
         assert(found, 'member should appear in member list after joining');
     });
 
@@ -574,12 +813,8 @@ async function run(): Promise<void> {
         const { status, data } = await get('/users/me/groups', memberToken);
         assertStatus(status, 200);
         const groups = extractList(data.data);
-        const found = groups.some(
-            (g: any) =>
-                g.groupId === openGroupId ||
-                g.group_id === openGroupId ||
-                g.group?.id === openGroupId ||
-                g.id === openGroupId,
+        const found  = groups.some(
+            (g: any) => g.groupId === openGroupId || g.group_id === openGroupId || g.group?.id === openGroupId || g.id === openGroupId,
         );
         assert(found, 'joined group should appear in /me/groups');
     });
@@ -590,7 +825,6 @@ async function run(): Promise<void> {
     });
 
     await test('DELETE /memberships/groups/:id/leave when not a member returns 403', async () => {
-        // Service throws FORBIDDEN when user is not an active member
         const { status } = await del(`/memberships/groups/${openGroupId}/leave`, memberToken);
         assertStatus(status, 403);
     });
@@ -605,11 +839,7 @@ async function run(): Promise<void> {
     section('4. Memberships — Applications');
 
     await test('POST /memberships/groups/:id/apply to application group (201)', async () => {
-        const { status, data } = await post(
-            `/memberships/groups/${appGroupId}/apply`,
-            {},
-            memberToken,
-        );
+        const { status, data } = await post(`/memberships/groups/${appGroupId}/apply`, {}, memberToken);
         assertStatus(status, 201);
         const app = data.data as Record<string, unknown>;
         applicationId = app.applicationId as string;
@@ -617,39 +847,24 @@ async function run(): Promise<void> {
     });
 
     await test('POST /memberships/groups/:id/apply again returns 409 (pending exists)', async () => {
-        const { status } = await post(
-            `/memberships/groups/${appGroupId}/apply`,
-            {},
-            memberToken,
-        );
+        const { status } = await post(`/memberships/groups/${appGroupId}/apply`, {}, memberToken);
         assertStatus(status, 409);
     });
 
     await test('POST /memberships/groups/:id/apply to open group returns 403 (wrong type)', async () => {
-        // open groups require POST /join — apply returns 403
-        const { status } = await post(
-            `/memberships/groups/${openGroupId}/apply`,
-            {},
-            outsiderToken,
-        );
+        const { status } = await post(`/memberships/groups/${openGroupId}/apply`, {}, outsiderToken);
         assertStatus(status, 403);
     });
 
     await test('GET /memberships/groups/:id/applications as admin returns list (200)', async () => {
-        const { status, data } = await get(
-            `/memberships/groups/${appGroupId}/applications`,
-            creatorToken,
-        );
+        const { status, data } = await get(`/memberships/groups/${appGroupId}/applications`, creatorToken);
         assertStatus(status, 200);
         const apps = extractList(data.data);
         assert(apps.length >= 1, `expected at least 1 application, got ${apps.length}`);
     });
 
     await test('GET /memberships/groups/:id/applications as non-admin returns 403', async () => {
-        const { status } = await get(
-            `/memberships/groups/${appGroupId}/applications`,
-            memberToken,
-        );
+        const { status } = await get(`/memberships/groups/${appGroupId}/applications`, memberToken);
         assertStatus(status, 403);
     });
 
@@ -678,7 +893,6 @@ async function run(): Promise<void> {
     });
 
     await test('PATCH /memberships/applications/:id as non-admin returns 403', async () => {
-        // outsider not in group → middleware blocks with 403
         const { status } = await patch(
             `/memberships/applications/${applicationId}`,
             { action: 'approve' },
@@ -697,12 +911,7 @@ async function run(): Promise<void> {
     });
 
     await test('POST apply after rejection allows re-application (201)', async () => {
-        // Old rejected application is deleted, fresh one is created
-        const { status, data } = await post(
-            `/memberships/groups/${appGroupId}/apply`,
-            {},
-            memberToken,
-        );
+        const { status, data } = await post(`/memberships/groups/${appGroupId}/apply`, {}, memberToken);
         assertStatus(status, 201);
         applicationId = (data.data as any).applicationId as string;
         assert(applicationId?.length > 0, 'new applicationId should be set');
@@ -714,7 +923,6 @@ async function run(): Promise<void> {
     });
 
     await test('DELETE /memberships/applications/:id again returns 409 (already withdrawn)', async () => {
-        // Service throws CONFLICT when application is not pending
         const { status } = await del(`/memberships/applications/${applicationId}`, memberToken);
         assertStatus(status, 409);
     });
@@ -724,14 +932,8 @@ async function run(): Promise<void> {
         assertStatus(status, 403);
     });
 
-    // Apply fresh + approve to grant membership for member-management tests
     await test('POST apply + PATCH approve → member becomes active (201 + 200)', async () => {
-        // Withdrawn application is deleted, fresh one is created
-        const { status: s1, data: d1 } = await post(
-            `/memberships/groups/${appGroupId}/apply`,
-            {},
-            memberToken,
-        );
+        const { status: s1, data: d1 } = await post(`/memberships/groups/${appGroupId}/apply`, {}, memberToken);
         assertStatus(s1, 201);
         const freshAppId = (d1.data as any).applicationId as string;
         assert(freshAppId?.length > 0, 'freshAppId should be set');
@@ -743,13 +945,10 @@ async function run(): Promise<void> {
         );
         assertStatus(s2, 200);
 
-        // Verify member is now in appGroup
         const { status: s3, data: d3 } = await get(`/groups/${appGroupId}/members`, creatorToken);
         assertStatus(s3, 200);
         const members = extractList(d3.data);
-        const found = members.some(
-            (m: any) => m.userId === memberId || m.user_id === memberId,
-        );
+        const found   = members.some((m: any) => m.userId === memberId || m.user_id === memberId);
         assert(found, 'member should appear in appGroup after approval');
     });
 
@@ -783,20 +982,14 @@ async function run(): Promise<void> {
             `/memberships/groups/${appGroupId}/form`,
             {
                 fields: [
-                    { id: 'q1', type: 'text', label: 'Why do you want to join?', required: true },
-                    {
-                        id: 'q2',
-                        type: 'select',
-                        label: 'How did you hear about us?',
-                        required: false,
-                        options: ['Social media', 'Friend', 'Other'],
-                    },
+                    { id: 'q1', type: 'text',   label: 'Why do you want to join?',   required: true  },
+                    { id: 'q2', type: 'select',  label: 'How did you hear about us?', required: false, options: ['Social media', 'Friend', 'Other'] },
                 ],
             },
             creatorToken,
         );
         assertStatus(status, 200);
-        const form = data.data as Record<string, unknown>;
+        const form   = data.data as Record<string, unknown>;
         assertHas(form, 'fields');
         const fields = form.fields as unknown[];
         assert(fields.length === 2, `expected 2 fields, got ${fields.length}`);
@@ -807,7 +1000,6 @@ async function run(): Promise<void> {
         assertStatus(status, 200);
         const form = data.data as Record<string, unknown> | null;
         if (form) {
-            assertHas(form, 'fields');
             const fields = form.fields as unknown[];
             assert(fields.length === 2, `expected 2 fields, got ${fields.length}`);
         }
@@ -816,16 +1008,11 @@ async function run(): Promise<void> {
     await test('PUT /memberships/groups/:id/form replaces form (1 field) (200)', async () => {
         const { status, data } = await put(
             `/memberships/groups/${appGroupId}/form`,
-            {
-                fields: [
-                    { id: 'q1', type: 'textarea', label: 'Tell us about yourself', required: true },
-                ],
-            },
+            { fields: [{ id: 'q1', type: 'textarea', label: 'Tell us about yourself', required: true }] },
             creatorToken,
         );
         assertStatus(status, 200);
-        const form = data.data as Record<string, unknown>;
-        const fields = form.fields as unknown[];
+        const fields = (data.data as Record<string, unknown>).fields as unknown[];
         assert(fields.length === 1, `expected 1 field after replace, got ${fields.length}`);
     });
 
@@ -839,17 +1026,8 @@ async function run(): Promise<void> {
     });
 
     await test('PUT /memberships/groups/:id/form with 21 fields returns 422', async () => {
-        const tooMany = Array.from({ length: 21 }, (_, i) => ({
-            id: `q${i}`,
-            type: 'text',
-            label: `Field ${i}`,
-            required: false,
-        }));
-        const { status } = await put(
-            `/memberships/groups/${appGroupId}/form`,
-            { fields: tooMany },
-            creatorToken,
-        );
+        const tooMany = Array.from({ length: 21 }, (_, i) => ({ id: `q${i}`, type: 'text', label: `Field ${i}`, required: false }));
+        const { status } = await put(`/memberships/groups/${appGroupId}/form`, { fields: tooMany }, creatorToken);
         assert(status >= 400 && status < 500, `Expected 4xx, got ${status}`);
     });
 
@@ -872,15 +1050,11 @@ async function run(): Promise<void> {
     });
 
     await test('PATCH /memberships/groups/:id/members/:userId without auth returns 401', async () => {
-        const { status } = await patch(
-            `/memberships/groups/${openGroupId}/members/${memberId}`,
-            { role: 'member' },
-        );
+        const { status } = await patch(`/memberships/groups/${openGroupId}/members/${memberId}`, { role: 'member' });
         assertStatus(status, 401);
     });
 
     await test('PATCH /memberships/groups/:id/members/:userId as non-admin returns 403', async () => {
-        // outsider not in openGroup → 403
         const { status } = await patch(
             `/memberships/groups/${openGroupId}/members/${memberId}`,
             { role: 'member' },
@@ -908,18 +1082,12 @@ async function run(): Promise<void> {
     });
 
     await test('DELETE /memberships/groups/:id/members/:userId removes member (200)', async () => {
-        const { status } = await del(
-            `/memberships/groups/${openGroupId}/members/${memberId}`,
-            creatorToken,
-        );
+        const { status } = await del(`/memberships/groups/${openGroupId}/members/${memberId}`, creatorToken);
         assertStatus(status, 200);
     });
 
     await test('DELETE /memberships/groups/:id/members/:userId twice returns 404 (not found)', async () => {
-        const { status } = await del(
-            `/memberships/groups/${openGroupId}/members/${memberId}`,
-            creatorToken,
-        );
+        const { status } = await del(`/memberships/groups/${openGroupId}/members/${memberId}`, creatorToken);
         assertStatus(status, 404);
     });
 
@@ -938,12 +1106,7 @@ async function run(): Promise<void> {
     });
 
     await test('POST /memberships/groups/:id/invite as non-admin returns 403', async () => {
-        // outsider not in group → 403
-        const { status } = await post(
-            `/memberships/groups/${openGroupId}/invite`,
-            {},
-            outsiderToken,
-        );
+        const { status } = await post(`/memberships/groups/${openGroupId}/invite`, {}, outsiderToken);
         assertStatus(status, 403);
     });
 
@@ -958,9 +1121,9 @@ async function run(): Promise<void> {
         assertHas(link, 'token');
         assertHas(link, 'id');
         inviteToken = link.token as string;
-        inviteId = link.id as string;
+        inviteId    = link.id    as string;
         assert(inviteToken.length > 0, 'inviteToken empty');
-        assert(inviteId.length > 0, 'inviteId empty');
+        assert(inviteId.length    > 0, 'inviteId empty');
     });
 
     await test('POST /memberships/groups/:id/invite with expires_in_hours > 8760 returns 422', async () => {
@@ -973,10 +1136,7 @@ async function run(): Promise<void> {
     });
 
     await test('GET /memberships/groups/:id/invites lists active links (200)', async () => {
-        const { status, data } = await get(
-            `/memberships/groups/${openGroupId}/invites`,
-            creatorToken,
-        );
+        const { status, data } = await get(`/memberships/groups/${openGroupId}/invites`, creatorToken);
         assertStatus(status, 200);
         const links = extractList(data.data);
         assert(links.length >= 1, `expected at least 1 invite, got ${links.length}`);
@@ -988,30 +1148,17 @@ async function run(): Promise<void> {
     });
 
     await test('POST /memberships/invites/:token/accept joins group (201)', async () => {
-        // member was removed in section 6 — not in openGroup
-        const { status } = await post(
-            `/memberships/invites/${inviteToken}/accept`,
-            {},
-            memberToken,
-        );
+        const { status } = await post(`/memberships/invites/${inviteToken}/accept`, {}, memberToken);
         assertStatus(status, 201);
     });
 
     await test('POST /memberships/invites/:token/accept again returns 409 (already member)', async () => {
-        const { status } = await post(
-            `/memberships/invites/${inviteToken}/accept`,
-            {},
-            memberToken,
-        );
+        const { status } = await post(`/memberships/invites/${inviteToken}/accept`, {}, memberToken);
         assertStatus(status, 409);
     });
 
     await test('POST /memberships/invites/invalid-token/accept returns 404', async () => {
-        const { status } = await post(
-            '/memberships/invites/definitely-not-a-real-token-xyz/accept',
-            {},
-            outsiderToken,
-        );
+        const { status } = await post('/memberships/invites/definitely-not-a-real-token-xyz/accept', {}, outsiderToken);
         assertStatus(status, 404);
     });
 
@@ -1031,11 +1178,7 @@ async function run(): Promise<void> {
     });
 
     await test('POST /memberships/invites/:token/accept after revoke returns 410 (Gone)', async () => {
-        const { status } = await post(
-            `/memberships/invites/${inviteToken}/accept`,
-            {},
-            outsiderToken,
-        );
+        const { status } = await post(`/memberships/invites/${inviteToken}/accept`, {}, outsiderToken);
         assertStatus(status, 410);
     });
 
@@ -1049,7 +1192,6 @@ async function run(): Promise<void> {
     });
 
     await test('DELETE /groups/:id as non-super_admin returns 403', async () => {
-        // outsider not in group → 403
         const { status } = await del(`/groups/${appGroupId}`, outsiderToken);
         assertStatus(status, 403);
     });
@@ -1079,26 +1221,27 @@ async function run(): Promise<void> {
     });
 
     await test('DELETE /users/me soft-deletes account (200)', async () => {
-        // Use outsider — they have no shared state that would break other tests
         const { status } = await del('/users/me', outsiderToken);
         assertStatus(status, 200);
     });
 
     await test('POST /groups after account deletion returns 404 (authenticateVerified: user.deletedAt set)', async () => {
-        // authenticateVerified checks user.deletedAt and returns 404 NOT_FOUND for deleted accounts
-        const { status } = await post(
-            '/groups',
-            { name: 'Ghost Group', category: 'Tech' },
-            outsiderToken,
-        );
+        const { status } = await post('/groups', { name: 'Ghost Group', category: 'Tech' }, outsiderToken);
         assertStatus(status, 404);
     });
+}
 
-    // ─── Summary ──────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+//  MAIN
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function run(): Promise<void> {
+    await runAuthSuite();
+    await runFeaturesSuite();
 
     const passed = results.filter((r) => r.passed).length;
     const failed = results.filter((r) => !r.passed).length;
-    const total = results.length;
+    const total  = results.length;
 
     console.log('\n══════════════════════════════════════════════════════════════');
     console.log(`  Results: ${passed}/${total} passed  |  ${failed} failed`);
@@ -1121,5 +1264,6 @@ run()
     })
     .finally(async () => {
         await redis.quit();
+        await prisma.$disconnect();
         process.exit(results.some((r) => !r.passed) ? 1 : 0);
     });
