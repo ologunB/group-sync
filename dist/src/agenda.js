@@ -10,10 +10,13 @@ const app_config_1 = require("./shared/config/app.config");
 const asLogger_1 = require("./shared/utils/asLogger");
 const mail_service_1 = require("./shared/queues/mail.service");
 // ─── Connection (BullMQ requires maxRetriesPerRequest: null) ──────────────────
-const makeConnection = () => new ioredis_1.default(app_config_1.config.redis.url, {
+const redisUrl = app_config_1.config.redis.url;
+const isTlsRedis = redisUrl.startsWith('rediss://');
+const makeConnection = () => new ioredis_1.default(redisUrl, {
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
-    lazyConnect: false,
+    lazyConnect: true,
+    ...(isTlsRedis ? { tls: { rejectUnauthorized: false } } : {}),
 });
 // ─── Queue defaults ───────────────────────────────────────────────────────────
 const QUEUE_NAME = 'system-jobs';
@@ -33,6 +36,8 @@ class AgendaManager {
             return;
         const queueConnection = makeConnection();
         const workerConnection = makeConnection();
+        // BullMQ requires noeviction; silently ignored on managed Redis (Upstash, etc.)
+        await queueConnection.config('SET', 'maxmemory-policy', 'noeviction').catch(() => { });
         const queueOptions = {
             connection: queueConnection,
             defaultJobOptions,

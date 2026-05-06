@@ -140,8 +140,8 @@ class MembershipService {
                     throw new error_middleware_1.ApiError(`Missing required form fields: ${missingRequired.join(', ')}`, http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY);
                 }
             }
-            // Delete rejected application if exists (allow re-application)
-            if (existingApp?.status === 'rejected') {
+            // Delete rejected or withdrawn application if exists (allow re-application)
+            if (existingApp?.status === 'rejected' || existingApp?.status === 'withdrawn') {
                 await connection_1.prisma.application.delete({ where: { id: existingApp.id } });
             }
             const application = await connection_1.prisma.application.create({

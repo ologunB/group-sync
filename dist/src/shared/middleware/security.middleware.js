@@ -46,6 +46,7 @@ const apiLimiter = (0, express_rate_limit_1.default)({
         data: null,
         error: null,
     },
+    skip: () => !app_config_1.config.server.isProduction,
 });
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 const corsOptions = {

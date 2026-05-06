@@ -36,9 +36,9 @@ class App {
     // ─── Middleware ──────────────────────────────────────────────────────────────
     configureMiddleware() {
         // Reverse proxy trust (required for accurate req.ip behind nginx / load balancer)
-        this.app.set('trust proxy', 1);
-        this.app.use(express_1.default.json({ limit: '10mb' }));
-        this.app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
+        this.app.set("trust proxy", 1);
+        this.app.use(express_1.default.json({ limit: "10mb" }));
+        this.app.use(express_1.default.urlencoded({ extended: true, limit: "10mb" }));
         this.app.use((0, cookie_parser_1.default)());
         this.app.use((0, compression_1.default)());
         // Security: helmet + cors + rate limiting
@@ -50,7 +50,7 @@ class App {
         // Health check — always first, not rate-limited
         this.app.get(`${apiPrefix}/health`, (_req, res) => {
             response_helper_1.ResponseHelper.success(res, {
-                status: 'ok',
+                status: "ok",
                 environment: app_config_1.config.server.nodeEnv,
                 timestamp: new Date().toISOString(),
             });
@@ -59,9 +59,52 @@ class App {
         this.app.use(`${apiPrefix}/auth`, auth_routes_1.default);
         this.app.use(`${apiPrefix}/users`, user_routes_1.default);
         this.app.use(`${apiPrefix}/groups`, group_routes_1.default);
-        this.app.use(`${apiPrefix}/memberships`, membership_routes_1.default);
+        this.app.use(`${apiPrefix}/groups`, membership_routes_1.default);
         // this.app.use(`${apiPrefix}/notifications`, notificationRoutes);
         // this.app.use(`${apiPrefix}/admin`, adminRoutes);
+        // Route manifest
+        this.app.get(`${apiPrefix}/routes`, (_req, res) => {
+            response_helper_1.ResponseHelper.success(res, this.listRoutes(), "Route manifest");
+        });
+    }
+    listRoutes() {
+        const routes = [];
+        function getPrefix(regexp) {
+            if (regexp.fast_slash)
+                return [];
+            const match = regexp
+                .toString()
+                .replace("\\/?", "")
+                .replace("(?=\\/|$)", "$")
+                .match(/^\/\^((?:\\[.*+?^${}()|[\]\\\/]|[^.*+?^${}()|[\]\\\/])*)\$\//);
+            if (!match)
+                return [];
+            return match[1].replace(/\\(.)/g, "$1").split("/").filter(Boolean);
+        }
+        function walk(stack, prefix) {
+            for (const layer of stack) {
+                if (layer.route) {
+                    const methods = Object.keys(layer.route.methods)
+                        .filter((m) => layer.route.methods[m] && m !== "_all")
+                        .map((m) => m.toUpperCase());
+                    const parts = [
+                        ...prefix,
+                        ...layer.route.path.split("/").filter(Boolean),
+                    ];
+                    routes.push({
+                        method: methods.join(", "),
+                        path: "/" + parts.join("/"),
+                    });
+                }
+                else if (layer.handle?.stack) {
+                    walk(layer.handle.stack, [...prefix, ...getPrefix(layer.regexp)]);
+                }
+            }
+        }
+        const router = this.app._router;
+        if (router?.stack)
+            walk(router.stack, []);
+        return routes.sort((a, b) => a.path.localeCompare(b.path));
     }
     // ─── Error handling ──────────────────────────────────────────────────────────
     configureErrorHandling() {
@@ -89,12 +132,12 @@ class App {
         this.httpServer.listen(port, () => {
             asLogger_1.asLogger.info(`GroupSync API listening on port ${port} [${nodeEnv}]`);
         });
-        this.httpServer.on('error', (err) => {
-            if (err.code === 'EADDRINUSE') {
+        this.httpServer.on("error", (err) => {
+            if (err.code === "EADDRINUSE") {
                 asLogger_1.asLogger.error(`Port ${port} is already in use`);
             }
             else {
-                asLogger_1.asLogger.error('HTTP server error:', err);
+                asLogger_1.asLogger.error("HTTP server error:", err);
             }
             process.exit(1);
         });

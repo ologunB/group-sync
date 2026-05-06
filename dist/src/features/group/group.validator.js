@@ -84,8 +84,87 @@ exports.createGroupValidator = [
         .optional({ nullable: true, checkFalsy: true })
         .isISO8601().withMessage('founding_date must be a valid ISO8601 date (YYYY-MM-DD)'),
 ];
-// ─── Update group (all optional, same rules) ──────────────────────────────────
-exports.updateGroupValidator = exports.createGroupValidator.map((chain) => chain.optional ? chain : chain);
+// ─── Update group (all fields optional, same rules as create) ────────────────
+// Defined independently — do NOT derive from createGroupValidator to avoid
+// mutating shared ValidationChain instances (optional() modifies chains in-place).
+exports.updateGroupValidator = [
+    (0, express_validator_1.body)('name')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('Group name must be a string')
+        .trim()
+        .isLength({ min: 2, max: 150 }).withMessage('Group name must be between 2 and 150 characters'),
+    (0, express_validator_1.body)('category')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('Category must be a string')
+        .trim()
+        .isLength({ min: 1, max: 80 }).withMessage('Category must not exceed 80 characters'),
+    (0, express_validator_1.body)('subcategory')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('Subcategory must be a string')
+        .trim()
+        .isLength({ max: 80 }).withMessage('Subcategory must not exceed 80 characters'),
+    (0, express_validator_1.body)('description')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('Description must be a string')
+        .trim(),
+    (0, express_validator_1.body)('city')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('City must be a string')
+        .trim()
+        .isLength({ max: 100 }).withMessage('City must not exceed 100 characters'),
+    (0, express_validator_1.body)('state')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('State must be a string')
+        .trim()
+        .isLength({ max: 100 }).withMessage('State must not exceed 100 characters'),
+    (0, express_validator_1.body)('country')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('Country must be a string')
+        .trim()
+        .isLength({ max: 100 }).withMessage('Country must not exceed 100 characters'),
+    (0, express_validator_1.body)('lat')
+        .optional({ nullable: true })
+        .isFloat({ min: -90, max: 90 })
+        .withMessage('Latitude must be between -90 and 90'),
+    (0, express_validator_1.body)('lng')
+        .optional({ nullable: true })
+        .isFloat({ min: -180, max: 180 })
+        .withMessage('Longitude must be between -180 and 180'),
+    (0, express_validator_1.body)('membership_type')
+        .optional()
+        .isIn(MEMBERSHIP_TYPES)
+        .withMessage(`membership_type must be one of: ${MEMBERSHIP_TYPES.join(', ')}`),
+    (0, express_validator_1.body)('membership_fee')
+        .optional({ nullable: true })
+        .isFloat({ min: 0 })
+        .withMessage('membership_fee must be a positive number'),
+    (0, express_validator_1.body)('membership_fee_currency')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString()
+        .isLength({ max: 10 })
+        .withMessage('membership_fee_currency must be a valid currency code'),
+    (0, express_validator_1.body)('membership_fee_frequency')
+        .optional({ nullable: true })
+        .isIn(FEE_FREQUENCIES)
+        .withMessage(`membership_fee_frequency must be one of: ${FEE_FREQUENCIES.join(', ')}`),
+    (0, express_validator_1.body)('how_to_join_content')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('how_to_join_content must be a string'),
+    (0, express_validator_1.body)('rules')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('rules must be a string'),
+    (0, express_validator_1.body)('cover_image_url')
+        .optional({ nullable: true, checkFalsy: true })
+        .isURL({ protocols: ['https'], require_protocol: true })
+        .withMessage('cover_image_url must be a valid HTTPS URL'),
+    (0, express_validator_1.body)('logo_url')
+        .optional({ nullable: true, checkFalsy: true })
+        .isURL({ protocols: ['https'], require_protocol: true })
+        .withMessage('logo_url must be a valid HTTPS URL'),
+    (0, express_validator_1.body)('founding_date')
+        .optional({ nullable: true, checkFalsy: true })
+        .isISO8601().withMessage('founding_date must be a valid ISO8601 date (YYYY-MM-DD)'),
+];
 // ─── List groups (query params) ───────────────────────────────────────────────
 exports.listGroupsValidator = [
     (0, express_validator_1.query)('q')

@@ -106,9 +106,9 @@ class GroupService {
             else {
                 conditions.push(client_1.Prisma.sql `g.is_discoverable = TRUE`);
             }
-            // Full-text search
+            // Full-text search (inline tsvector — no dedicated fts_vector column required)
             if (query.q?.trim()) {
-                conditions.push(client_1.Prisma.sql `g.fts_vector @@ plainto_tsquery('english', ${query.q.trim()})`);
+                conditions.push(client_1.Prisma.sql `to_tsvector('english', g.name || ' ' || COALESCE(g.description, '') || ' ' || g.category) @@ plainto_tsquery('english', ${query.q.trim()})`);
             }
             // Category / subcategory filters
             if (query.category) {
@@ -172,7 +172,10 @@ class GroupService {
             else if (query.q?.trim()) {
                 // relevance: rank by FTS score
                 orderClause = client_1.Prisma.sql `
-          ORDER BY ts_rank(g.fts_vector, plainto_tsquery('english', ${query.q.trim()})) DESC,
+          ORDER BY ts_rank(
+            to_tsvector('english', g.name || ' ' || COALESCE(g.description, '') || ' ' || g.category),
+            plainto_tsquery('english', ${query.q.trim()})
+          ) DESC,
                    g.created_at DESC
         `;
             }

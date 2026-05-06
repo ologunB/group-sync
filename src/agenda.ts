@@ -18,11 +18,15 @@ export type JobName =
 
 // ─── Connection (BullMQ requires maxRetriesPerRequest: null) ──────────────────
 
+const redisUrl = config.redis.url;
+const isTlsRedis = redisUrl.startsWith('rediss://');
+
 const makeConnection = () =>
-    new IORedis(config.redis.url, {
+    new IORedis(redisUrl, {
         maxRetriesPerRequest: null,
         enableReadyCheck: false,
-        lazyConnect: false,
+        lazyConnect: true,
+        ...(isTlsRedis ? { tls: { rejectUnauthorized: false } } : {}),
     });
 
 // ─── Queue defaults ───────────────────────────────────────────────────────────
@@ -48,6 +52,9 @@ export class AgendaManager {
 
         const queueConnection = makeConnection();
         const workerConnection = makeConnection();
+
+        // BullMQ requires noeviction; silently ignored on managed Redis (Upstash, etc.)
+        await queueConnection.config('SET', 'maxmemory-policy', 'noeviction').catch(() => {});
 
         const queueOptions: QueueOptions = {
             connection: queueConnection,
