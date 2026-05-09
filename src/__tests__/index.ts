@@ -10,7 +10,7 @@
 
 import { redis, prisma } from '../database/connection';
 
-const BASE = 'http://localhost:3000/api/v1';
+const BASE = Boolean(false) ? 'https://group-sync-ovzh.onrender.com/api/v1' : 'http://localhost:3000/api/v1';
 const ts = Date.now();
 
 // ─── Shared assertion helpers ─────────────────────────────────────────────────
