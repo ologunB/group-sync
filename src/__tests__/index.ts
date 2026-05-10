@@ -565,9 +565,12 @@ async function runFeaturesSuite(): Promise<void> {
     });
 
     await test('re-login all actors to get fresh tokens reflecting DB change', async () => {
-        const { data: cd } = await post('/auth/login', { email: CREATOR_EMAIL,  password: CREATOR_PASS  });
-        const { data: md } = await post('/auth/login', { email: MEMBER_EMAIL,   password: MEMBER_PASS   });
-        const { data: od } = await post('/auth/login', { email: OUTSIDER_EMAIL, password: OUTSIDER_PASS });
+        const { status: cs, data: cd } = await post('/auth/login', { email: CREATOR_EMAIL,  password: CREATOR_PASS  });
+        const { status: ms, data: md } = await post('/auth/login', { email: MEMBER_EMAIL,   password: MEMBER_PASS   });
+        const { status: os, data: od } = await post('/auth/login', { email: OUTSIDER_EMAIL, password: OUTSIDER_PASS });
+        assert(cs === 200, `creator login failed (${cs}): ${JSON.stringify(cd)}`);
+        assert(ms === 200, `member login failed (${ms}): ${JSON.stringify(md)}`);
+        assert(os === 200, `outsider login failed (${os}): ${JSON.stringify(od)}`);
         creatorToken  = ((cd.data as any).tokens as any).accessToken;
         memberToken   = ((md.data as any).tokens as any).accessToken;
         outsiderToken = ((od.data as any).tokens as any).accessToken;
@@ -2045,7 +2048,7 @@ async function runFeaturesSuite(): Promise<void> {
 
     // ── 9. Group Deletion ─────────────────────────────────────────────────────
 
-    section('8. Group Deletion');
+    section('9. Group Deletion');
 
     await test('DELETE /groups/:id without auth returns 401', async () => {
         const { status } = await del(`/groups/${appGroupId}`);
@@ -2074,7 +2077,7 @@ async function runFeaturesSuite(): Promise<void> {
 
     // ── 10. Account Deletion ───────────────────────────────────────────────────
 
-    section('9. Account Deletion');
+    section('10. Account Deletion');
 
     await test('DELETE /users/me without auth returns 401', async () => {
         const { status } = await del('/users/me');

@@ -68,12 +68,20 @@ export class SessionService {
     }
 
     static async getFailedLoginCount(userId: string): Promise<number> {
-        const raw = await redis.get(Keys.loginFailed(userId));
-        return raw ? parseInt(raw, 10) : 0;
+        try {
+            const raw = await redis.get(Keys.loginFailed(userId));
+            return raw ? parseInt(raw, 10) : 0;
+        } catch {
+            return 0; // Redis unavailable — treat as no failures recorded
+        }
     }
 
     static async clearFailedLogins(userId: string): Promise<void> {
-        await redis.del(Keys.loginFailed(userId));
+        try {
+            await redis.del(Keys.loginFailed(userId));
+        } catch {
+            // Non-critical: counter will expire naturally via TTL
+        }
     }
 
     static async isAccountLocked(userId: string): Promise<boolean> {
