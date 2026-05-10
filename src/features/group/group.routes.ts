@@ -6,6 +6,7 @@ import {
     authorizeGroupRole,
 } from '../../shared/middleware/auth.middleware';
 import { validateRequest } from '../../shared/utils/validators';
+import { uploadImage } from '../../shared/middleware/upload.middleware';
 import {
     createGroupValidator,
     updateGroupValidator,
@@ -92,6 +93,26 @@ router.get(
     validateRequest(groupIdParamValidator),
     authorizeGroupRole('super_admin', 'admin'),
     controller.getGroupStats,
+);
+
+// ─── POST /groups/:id/cover — admin or super_admin ───────────────────────────
+router.post(
+    '/:id/cover',
+    authenticate,
+    validateRequest(groupIdParamValidator),
+    authorizeGroupRole('super_admin', 'admin'),
+    uploadImage('cover'),
+    controller.uploadCover,
+);
+
+// ─── POST /groups/:id/logo — admin or super_admin ────────────────────────────
+router.post(
+    '/:id/logo',
+    authenticate,
+    validateRequest(groupIdParamValidator),
+    authorizeGroupRole('super_admin', 'admin'),
+    uploadImage('logo'),
+    controller.uploadLogo,
 );
 
 export default router;

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { UserController } from './user.controller';
 import { authenticate } from '../../shared/middleware/auth.middleware';
 import { validateRequest } from '../../shared/utils/validators';
+import { uploadImage } from '../../shared/middleware/upload.middleware';
 import {
     updateProfileValidator,
     updateInterestsValidator,
@@ -17,6 +18,7 @@ const controller = new UserController();
 
 router.get('/me', authenticate, controller.getMe);
 router.patch('/me', authenticate, validateRequest(updateProfileValidator), controller.updateMe);
+router.post('/me/photo', authenticate, uploadImage('photo'), controller.uploadPhoto);
 router.delete('/me', authenticate, controller.deleteMe);
 router.get('/me/groups', authenticate, validateRequest(paginationValidator), controller.getMyGroups);
 router.get('/me/applications', authenticate, validateRequest(myApplicationsValidator), controller.getMyApplications);

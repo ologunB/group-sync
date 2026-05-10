@@ -6,6 +6,7 @@ import { Messages } from '../../shared/utils/response.constants';
 import { asLogger } from '../../shared/utils/asLogger';
 import { AuditLogger, LogActions, ResourceTypes } from '../../shared/utils/audit.logger';
 import { TokenPayload } from '../../shared/types/common.types';
+import { StorageService } from '../../shared/storage/storage.service';
 import {
     UpdateProfileDTO,
     UpdateInterestsDTO,
@@ -562,6 +563,29 @@ export class UserService {
             );
             if (error instanceof ApiError) throw error;
             asLogger.error('UserService.unblockUser:', error);
+            throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ── uploadPhoto ────────────────────────────────────────────────────────────
+
+    async uploadPhoto(userId: string, buffer: Buffer, mimeType: string): Promise<{ url: string }> {
+        try {
+            const result = await StorageService.upload(buffer, mimeType, {
+                folder:   'groupsync/avatars',
+                publicId: userId,
+                transformation: [{ width: 400, height: 400, crop: 'fill', quality: 'auto', fetch_format: 'auto' }],
+            });
+
+            await prisma.user.update({
+                where: { id: userId },
+                data:  { profilePhotoUrl: result.url },
+            });
+
+            return { url: result.url };
+        } catch (error: any) {
+            if (error instanceof ApiError) throw error;
+            asLogger.error('UserService.uploadPhoto:', error);
             throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }

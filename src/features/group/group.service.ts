@@ -6,6 +6,7 @@ import { Messages } from '../../shared/utils/response.constants';
 import { asLogger } from '../../shared/utils/asLogger';
 import { AuditLogger, LogActions, ResourceTypes } from '../../shared/utils/audit.logger';
 import { TokenPayload, PaginationMeta } from '../../shared/types/common.types';
+import { StorageService } from '../../shared/storage/storage.service';
 import { AgendaManager } from '../../agenda';
 import { generateUniqueGroupSlug } from '../../shared/utils/slug';
 import {
@@ -597,6 +598,52 @@ export class GroupService {
         } catch (error: any) {
             if (error instanceof ApiError) throw error;
             asLogger.error('GroupService.getGroupStats:', error);
+            throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ── uploadCover ────────────────────────────────────────────────────────────
+
+    async uploadCover(groupId: string, buffer: Buffer, mimeType: string): Promise<{ url: string }> {
+        try {
+            const result = await StorageService.upload(buffer, mimeType, {
+                folder:   `groupsync/groups/${groupId}`,
+                publicId: 'cover',
+                transformation: [{ width: 1200, height: 400, crop: 'fill', quality: 'auto', fetch_format: 'auto' }],
+            });
+
+            await prisma.group.update({
+                where: { id: groupId },
+                data:  { coverImageUrl: result.url },
+            });
+
+            return { url: result.url };
+        } catch (error: any) {
+            if (error instanceof ApiError) throw error;
+            asLogger.error('GroupService.uploadCover:', error);
+            throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ── uploadLogo ─────────────────────────────────────────────────────────────
+
+    async uploadLogo(groupId: string, buffer: Buffer, mimeType: string): Promise<{ url: string }> {
+        try {
+            const result = await StorageService.upload(buffer, mimeType, {
+                folder:   `groupsync/groups/${groupId}`,
+                publicId: 'logo',
+                transformation: [{ width: 400, height: 400, crop: 'fill', quality: 'auto', fetch_format: 'auto' }],
+            });
+
+            await prisma.group.update({
+                where: { id: groupId },
+                data:  { logoUrl: result.url },
+            });
+
+            return { url: result.url };
+        } catch (error: any) {
+            if (error instanceof ApiError) throw error;
+            asLogger.error('GroupService.uploadLogo:', error);
             throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }

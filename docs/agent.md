@@ -26,7 +26,7 @@
 | Cache | Redis (ioredis) |
 | Job Queue | BullMQ — single queue named `system-jobs` |
 | Real-time | Socket.io |
-| File Storage | AWS S3 or Cloudflare R2 |
+| File Storage | Cloudinary (active) — swappable to S3/R2 via `STORAGE_PROVIDER` env var |
 | Auth | JWT access token (15m) + opaque refresh token (30d, stored in DB) |
 | Email | Nodemailer + HTML templates |
 | Push | Firebase Cloud Messaging (FCM) |
@@ -101,6 +101,10 @@ src/
     ├── queues/
     │   ├── mail.service.ts
     │   └── push.service.ts
+    ├── storage/
+    │   ├── storage.types.ts       # StorageProvider interface + UploadOptions / UploadResult
+    │   ├── cloudinary.provider.ts # Cloudinary implementation
+    │   └── storage.service.ts     # factory singleton — reads STORAGE_PROVIDER env var
     ├── socket/
     │   ├── socket.service.ts
     │   └── socket.events.ts
@@ -387,7 +391,54 @@ AgendaManager.scheduleTask(time, name, data)  // supports 'now', 'in X minutes'
 
 ---
 
-## 9. WebSocket (Socket.io)
+## 9. File Storage
+
+### Provider pattern
+`StorageService` is a singleton that delegates to the configured provider. To switch providers: set `STORAGE_PROVIDER=s3` (or any future key) in `.env` and implement a class that satisfies `StorageProvider`. No controller or service file changes.
+
+```typescript
+// Always use StorageService — never import cloudinary/S3 SDKs directly in feature code:
+const result = await StorageService.upload(buffer, mimeType, {
+    folder:         'groupsync/avatars',
+    publicId:       userId,             // stable ID means re-upload overwrites cleanly
+    transformation: [{ width: 400, height: 400, crop: 'fill', quality: 'auto', fetch_format: 'auto' }],
+});
+// result: { url, publicId, format, bytes, width?, height? }
+
+await StorageService.delete(publicId);  // pass publicId from the original upload result
+```
+
+### Upload middleware
+```typescript
+// src/shared/middleware/upload.middleware.ts
+// Accepts JPEG, PNG, WebP — max 5 MB — stores in memory buffer:
+uploadImage('fieldName')   // returns multer.single() middleware
+```
+
+### Upload endpoints (controller → service — no upload logic in controllers)
+| Method | Path | Auth | Multer field | Service method |
+|--------|------|------|--------------|----------------|
+| POST | `/users/me/photo` | Bearer | `photo` | `UserService.uploadPhoto()` |
+| POST | `/groups/:id/cover` | Bearer · admin+ | `cover` | `GroupService.uploadCover()` |
+| POST | `/groups/:id/logo` | Bearer · admin+ | `logo` | `GroupService.uploadLogo()` |
+
+Response: `{ success: true, data: { url: "https://..." } }`
+
+### Cloudinary folder layout
+```
+groupsync/avatars/<userId>          ← profile photos (overwritten on re-upload)
+groupsync/groups/<groupId>/cover    ← cover image
+groupsync/groups/<groupId>/logo     ← logo
+```
+
+### Switching to S3
+1. Add `S3Provider` implementing `StorageProvider` in `src/shared/storage/s3.provider.ts`.
+2. Add a `case 's3':` branch in `storage.service.ts → buildProvider()`.
+3. Set `STORAGE_PROVIDER=s3` in `.env`.
+
+---
+
+## 10. WebSocket (Socket.io)  <!-- was §9 -->
 
 ### Setup
 - Attach to the same HTTP server as Express.
@@ -496,7 +547,7 @@ AuditLogger.log(
 
 > These are rules unique to this project. Always check here before implementing any feature.
 
-1. **ID verification gate**: Users with `id_verification_status != 'verified'` cannot join groups, apply, create groups, send messages, or send DMs. Use `authenticateVerified` middleware on these routes.
+1. **ID verification gate**: Users with `id_verification_status != 'verified'` cannot join groups, apply, create groups, send messages, or send DMs. Use `authenticateVerified` middleware on these routes. ⚠️ **Temporarily disabled** — the check inside `authenticateVerified` is commented out while the KYC flow is being built; all `authenticateVerified` routes currently behave like `authenticate`. Re-enable before going to production.
 
 2. **Role hierarchy**: `super_admin > admin > moderator > member`. An admin cannot modify another admin — only super_admin can. Super admin cannot be removed without ownership transfer.
 
@@ -604,11 +655,10 @@ git pull → npm install → npm run build (tsc) → pm2 restart {id}
 
 | File | Purpose |
 |---|---|
-| `backend.md` | Coding patterns, class structures, full code examples |
 | `backend-srs.md` | Full SQL schema, all endpoint specs, business rules, job definitions |
-| This file (`agent.md`) | Quick-reference for every session |
+| This file (`agent.md`) | Coding conventions, patterns, and quick-reference for every session |
 
 When implementing a new feature:
 1. Check `agent.md §14` (GroupSync-specific rules) for anything that overrides the general pattern.
 2. Check `backend-srs.md` for the exact endpoint spec and SQL schema for that feature.
-3. Follow `backend.md` for the code structure, patterns, and style.
+3. Follow the conventions in this file (`agent.md`) for code structure, patterns, and style.

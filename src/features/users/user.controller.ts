@@ -154,4 +154,23 @@ export class UserController {
             next(error);
         }
     };
+
+    // ─── POST /users/me/photo ──────────────────────────────────────────────────
+
+    uploadPhoto = async (
+        req: AuthenticatedRequest,
+        res: Response,
+        next: NextFunction,
+    ): Promise<void> => {
+        try {
+            if (!req.file) {
+                ResponseHelper.error(res, 'No image file provided', StatusCodes.BAD_REQUEST);
+                return;
+            }
+            const result = await userService.uploadPhoto(req.user!.userId, req.file.buffer, req.file.mimetype);
+            ResponseHelper.success(res, result, 'Profile photo updated successfully.');
+        } catch (error) {
+            next(error);
+        }
+    };
 }
