@@ -22,6 +22,10 @@ const auth_routes_1 = __importDefault(require("./features/auth/auth.routes"));
 const user_routes_1 = __importDefault(require("./features/users/user.routes"));
 const group_routes_1 = __importDefault(require("./features/group/group.routes"));
 const membership_routes_1 = __importDefault(require("./features/membership/membership.routes"));
+const notification_routes_1 = __importDefault(require("./features/notifications/notification.routes"));
+const event_routes_1 = __importDefault(require("./features/events/event.routes"));
+const report_routes_1 = __importDefault(require("./features/reports/report.routes"));
+const admin_routes_1 = __importDefault(require("./features/admin/admin.routes"));
 class App {
     app;
     httpServer;
@@ -60,8 +64,10 @@ class App {
         this.app.use(`${apiPrefix}/users`, user_routes_1.default);
         this.app.use(`${apiPrefix}/groups`, group_routes_1.default);
         this.app.use(`${apiPrefix}/groups`, membership_routes_1.default);
-        // this.app.use(`${apiPrefix}/notifications`, notificationRoutes);
-        // this.app.use(`${apiPrefix}/admin`, adminRoutes);
+        this.app.use(`${apiPrefix}/notifications`, notification_routes_1.default);
+        this.app.use(`${apiPrefix}`, event_routes_1.default);
+        this.app.use(`${apiPrefix}/reports`, report_routes_1.default);
+        this.app.use(`${apiPrefix}/admin`, admin_routes_1.default);
         // Route manifest
         this.app.get(`${apiPrefix}/routes`, (_req, res) => {
             response_helper_1.ResponseHelper.success(res, this.listRoutes(), "Route manifest");

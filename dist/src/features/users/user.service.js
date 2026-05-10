@@ -7,6 +7,7 @@ const error_middleware_1 = require("../../shared/middleware/error.middleware");
 const response_constants_1 = require("../../shared/utils/response.constants");
 const asLogger_1 = require("../../shared/utils/asLogger");
 const audit_logger_1 = require("../../shared/utils/audit.logger");
+const storage_service_1 = require("../../shared/storage/storage.service");
 const user_types_1 = require("./user.types");
 class UserService {
     // ── getMe ──────────────────────────────────────────────────────────────────
@@ -426,6 +427,27 @@ class UserService {
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('UserService.unblockUser:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    // ── uploadPhoto ────────────────────────────────────────────────────────────
+    async uploadPhoto(userId, buffer, mimeType) {
+        try {
+            const result = await storage_service_1.StorageService.upload(buffer, mimeType, {
+                folder: 'groupsync/avatars',
+                publicId: userId,
+                transformation: [{ width: 400, height: 400, crop: 'fill', quality: 'auto', fetch_format: 'auto' }],
+            });
+            await connection_1.prisma.user.update({
+                where: { id: userId },
+                data: { profilePhotoUrl: result.url },
+            });
+            return { url: result.url };
+        }
+        catch (error) {
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('UserService.uploadPhoto:', error);
             throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }

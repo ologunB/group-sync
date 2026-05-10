@@ -8,6 +8,7 @@ const error_middleware_1 = require("../../shared/middleware/error.middleware");
 const response_constants_1 = require("../../shared/utils/response.constants");
 const asLogger_1 = require("../../shared/utils/asLogger");
 const audit_logger_1 = require("../../shared/utils/audit.logger");
+const storage_service_1 = require("../../shared/storage/storage.service");
 const agenda_1 = require("../../agenda");
 const slug_1 = require("../../shared/utils/slug");
 const group_types_1 = require("./group.types");
@@ -519,6 +520,48 @@ class GroupService {
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('GroupService.getGroupStats:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    // ── uploadCover ────────────────────────────────────────────────────────────
+    async uploadCover(groupId, buffer, mimeType) {
+        try {
+            const result = await storage_service_1.StorageService.upload(buffer, mimeType, {
+                folder: `groupsync/groups/${groupId}`,
+                publicId: 'cover',
+                transformation: [{ width: 1200, height: 400, crop: 'fill', quality: 'auto', fetch_format: 'auto' }],
+            });
+            await connection_1.prisma.group.update({
+                where: { id: groupId },
+                data: { coverImageUrl: result.url },
+            });
+            return { url: result.url };
+        }
+        catch (error) {
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('GroupService.uploadCover:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    // ── uploadLogo ─────────────────────────────────────────────────────────────
+    async uploadLogo(groupId, buffer, mimeType) {
+        try {
+            const result = await storage_service_1.StorageService.upload(buffer, mimeType, {
+                folder: `groupsync/groups/${groupId}`,
+                publicId: 'logo',
+                transformation: [{ width: 400, height: 400, crop: 'fill', quality: 'auto', fetch_format: 'auto' }],
+            });
+            await connection_1.prisma.group.update({
+                where: { id: groupId },
+                data: { logoUrl: result.url },
+            });
+            return { url: result.url };
+        }
+        catch (error) {
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('GroupService.uploadLogo:', error);
             throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }

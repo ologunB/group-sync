@@ -106,6 +106,20 @@ class UserController {
             next(error);
         }
     };
+    // ─── POST /users/me/photo ──────────────────────────────────────────────────
+    uploadPhoto = async (req, res, next) => {
+        try {
+            if (!req.file) {
+                response_helper_1.ResponseHelper.error(res, 'No image file provided', http_status_codes_1.StatusCodes.BAD_REQUEST);
+                return;
+            }
+            const result = await userService.uploadPhoto(req.user.userId, req.file.buffer, req.file.mimetype);
+            response_helper_1.ResponseHelper.success(res, result, 'Profile photo updated successfully.');
+        }
+        catch (error) {
+            next(error);
+        }
+    };
 }
 exports.UserController = UserController;
 //# sourceMappingURL=user.controller.js.map

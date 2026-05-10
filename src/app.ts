@@ -20,6 +20,10 @@ import authRoutes from "./features/auth/auth.routes";
 import userRoutes from "./features/users/user.routes";
 import groupRoutes from "./features/group/group.routes";
 import membershipRoutes from "./features/membership/membership.routes";
+import notificationRoutes from "./features/notifications/notification.routes";
+import eventRoutes from "./features/events/event.routes";
+import reportRoutes from "./features/reports/report.routes";
+import adminRoutes from "./features/admin/admin.routes";
 
 export class App {
   public readonly app: Application;
@@ -69,8 +73,10 @@ export class App {
     this.app.use(`${apiPrefix}/users`, userRoutes);
     this.app.use(`${apiPrefix}/groups`, groupRoutes);
     this.app.use(`${apiPrefix}/groups`, membershipRoutes);
-    // this.app.use(`${apiPrefix}/notifications`, notificationRoutes);
-    // this.app.use(`${apiPrefix}/admin`, adminRoutes);
+    this.app.use(`${apiPrefix}/notifications`, notificationRoutes);
+    this.app.use(`${apiPrefix}`, eventRoutes);
+    this.app.use(`${apiPrefix}/reports`, reportRoutes);
+    this.app.use(`${apiPrefix}/admin`, adminRoutes);
 
     // Route manifest
     this.app.get(`${apiPrefix}/routes`, (_req, res) => {

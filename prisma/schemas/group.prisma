@@ -29,11 +29,13 @@ model Group {
   updatedAt              DateTime                              @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt              DateTime?                             @map("deleted_at") @db.Timestamptz
 
-  creator      User          @relation("GroupCreator", fields: [createdBy], references: [id])
-  memberships  Membership[]
-  applications Application[]
-  inviteLinks  InviteLink[]
-  groupForm    GroupForm?
+  creator               User                     @relation("GroupCreator", fields: [createdBy], references: [id])
+  memberships           Membership[]
+  applications          Application[]
+  inviteLinks           InviteLink[]
+  groupForm             GroupForm?
+  events                Event[]
+  notificationPrefs     NotificationPreference[]
 
   @@index([category], map: "idx_groups_category")
   @@index([slug], map: "idx_groups_slug")

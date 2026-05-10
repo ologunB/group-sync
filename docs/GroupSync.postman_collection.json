@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "groupsync-api-v1",
     "name": "GroupSync API",
-    "description": "Complete API documentation for GroupSync \u2014 location-based social platform.\n\n## Quick Setup\n1. Import this collection\n2. Set `baseUrl` to `http://localhost:3000/api/v1`\n3. Run Register or Login \u2014 tokens saved automatically\n4. All authenticated requests use `{{accessToken}}` via collection-level Auth\n\n## Variables\n| Variable | Description | Auto-set |\n|---|---|---|\n| `baseUrl` | API base URL | No |\n| `accessToken` | JWT (15 min) | Yes \u2014 Login/Register |\n| `refreshToken` | Opaque token (30d) | Yes \u2014 Login/Register |\n| `userId` | Auth user UUID | Yes \u2014 Login/Register |\n| `targetUserId` | Another user UUID | No \u2014 set manually |\n| `groupId` | Group UUID | Yes \u2014 Create Group |\n| `groupSlug` | Group slug | Yes \u2014 Create Group |\n| `applicationId` | Application UUID | Yes \u2014 Apply to Group |\n| `inviteLinkId` | Invite link UUID | Yes \u2014 Generate Invite |\n| `inviteToken` | Invite token string | Yes \u2014 Generate Invite |\n\n## Response Envelope\n```json\n{ \"success\": true|false, \"message\": \"string\", \"data\": {}|[]|null, \"error\": null }\n```\nPaginated: includes `pagination: { page, limit, total }`",
+    "description": "Complete API documentation for GroupSync — location-based social platform.\n\n## Quick Setup\n1. Import this collection\n2. Set `baseUrl` to `http://localhost:3000/api/v1`\n3. Run Register or Login — tokens saved automatically\n4. All authenticated requests use `{{accessToken}}` via collection-level Auth\n\n## Variables\n| Variable | Description | Auto-set |\n|---|---|---|\n| `baseUrl` | API base URL | No |\n| `accessToken` | JWT (15 min) | Yes — Login/Register |\n| `refreshToken` | Opaque token (30d) | Yes — Login/Register |\n| `userId` | Auth user UUID | Yes — Login/Register |\n| `targetUserId` | Another user UUID | No — set manually |\n| `groupId` | Group UUID | Yes — Create Group |\n| `groupSlug` | Group slug | Yes — Create Group |\n| `applicationId` | Application UUID | Yes — Apply to Group |\n| `inviteLinkId` | Invite link UUID | Yes — Generate Invite |\n| `inviteToken` | Invite token string | Yes — Generate Invite |\n\n## Response Envelope\n```json\n{ \"success\": true|false, \"message\": \"string\", \"data\": {}|[]|null, \"error\": null }\n```\nPaginated: includes `pagination: { page, limit, total }`",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "version": {
       "major": 1,
@@ -68,6 +68,21 @@
     },
     {
       "key": "resetToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "eventId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "notificationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reportId",
       "value": "",
       "type": "string"
     }
@@ -203,7 +218,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Account created successfully. Please check your email to verify your account.\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"email\": \"testuser@example.com\",\n      \"displayName\": \"Test User\",\n      \"username\": null,\n      \"profilePhotoUrl\": null,\n      \"bio\": null,\n      \"city\": null,\n      \"state\": null,\n      \"country\": \"NG\",\n      \"interests\": [],\n      \"emailVerifiedAt\": null,\n      \"idVerificationStatus\": \"unsubmitted\",\n      \"status\": \"active\",\n      \"lastLoginAt\": null,\n      \"preferredLanguage\": \"en\",\n      \"createdAt\": \"2026-05-03T16:00:00.000Z\",\n      \"updatedAt\": \"2026-05-03T16:00:00.000Z\"\n    },\n    \"tokens\": {\n      \"accessToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n      \"refreshToken\": \"a3f8b2c1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0\",\n      \"expiresIn\": 900\n    }\n  }\n}"
             },
             {
-              "name": "409 Conflict \u2014 Email exists",
+              "name": "409 Conflict — Email exists",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -215,7 +230,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"An account with this email address already exists.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "422 Unprocessable \u2014 Validation failed",
+              "name": "422 Unprocessable — Validation failed",
               "status": "Unprocessable Entity",
               "code": 422,
               "header": [
@@ -293,7 +308,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Login successful.\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"email\": \"testuser@example.com\",\n      \"displayName\": \"Test User\",\n      \"idVerificationStatus\": \"unsubmitted\",\n      \"status\": \"active\",\n      \"lastLoginAt\": \"2026-05-03T16:00:00.000Z\",\n      \"createdAt\": \"2026-05-03T16:00:00.000Z\",\n      \"updatedAt\": \"2026-05-03T16:00:00.000Z\"\n    },\n    \"tokens\": {\n      \"accessToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n      \"refreshToken\": \"a3f8b2c1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0\",\n      \"expiresIn\": 900\n    }\n  }\n}"
             },
             {
-              "name": "401 Unauthorized \u2014 Wrong credentials",
+              "name": "401 Unauthorized — Wrong credentials",
               "status": "Unauthorized",
               "code": 401,
               "header": [
@@ -305,7 +320,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"Invalid email or password.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "429 Too Many Requests \u2014 Account locked",
+              "name": "429 Too Many Requests — Account locked",
               "status": "Too Many Requests",
               "code": 429,
               "header": [
@@ -367,7 +382,7 @@
                 "social"
               ]
             },
-            "description": "Login or register via Google or Apple ID token.\n\nResolution flow:\n1. Provider ID linked \u2192 sign in\n2. Email exists, no link \u2192 link provider, sign in\n3. Neither \u2192 create account + link, sign in\n\nisNewUser=true triggers onboarding flow on client.\nApple returns 501 until Apple JWK verification is configured."
+            "description": "Login or register via Google or Apple ID token.\n\nResolution flow:\n1. Provider ID linked → sign in\n2. Email exists, no link → link provider, sign in\n3. Neither → create account + link, sign in\n\nisNewUser=true triggers onboarding flow on client.\nApple returns 501 until Apple JWK verification is configured."
           },
           "response": [
             {
@@ -383,7 +398,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Login successful.\",\n  \"data\": {\n    \"user\": { \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\", \"email\": \"testuser@gmail.com\", \"displayName\": \"Test User\", \"idVerificationStatus\": \"unsubmitted\", \"status\": \"active\" },\n    \"tokens\": { \"accessToken\": \"eyJhbGci...\", \"refreshToken\": \"a3f8b2c1...\", \"expiresIn\": 900 },\n    \"isNewUser\": false\n  }\n}"
             },
             {
-              "name": "401 Unauthorized \u2014 Invalid token",
+              "name": "401 Unauthorized — Invalid token",
               "status": "Unauthorized",
               "code": 401,
               "header": [
@@ -440,7 +455,7 @@
                 "logout"
               ]
             },
-            "description": "Revoke refresh token and session. Auth required.\n\nAccess token remains valid until 15-min TTL expires (stateless JWT).\nIdempotent \u2014 already-revoked tokens return 200.\nClears presence:{userId} in Redis.",
+            "description": "Revoke refresh token and session. Auth required.\n\nAccess token remains valid until 15-min TTL expires (stateless JWT).\nIdempotent — already-revoked tokens return 200.\nClears presence:{userId} in Redis.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -515,7 +530,7 @@
                 "refresh"
               ]
             },
-            "description": "Exchange refresh token for new token pair. No auth header needed.\n\nToken rotation: old token atomically revoked \u2014 each token usable once only.\nCall when access token expires (HTTP 401 TOKEN_EXPIRED)."
+            "description": "Exchange refresh token for new token pair. No auth header needed.\n\nToken rotation: old token atomically revoked — each token usable once only.\nCall when access token expires (HTTP 401 TOKEN_EXPIRED)."
           },
           "response": [
             {
@@ -531,7 +546,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Tokens refreshed successfully.\",\n  \"data\": {\n    \"tokens\": { \"accessToken\": \"eyJhbGci...\", \"refreshToken\": \"b4c9d0e1...\", \"expiresIn\": 900 }\n  }\n}"
             },
             {
-              "name": "401 Unauthorized \u2014 Invalid refresh token",
+              "name": "401 Unauthorized — Invalid refresh token",
               "status": "Unauthorized",
               "code": 401,
               "header": [
@@ -576,11 +591,11 @@
                 "forgot-password"
               ]
             },
-            "description": "Request 6-digit OTP for password reset.\n\nAlways returns 200 regardless of email existence \u2014 prevents enumeration.\nOTP TTL: 10 min (Redis: verify:forgot:{email}).\n\nFlow: forgot-password \u2192 verify-forgot-otp \u2192 reset-password"
+            "description": "Request 6-digit OTP for password reset.\n\nAlways returns 200 regardless of email existence — prevents enumeration.\nOTP TTL: 10 min (Redis: verify:forgot:{email}).\n\nFlow: forgot-password → verify-forgot-otp → reset-password"
           },
           "response": [
             {
-              "name": "200 OK \u2014 Always returned",
+              "name": "200 OK — Always returned",
               "status": "OK",
               "code": 200,
               "header": [
@@ -642,11 +657,11 @@
                 "verify-forgot-otp"
               ]
             },
-            "description": "Verify forgot-password OTP without DB changes.\n\nDoes NOT consume or extend the OTP \u2014 same OTP must be sent to reset-password.\nGate the new password UI behind a 200 from this endpoint."
+            "description": "Verify forgot-password OTP without DB changes.\n\nDoes NOT consume or extend the OTP — same OTP must be sent to reset-password.\nGate the new password UI behind a 200 from this endpoint."
           },
           "response": [
             {
-              "name": "200 OK \u2014 OTP valid",
+              "name": "200 OK — OTP valid",
               "status": "OK",
               "code": 200,
               "header": [
@@ -658,7 +673,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"OTP is valid.\",\n  \"data\": null\n}"
             },
             {
-              "name": "400 Bad Request \u2014 OTP invalid/expired",
+              "name": "400 Bad Request — OTP invalid/expired",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -719,7 +734,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Password has been reset successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "400 Bad Request \u2014 OTP invalid/expired",
+              "name": "400 Bad Request — OTP invalid/expired",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -761,7 +776,7 @@
                 "change-password"
               ]
             },
-            "description": "Change authenticated user's password. Auth required.\n\nRequires current password \u2014 use forgot-password flow if unknown.\nSocial-only accounts: returns 400 (no password set).",
+            "description": "Change authenticated user's password. Auth required.\n\nRequires current password — use forgot-password flow if unknown.\nSocial-only accounts: returns 400 (no password set).",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -787,7 +802,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Password changed successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "400 Bad Request \u2014 Wrong current password",
+              "name": "400 Bad Request — Wrong current password",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -848,7 +863,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Email verified successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "400 Bad Request \u2014 Invalid/expired OTP",
+              "name": "400 Bad Request — Invalid/expired OTP",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -897,7 +912,7 @@
           },
           "response": [
             {
-              "name": "200 OK \u2014 Always returned",
+              "name": "200 OK — Always returned",
               "status": "OK",
               "code": 200,
               "header": [
@@ -965,7 +980,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Identity document submitted for review.\",\n  \"data\": { \"idVerificationStatus\": \"pending\" }\n}"
             },
             {
-              "name": "409 Conflict \u2014 Already pending/verified",
+              "name": "409 Conflict — Already pending/verified",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -1015,11 +1030,11 @@
                 "kyc-webhook"
               ]
             },
-            "description": "Internal endpoint \u2014 called by KYC provider, not client app.\n\nSignature: sha256=HMAC-SHA256(body, KYC_WEBHOOK_SECRET). Invalid \u2192 401.\nIdempotency: event_id cached in Redis 24hr. Duplicates silently ignored.\n\nOn approved: status=verified, document fields nulled, S3 cleanup queued, approval email sent.\nOn rejected: status=rejected, document fields nulled, rejection email sent."
+            "description": "Internal endpoint — called by KYC provider, not client app.\n\nSignature: sha256=HMAC-SHA256(body, KYC_WEBHOOK_SECRET). Invalid → 401.\nIdempotency: event_id cached in Redis 24hr. Duplicates silently ignored.\n\nOn approved: status=verified, document fields nulled, S3 cleanup queued, approval email sent.\nOn rejected: status=rejected, document fields nulled, rejection email sent."
           },
           "response": [
             {
-              "name": "200 OK \u2014 Processed",
+              "name": "200 OK — Processed",
               "status": "OK",
               "code": 200,
               "header": [
@@ -1031,7 +1046,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Webhook received\",\n  \"data\": null\n}"
             },
             {
-              "name": "401 Unauthorized \u2014 Invalid signature",
+              "name": "401 Unauthorized — Invalid signature",
               "status": "Unauthorized",
               "code": 401,
               "header": [
@@ -1048,7 +1063,7 @@
     },
     {
       "name": "Users",
-      "description": "Profile management, public profiles, interests, group memberships, applications, blocking.\n\nPrivacy rules:\n- phone, phoneIv, passwordHash, idDocumentUrl, idDocumentIv \u2014 never returned\n- email \u2014 only to owning user (GET /users/me)\n- idVerificationStatus \u2014 only to owning user\n- Block in either direction \u2192 GET /users/:id returns 404",
+      "description": "Profile management, public profiles, interests, group memberships, applications, blocking.\n\nPrivacy rules:\n- phone, phoneIv, passwordHash, idDocumentUrl, idDocumentIv — never returned\n- email — only to owning user (GET /users/me)\n- idVerificationStatus — only to owning user\n- Block in either direction → GET /users/:id returns 404",
       "item": [
         {
           "name": "Get My Profile",
@@ -1176,7 +1191,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Profile updated successfully.\",\n  \"data\": {\n    \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"email\": \"testuser@example.com\",\n    \"displayName\": \"Test User Updated\",\n    \"username\": \"test_user\",\n    \"city\": \"Lagos\",\n    \"state\": \"Lagos\",\n    \"country\": \"NG\",\n    \"bio\": \"Lagos-based software engineer passionate about communities.\",\n    \"interests\": [\"tech\"],\n    \"idVerificationStatus\": \"verified\",\n    \"status\": \"active\",\n    \"createdAt\": \"2026-05-03T16:00:00.000Z\",\n    \"updatedAt\": \"2026-05-03T17:00:00.000Z\"\n  }\n}"
             },
             {
-              "name": "409 Conflict \u2014 Username taken",
+              "name": "409 Conflict — Username taken",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -1219,7 +1234,7 @@
                 "me"
               ]
             },
-            "description": "Soft-delete account (GDPR). Auth required.\n\nSets deletedAt, status=banned, rewrites email to deleted_{id}@deleted.groupsync.\nRevokes all refresh tokens and sessions.\nIrreversible from API \u2014 requires direct DB restoration.",
+            "description": "Soft-delete account (GDPR). Auth required.\n\nSets deletedAt, status=banned, rewrites email to deleted_{id}@deleted.groupsync.\nRevokes all refresh tokens and sessions.\nIrreversible from API — requires direct DB restoration.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1481,7 +1496,7 @@
                   "key": "photo",
                   "type": "file",
                   "src": "",
-                  "description": "Profile photo \u2014 JPEG, PNG, or WebP, max 5 MB"
+                  "description": "Profile photo — JPEG, PNG, or WebP, max 5 MB"
                 }
               ]
             },
@@ -1522,7 +1537,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Profile photo updated successfully.\",\n  \"data\": {\n    \"url\": \"https://res.cloudinary.com/dmayydar0/image/upload/groupsync/avatars/user-uuid.jpg\"\n  }\n}"
             },
             {
-              "name": "422 \u2014 Invalid file type",
+              "name": "422 — Invalid file type",
               "status": "Unprocessable Entity",
               "code": 422,
               "header": [
@@ -1534,7 +1549,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"Only JPEG, PNG, and WebP images are allowed\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "400 \u2014 No file attached",
+              "name": "400 — No file attached",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -1669,7 +1684,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"User blocked successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "400 Bad Request \u2014 Cannot block yourself",
+              "name": "400 Bad Request — Cannot block yourself",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -1709,7 +1724,7 @@
                 "block"
               ]
             },
-            "description": "Remove block. Auth required. Idempotent (deleteMany \u2014 no error if not blocked).\n400 if self-unblock.",
+            "description": "Remove block. Auth required. Idempotent (deleteMany — no error if not blocked).\n400 if self-unblock.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1740,7 +1755,7 @@
     },
     {
       "name": "Groups",
-      "description": "Group CRUD \u2014 create, list/search, get by slug, update, delete, members, stats.\n\nRole hierarchy: super_admin > admin > moderator > member\nInvite-only groups: hidden from discovery, profile returns 404 for non-members.",
+      "description": "Group CRUD — create, list/search, get by slug, update, delete, members, stats.\n\nRole hierarchy: super_admin > admin > moderator > member\nInvite-only groups: hidden from discovery, profile returns 404 for non-members.",
       "item": [
         {
           "name": "Create Group",
@@ -1812,7 +1827,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Group created successfully.\",\n  \"data\": {\n    \"id\": \"b2c3d4e5-f6a7-8901-bcde-f12345678901\",\n    \"name\": \"Lagos Tech Community\",\n    \"slug\": \"lagos-tech-community\",\n    \"category\": \"Technology\",\n    \"subcategory\": \"Software Engineering\",\n    \"description\": \"A community for software engineers in Lagos.\",\n    \"coverImageUrl\": \"https://bucket.s3.amazonaws.com/covers/ltc.jpg\",\n    \"logoUrl\": \"https://bucket.s3.amazonaws.com/logos/ltc.png\",\n    \"city\": \"Lagos\",\n    \"state\": \"Lagos\",\n    \"country\": \"NG\",\n    \"membershipType\": \"open\",\n    \"membershipFee\": null,\n    \"membershipFeeCurrency\": \"NGN\",\n    \"membershipFeeFrequency\": null,\n    \"howToJoinContent\": \"Just click join!\",\n    \"rules\": \"Be respectful. No spam.\",\n    \"foundingDate\": null,\n    \"isVerified\": false,\n    \"isDiscoverable\": true,\n    \"memberCount\": 1,\n    \"status\": \"active\",\n    \"createdBy\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"createdAt\": \"2026-05-03T16:00:00.000Z\",\n    \"updatedAt\": \"2026-05-03T16:00:00.000Z\"\n  }\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Not verified",
+              "name": "403 Forbidden — Not verified",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -1824,7 +1839,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"You must complete identity verification to perform this action.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "422 Unprocessable \u2014 Validation failed",
+              "name": "422 Unprocessable — Validation failed",
               "status": "Unprocessable Entity",
               "code": 422,
               "header": [
@@ -1956,7 +1971,7 @@
                 }
               ]
             },
-            "description": "List and search groups. Auth optional \u2014 affects invite-only visibility.\n\nSearch: full-text via fts_vector (name, description, category, subcategory).\nDistance filter: requires lat + lng + radius_km.\nDistance sort: requires lat + lng.\nInvite-only groups excluded unless caller is an active member.\nDeleted/inactive groups always excluded."
+            "description": "List and search groups. Auth optional — affects invite-only visibility.\n\nSearch: full-text via fts_vector (name, description, category, subcategory).\nDistance filter: requires lat + lng + radius_km.\nDistance sort: requires lat + lng.\nInvite-only groups excluded unless caller is an active member.\nDeleted/inactive groups always excluded."
           },
           "response": [
             {
@@ -2103,7 +2118,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Group updated successfully.\",\n  \"data\": {\n    \"id\": \"b2c3d4e5-f6a7-8901-bcde-f12345678901\",\n    \"name\": \"Lagos Tech Community\",\n    \"slug\": \"lagos-tech-community\",\n    \"membershipType\": \"application\",\n    \"status\": \"active\",\n    \"updatedAt\": \"2026-05-03T17:00:00.000Z\"\n  }\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Not admin",
+              "name": "403 Forbidden — Not admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2168,7 +2183,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Group deleted successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Not super_admin",
+              "name": "403 Forbidden — Not super_admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2350,7 +2365,7 @@
                   "key": "cover",
                   "type": "file",
                   "src": "",
-                  "description": "Cover image \u2014 JPEG, PNG, or WebP, max 5 MB. Recommended: 1200\u00d7400 px"
+                  "description": "Cover image — JPEG, PNG, or WebP, max 5 MB. Recommended: 1200×400 px"
                 }
               ]
             },
@@ -2365,7 +2380,7 @@
                 "cover"
               ]
             },
-            "description": "Upload or replace the group's cover image. Requires admin or super_admin role.\n\nAccepts multipart/form-data with field name `cover`.\nAllowed formats: JPEG, PNG, WebP. Max 5 MB.\nImage is cropped and optimised to 1200\u00d7400 px.\n\n403 if caller is not admin/super_admin.",
+            "description": "Upload or replace the group's cover image. Requires admin or super_admin role.\n\nAccepts multipart/form-data with field name `cover`.\nAllowed formats: JPEG, PNG, WebP. Max 5 MB.\nImage is cropped and optimised to 1200×400 px.\n\n403 if caller is not admin/super_admin.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2391,7 +2406,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Cover image updated successfully.\",\n  \"data\": {\n    \"url\": \"https://res.cloudinary.com/dmayydar0/image/upload/groupsync/groups/group-uuid/cover.jpg\"\n  }\n}"
             },
             {
-              "name": "403 \u2014 Not admin",
+              "name": "403 — Not admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2431,7 +2446,7 @@
                   "key": "logo",
                   "type": "file",
                   "src": "",
-                  "description": "Logo \u2014 JPEG, PNG, or WebP, max 5 MB. Recommended: 400\u00d7400 px (square)"
+                  "description": "Logo — JPEG, PNG, or WebP, max 5 MB. Recommended: 400×400 px (square)"
                 }
               ]
             },
@@ -2446,7 +2461,7 @@
                 "logo"
               ]
             },
-            "description": "Upload or replace the group's logo. Requires admin or super_admin role.\n\nAccepts multipart/form-data with field name `logo`.\nAllowed formats: JPEG, PNG, WebP. Max 5 MB.\nImage is cropped and optimised to 400\u00d7400 px.\n\n403 if caller is not admin/super_admin.",
+            "description": "Upload or replace the group's logo. Requires admin or super_admin role.\n\nAccepts multipart/form-data with field name `logo`.\nAllowed formats: JPEG, PNG, WebP. Max 5 MB.\nImage is cropped and optimised to 400×400 px.\n\n403 if caller is not admin/super_admin.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2472,7 +2487,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Logo updated successfully.\",\n  \"data\": {\n    \"url\": \"https://res.cloudinary.com/dmayydar0/image/upload/groupsync/groups/group-uuid/logo.jpg\"\n  }\n}"
             },
             {
-              "name": "403 \u2014 Not admin",
+              "name": "403 — Not admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2544,7 +2559,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"You have joined the group successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Not open group",
+              "name": "403 Forbidden — Not open group",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2556,7 +2571,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"This group requires an application. Use POST /groups/:id/apply instead.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "409 Conflict \u2014 Already a member",
+              "name": "409 Conflict — Already a member",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -2640,7 +2655,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Application submitted successfully.\",\n  \"data\": {\n    \"applicationId\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n    \"status\": \"pending\"\n  }\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Not application group",
+              "name": "403 Forbidden — Not application group",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2652,7 +2667,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"This group is open. Use POST /groups/:id/join instead.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "409 Conflict \u2014 Pending application exists",
+              "name": "409 Conflict — Pending application exists",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -2664,7 +2679,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"You already have a pending application for this group.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "422 Unprocessable \u2014 Required fields missing",
+              "name": "422 Unprocessable — Required fields missing",
               "status": "Unprocessable Entity",
               "code": 422,
               "header": [
@@ -2730,7 +2745,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"You have left the group.\",\n  \"data\": null\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Owner cannot leave",
+              "name": "403 Forbidden — Owner cannot leave",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2869,7 +2884,7 @@
           },
           "response": [
             {
-              "name": "200 OK \u2014 Approved",
+              "name": "200 OK — Approved",
               "status": "OK",
               "code": 200,
               "header": [
@@ -2881,7 +2896,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Application approved. Member added to the group.\",\n  \"data\": null\n}"
             },
             {
-              "name": "200 OK \u2014 Rejected",
+              "name": "200 OK — Rejected",
               "status": "OK",
               "code": 200,
               "header": [
@@ -2893,7 +2908,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Application rejected.\",\n  \"data\": null\n}"
             },
             {
-              "name": "409 Conflict \u2014 Not pending",
+              "name": "409 Conflict — Not pending",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -2936,7 +2951,7 @@
                 "{{applicationId}}"
               ]
             },
-            "description": "Reject with a reason. Same endpoint as approve \u2014 just set action=reject and include rejection_reason.\n\nrejection_reason is included in the notification email sent to the applicant.\nMax 1000 characters.",
+            "description": "Reject with a reason. Same endpoint as approve — just set action=reject and include rejection_reason.\n\nrejection_reason is included in the notification email sent to the applicant.\nMax 1000 characters.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -3016,7 +3031,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Application withdrawn successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "409 Conflict \u2014 Not pending",
+              "name": "409 Conflict — Not pending",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -3072,7 +3087,7 @@
           },
           "response": [
             {
-              "name": "200 OK \u2014 Form exists",
+              "name": "200 OK — Form exists",
               "status": "OK",
               "code": 200,
               "header": [
@@ -3084,7 +3099,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"fields\": [\n      { \"id\": \"field_001\", \"type\": \"textarea\", \"label\": \"Why do you want to join?\", \"required\": true },\n      { \"id\": \"field_002\", \"type\": \"select\", \"label\": \"Years of experience\", \"required\": true, \"options\": [\"0-1\", \"2-5\", \"5-10\", \"10+\"] },\n      { \"id\": \"field_003\", \"type\": \"checkbox\", \"label\": \"I agree to the group rules\", \"required\": true }\n    ]\n  }\n}"
             },
             {
-              "name": "200 OK \u2014 No form configured",
+              "name": "200 OK — No form configured",
               "status": "OK",
               "code": 200,
               "header": [
@@ -3208,7 +3223,7 @@
                 "{{targetUserId}}"
               ]
             },
-            "description": "Promote, demote, suspend, or ban a group member. Auth required. Role: admin or super_admin.\n\nRole hierarchy rules:\n- Cannot modify super_admin (403)\n- Admin cannot modify another admin \u2014 only super_admin can (403)\n- Can only assign roles BELOW your own rank (403)\n- Caller must outrank target to modify them (403)\n\nCan send role, status, or both.\nroles: admin | moderator | member (cannot set super_admin via this endpoint)\nstatuses: active | suspended | banned\n\nNotifies affected member via BullMQ.",
+            "description": "Promote, demote, suspend, or ban a group member. Auth required. Role: admin or super_admin.\n\nRole hierarchy rules:\n- Cannot modify super_admin (403)\n- Admin cannot modify another admin — only super_admin can (403)\n- Can only assign roles BELOW your own rank (403)\n- Caller must outrank target to modify them (403)\n\nCan send role, status, or both.\nroles: admin | moderator | member (cannot set super_admin via this endpoint)\nstatuses: active | suspended | banned\n\nNotifies affected member via BullMQ.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -3234,7 +3249,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Member updated successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Cannot modify super_admin",
+              "name": "403 Forbidden — Cannot modify super_admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -3246,7 +3261,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"The group owner cannot be modified. Transfer ownership first.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Admin vs admin",
+              "name": "403 Forbidden — Admin vs admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -3290,7 +3305,7 @@
                 "{{targetUserId}}"
               ]
             },
-            "description": "Suspend a member. Same endpoint as role update \u2014 set status=suspended.\n\nSuspended members cannot send messages or participate in the group.\nRestored by setting status=active.",
+            "description": "Suspend a member. Same endpoint as role update — set status=suspended.\n\nSuspended members cannot send messages or participate in the group.\nRestored by setting status=active.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -3487,7 +3502,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Member removed from the group.\",\n  \"data\": null\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Cannot remove super_admin",
+              "name": "403 Forbidden — Cannot remove super_admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -3681,7 +3696,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Invite link revoked.\",\n  \"data\": null\n}"
             },
             {
-              "name": "409 Conflict \u2014 Already revoked",
+              "name": "409 Conflict — Already revoked",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -3748,7 +3763,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"You have joined the group via invite link.\",\n  \"data\": null\n}"
             },
             {
-              "name": "410 Gone \u2014 Link revoked/expired/exhausted",
+              "name": "410 Gone — Link revoked/expired/exhausted",
               "status": "Gone",
               "code": 410,
               "header": [
@@ -3760,7 +3775,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"This invite link has expired.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "409 Conflict \u2014 Already a member",
+              "name": "409 Conflict — Already a member",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -3772,7 +3787,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"You are already a member of this group.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "404 Not Found \u2014 Invalid token",
+              "name": "404 Not Found — Invalid token",
               "status": "Not Found",
               "code": 404,
               "header": [
@@ -3784,6 +3799,1006 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"This invite link is invalid or does not exist.\",\n  \"data\": null,\n  \"error\": null\n}"
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "item": [
+        {
+          "name": "Create Event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/groups/{{groupId}}/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "{{groupId}}",
+                "events"
+              ]
+            },
+            "description": "Create an event in a group. Requires admin or super_admin role.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Lagos Tech Meetup\",\n  \"description\": \"Monthly engineering meetup\",\n  \"starts_at\": \"2027-06-15T18:00:00.000Z\",\n  \"rsvp_limit\": 100\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.data && b.data.id) pm.collectionVariables.set(\"eventId\", b.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Group Events",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/groups/{{groupId}}/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "{{groupId}}",
+                "events"
+              ]
+            },
+            "description": "List all non-cancelled events in a group. Paginated.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Event",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{eventId}}"
+              ]
+            },
+            "description": "Get event details. Includes myRsvp field showing current user's RSVP status.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Event",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{eventId}}"
+              ]
+            },
+            "description": "Update event details. Requires admin role.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Meetup Title\",\n  \"rsvp_limit\": 150\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "RSVP to Event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/rsvp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{eventId}}",
+                "rsvp"
+              ]
+            },
+            "description": "RSVP to an event. Status: going | maybe | not_going. Returns 409 if already RSVPed.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"going\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update RSVP",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/rsvp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{eventId}}",
+                "rsvp"
+              ]
+            },
+            "description": "Update your RSVP status. Must have an existing RSVP.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"maybe\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel RSVP",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/rsvp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{eventId}}",
+                "rsvp"
+              ]
+            },
+            "description": "Cancel/delete your RSVP for an event.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List RSVPs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/rsvps",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{eventId}}",
+                "rsvps"
+              ]
+            },
+            "description": "List all RSVPs for an event. Requires admin role.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel/Delete Event",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{eventId}}"
+              ]
+            },
+            "description": "Cancel an event (sets status to cancelled). Requires admin role.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications"
+              ]
+            },
+            "description": "List notifications (cursor-based). Query: cursor?, limit (1-50), unread_only?. Returns unread_count.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Notification Read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{notificationId}}/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "{{notificationId}}",
+                "read"
+              ]
+            },
+            "description": "Mark a single notification as read.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark All Read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/read-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "read-all"
+              ]
+            },
+            "description": "Mark all notifications as read. Returns { count: number }.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Notification",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{notificationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "{{notificationId}}"
+              ]
+            },
+            "description": "Delete a notification.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Preferences",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/preferences",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "preferences"
+              ]
+            },
+            "description": "Get notification preferences. group_id=null entries are global defaults.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Preferences",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/preferences",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "preferences"
+              ]
+            },
+            "description": "Upsert notification preferences. group_id=null sets global default.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferences\": [\n    {\n      \"pref_type\": \"event_created\",\n      \"push_enabled\": true,\n      \"in_app_enabled\": true\n    },\n    {\n      \"group_id\": \"{{groupId}}\",\n      \"pref_type\": \"message\",\n      \"push_enabled\": false,\n      \"in_app_enabled\": true\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Submit Report",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports"
+              ]
+            },
+            "description": "Submit a report. Rate-limited: 5 per user per 24 hours. Reasons: spam|harassment|hate_speech|fake_profile|inappropriate_content|other. Target types: user|group|message.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"target_type\": \"user\",\n  \"target_id\": \"{{targetUserId}}\",\n  \"reason\": \"spam\",\n  \"description\": \"Spam behaviour reported.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.data && b.data.id) pm.collectionVariables.set(\"reportId\", b.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Platform Admin",
+      "item": [
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ]
+            },
+            "description": "List all users. Query: page, limit, status (active|suspended|banned), search.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update User Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{targetUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{targetUserId}}"
+              ]
+            },
+            "description": "Update a user's status. Values: active|suspended|banned.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Verification",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{targetUserId}}/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{targetUserId}}",
+                "verification"
+              ]
+            },
+            "description": "View submitted ID verification document details.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Review ID Verification",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{targetUserId}}/verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{targetUserId}}",
+                "verification"
+              ]
+            },
+            "description": "Approve or reject ID verification. Decision: approved|rejected. On decision, id_document_url is cleared.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approved\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Groups",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/groups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "groups"
+              ]
+            },
+            "description": "List all groups. Query: page, limit, status, search.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Group",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/groups/{{groupId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "groups",
+                "{{groupId}}"
+              ]
+            },
+            "description": "Verify, suspend, or restore a group. Fields: is_verified (bool), status (active|suspended).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_verified\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Reports",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "reports"
+              ]
+            },
+            "description": "List all reports. Query: page, limit, status (open|reviewing|resolved|dismissed).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Resolve Report",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/{{reportId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "reports",
+                "{{reportId}}"
+              ]
+            },
+            "description": "Resolve or dismiss a report. Action: resolved|dismissed.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"resolved\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Audit Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/audit-logs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "audit-logs"
+              ]
+            },
+            "description": "Query audit logs. Query: page, limit, user_id, action, entity_type, date_from, date_to.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
         }
       ]
     }

@@ -102,6 +102,34 @@ class GroupController {
             next(error);
         }
     };
+    // ─── POST /groups/:id/cover ────────────────────────────────────────────────
+    uploadCover = async (req, res, next) => {
+        try {
+            if (!req.file) {
+                response_helper_1.ResponseHelper.error(res, 'No image file provided', http_status_codes_1.StatusCodes.BAD_REQUEST);
+                return;
+            }
+            const result = await groupService.uploadCover(req.params.id, req.file.buffer, req.file.mimetype);
+            response_helper_1.ResponseHelper.success(res, result, 'Cover image updated successfully.');
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    // ─── POST /groups/:id/logo ─────────────────────────────────────────────────
+    uploadLogo = async (req, res, next) => {
+        try {
+            if (!req.file) {
+                response_helper_1.ResponseHelper.error(res, 'No image file provided', http_status_codes_1.StatusCodes.BAD_REQUEST);
+                return;
+            }
+            const result = await groupService.uploadLogo(req.params.id, req.file.buffer, req.file.mimetype);
+            response_helper_1.ResponseHelper.success(res, result, 'Logo updated successfully.');
+        }
+        catch (error) {
+            next(error);
+        }
+    };
 }
 exports.GroupController = GroupController;
 //# sourceMappingURL=group.controller.js.map

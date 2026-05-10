@@ -178,6 +178,10 @@ class AgendaManager {
                 asLogger_1.asLogger.info('process-group-announcement job received', { groupId: job.data.groupId });
                 break;
             }
+            case 'notify-platform-admin': {
+                asLogger_1.asLogger.info('notify-platform-admin job received', { type: job.data.type, reportId: job.data.reportId });
+                break;
+            }
             default: {
                 asLogger_1.asLogger.warn(`AgendaManager: unknown job name "${name}"`, { jobId: job.id });
                 break;

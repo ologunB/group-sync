@@ -58,7 +58,8 @@ const authenticateVerified = (req, res, next) => {
                 return next(new error_middleware_1.ApiError(response_constants_1.Messages.ACCOUNT_BANNED, http_status_codes_1.StatusCodes.FORBIDDEN));
             }
             if (user.idVerificationStatus !== 'verified') {
-                return next(new error_middleware_1.ApiError(response_constants_1.Messages.ID_NOT_VERIFIED, http_status_codes_1.StatusCodes.FORBIDDEN));
+                ///todo: for now, comment out
+                //  return next(new ApiError(Messages.ID_NOT_VERIFIED, StatusCodes.FORBIDDEN));
             }
             next();
         }

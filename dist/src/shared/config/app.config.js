@@ -41,6 +41,12 @@ exports.config = {
         key: require_env('ENCRYPTION_KEY'),
         algorithm: optional_env('ENCRYPTION_ALGORITHM', 'aes-256-cbc'),
     },
+    storage: {
+        provider: optional_env('STORAGE_PROVIDER', 'cloudinary'),
+        cloudName: optional_env('CLOUDINARY_CLOUD_NAME', ''),
+        apiKey: optional_env('CLOUDINARY_API_KEY', ''),
+        apiSecret: optional_env('CLOUDINARY_API_SECRET', ''),
+    },
     s3: {
         accessKeyId: optional_env('AWS_ACCESS_KEY_ID', ''),
         secretAccessKey: optional_env('AWS_SECRET_ACCESS_KEY', ''),

@@ -39,6 +39,25 @@ exports.LogActions = {
     GROUP_APPLICATION_WITHDRAW: 'group.application_withdraw',
     GROUP_INVITE_REVOKE: 'group.invite_revoke',
     GROUP_FORM_UPSERT: 'group.form_upsert',
+    // Events
+    EVENT_CREATE: 'event.create',
+    EVENT_UPDATE: 'event.update',
+    EVENT_DELETE: 'event.delete',
+    EVENT_RSVP: 'event.rsvp',
+    EVENT_RSVP_UPDATE: 'event.rsvp_update',
+    EVENT_RSVP_CANCEL: 'event.rsvp_cancel',
+    // Notifications
+    NOTIFICATION_READ: 'notification.read',
+    NOTIFICATION_READ_ALL: 'notification.read_all',
+    NOTIFICATION_DELETE: 'notification.delete',
+    NOTIFICATION_PREF_UPDATE: 'notification.pref_update',
+    // Reports
+    REPORT_SUBMIT: 'report.submit',
+    // Admin
+    ADMIN_USER_UPDATE: 'admin.user_update',
+    ADMIN_USER_VERIFY_ID: 'admin.user_verify_id',
+    ADMIN_GROUP_UPDATE: 'admin.group_update',
+    ADMIN_REPORT_RESOLVE: 'admin.report_resolve',
 };
 // ─── Resource type constants ──────────────────────────────────────────────────
 exports.ResourceTypes = {

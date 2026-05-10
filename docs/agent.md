@@ -651,7 +651,121 @@ git pull → npm install → npm run build (tsc) → pm2 restart {id}
 
 ---
 
-## 18. Reference Files
+## 18. Events
+
+### Prisma models
+- `Event` → `events` table. Key fields: `groupId`, `createdBy`, `startsAt`, `endsAt`, `rsvpLimit`, `rsvpCount` (denormalized), `status` (`scheduled|cancelled|completed`), optional PostGIS `locationPoint`.
+- `EventRsvp` → `event_rsvps` table. Unique on `(eventId, userId)`. Status: `going|maybe|not_going`.
+
+### Business rules
+- `starts_at` must be in the future at creation time (enforced in validator).
+- `ends_at` must be after `starts_at` when provided.
+- RSVP limit: if `rsvpLimit` is set and `rsvpCount >= rsvpLimit`, reject new 'going' RSVPs with 422.
+- `rsvpCount` is maintained in application code (not a DB trigger) via `prisma.$transaction([upsert, update])`.
+- Cancelling event: set `status = 'cancelled'` — never hard-delete.
+- On event create: queue `notify-group-members` BullMQ job to fan-out `event_created` notifications.
+- `authorizeGroupRole('super_admin', 'admin')` on create/update/delete/listRsvps.
+
+### Endpoint table
+| Method | Path | Auth |
+|--------|------|------|
+| POST | `/groups/:id/events` | Bearer · admin+ |
+| GET | `/groups/:id/events` | Bearer |
+| GET | `/events/:id` | Bearer |
+| PATCH | `/events/:id` | Bearer · admin+ |
+| DELETE | `/events/:id` | Bearer · admin+ |
+| POST | `/events/:id/rsvp` | Bearer · member |
+| PATCH | `/events/:id/rsvp` | Bearer · member |
+| DELETE | `/events/:id/rsvp` | Bearer · member |
+| GET | `/events/:id/rsvps` | Bearer · admin+ |
+
+### Route mounting
+Event routes are mounted at `/api/v1` (not `/api/v1/events`) because the router handles both `/groups/:id/events` and `/events/:id` paths.
+
+---
+
+## 19. Notifications
+
+### Prisma models
+- `Notification` → `notifications` table. Key fields: `userId`, `type`, `title`, `body`, `referenceType`, `referenceId`, `isRead`, `createdAt`.
+- `NotificationPreference` → `notification_preferences` table. Unique on `(userId, groupId, prefType)`. `groupId = null` = global preference.
+
+### Notification types
+`message | application_submitted | application_approved | application_rejected | member_joined | event_created | group_announcement | dm_received | invite_received | membership_updated | system`
+
+### Pagination
+Cursor-based — ordered by `createdAt DESC`. Cursor is the `id` of the last item returned. Response shape includes `unread_count` alongside cursor fields.
+
+### Creating notifications from other services
+```typescript
+import { NotificationService } from '../notifications/notification.service';
+await NotificationService.create({
+    userId: targetUserId,
+    type: 'member_joined',
+    title: 'New member joined',
+    body: 'Someone joined your group.',
+    referenceType: 'group',
+    referenceId: groupId,
+});
+```
+
+### Endpoint table
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/notifications` | Bearer |
+| PATCH | `/notifications/read-all` | Bearer |
+| PATCH | `/notifications/:id/read` | Bearer |
+| DELETE | `/notifications/:id` | Bearer |
+| GET | `/notifications/preferences` | Bearer |
+| PATCH | `/notifications/preferences` | Bearer |
+
+**Important**: preferences routes are defined BEFORE `/:id` routes in the router to prevent Express treating `preferences` as an ID param.
+
+---
+
+## 20. Reports
+
+### Business rules
+- Rate limit: **5 reports per user per 24 hours** enforced via Redis counter key `report:rate:{userId}` with 24hr TTL.
+- Redis `INCR` first, then check; if counter === 1 set `EXPIRE`. Return 429 if count > 5.
+- After insert, queue `notify-platform-admin` BullMQ job.
+- Reasons: `spam | harassment | hate_speech | fake_profile | inappropriate_content | other`
+- Target types: `user | group | message`
+
+### Endpoint table
+| Method | Path | Auth |
+|--------|------|------|
+| POST | `/reports` | Bearer |
+
+---
+
+## 21. Platform Admin
+
+### Permission
+All admin routes use `authorize('platform.admin')` — this checks `req.user.permissions` from the JWT payload. Platform admin users must have `platform.admin` in their permissions array (set at token generation in `InitialSeeder` or user creation).
+
+### Endpoint table (prefix `/admin`)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/users` | List users (filterable: status, search) |
+| PATCH | `/admin/users/:id` | Update user status (active/suspended/banned) |
+| GET | `/admin/users/:id/verification` | View submitted ID document |
+| PATCH | `/admin/users/:id/verification` | Approve or reject ID verification |
+| GET | `/admin/groups` | List groups (filterable: status, search) |
+| PATCH | `/admin/groups/:id` | Verify/suspend/restore group |
+| GET | `/admin/reports` | List reports (filterable: status) |
+| PATCH | `/admin/reports/:id` | Resolve or dismiss report |
+| GET | `/admin/audit-logs` | Query audit log |
+
+### Notes
+- ID verification: on approval, `idDocumentUrl` and `idDocumentIv` are cleared (document deleted from storage).
+- Group verify: `PATCH /admin/groups/:id` with `{ is_verified: true }`.
+- Report resolution: body `{ action: "resolved" | "dismissed" }`.
+- Audit log query supports: `user_id`, `action`, `entity_type`, `date_from`, `date_to`.
+
+---
+
+## 23. Reference Files
 
 | File | Purpose |
 |---|---|

@@ -14,7 +14,8 @@ export type JobName =
     | 'storage-cleanup'
     | 'expire-invite-links'
     | 'notify-group-members'
-    | 'process-group-announcement';
+    | 'process-group-announcement'
+    | 'notify-platform-admin';
 
 // ─── Connection (BullMQ requires maxRetriesPerRequest: null) ──────────────────
 
@@ -221,6 +222,11 @@ export class AgendaManager {
 
             case 'process-group-announcement': {
                 asLogger.info('process-group-announcement job received', { groupId: job.data.groupId });
+                break;
+            }
+
+            case 'notify-platform-admin': {
+                asLogger.info('notify-platform-admin job received', { type: job.data.type, reportId: job.data.reportId });
                 break;
             }
 

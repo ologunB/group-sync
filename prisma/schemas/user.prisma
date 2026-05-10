@@ -35,7 +35,13 @@ model User {
   memberships          Membership[]
   applications         Application[]  @relation("ApplicationUser")
   applicationsReviewed Application[]  @relation("ApplicationReviewer")
-  inviteLinksCreated   InviteLink[]   @relation("InviteLinkCreator")
+  inviteLinksCreated   InviteLink[]              @relation("InviteLinkCreator")
+  eventsCreated        Event[]                   @relation("EventCreator")
+  eventRsvps           EventRsvp[]
+  notifications        Notification[]
+  notificationPrefs    NotificationPreference[]
+  reportsGiven         Report[]                  @relation("ReporterRelation")
+  reportsReviewed      Report[]                  @relation("ReviewerRelation")
 
   @@index([status], map: "idx_users_status")
   @@index([idVerificationStatus], map: "idx_users_verification")
@@ -71,4 +77,26 @@ model UserBlock {
   @@index([blockerId], map: "idx_blocks_blocker")
   @@index([blockedId], map: "idx_blocks_blocked")
   @@map("user_blocks")
+}
+
+// ─── Report ───────────────────────────────────────────────────────────────────
+
+model Report {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reporterId  String    @map("reporter_id") @db.Uuid
+  targetType  String    @map("target_type") @db.VarChar(20)
+  targetId    String    @map("target_id") @db.Uuid
+  reason      String    @db.VarChar(80)
+  description String?
+  status      String    @default("open") @db.VarChar(20)
+  reviewedBy  String?   @map("reviewed_by") @db.Uuid
+  reviewedAt  DateTime? @map("reviewed_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  reporter User  @relation("ReporterRelation", fields: [reporterId], references: [id])
+  reviewer User? @relation("ReviewerRelation", fields: [reviewedBy], references: [id])
+
+  @@index([status, createdAt], map: "idx_reports_status")
+  @@index([targetType, targetId], map: "idx_reports_target")
+  @@map("reports")
 }
