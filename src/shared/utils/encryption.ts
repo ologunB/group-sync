@@ -76,6 +76,13 @@ export class EncryptionUtil {
         };
     }
 
+    // ─── Deterministic phone hash for uniqueness checks ─────────────────────────
+
+    static hashPhone(phone: string): string {
+        const normalized = phone.trim().replace(/\s+/g, '');
+        return crypto.createHmac('sha256', config.encryption.key).update(normalized).digest('hex');
+    }
+
     // ─── AES-256-CBC field encryption (phone, id_document_url) ─────────────────
 
     static encryptField(plaintext: string): EncryptedField {

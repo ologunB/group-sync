@@ -47,6 +47,7 @@ function stripSensitiveFields<T extends Record<string, unknown>>(user: T): SafeU
         passwordHash: _ph,
         phone: _p,
         phoneIv: _piv,
+        phoneHash: _phash,
         idDocumentUrl: _idu,
         idDocumentIv: _idiv,
         deletedAt: _da,
@@ -75,10 +76,19 @@ export class AuthService {
 
             const passwordHash = await EncryptionUtil.hashPassword(dto.password);
 
-            // Encrypt the phone if provided
+            // Encrypt the phone if provided, enforce uniqueness via HMAC hash
             let phone: string | undefined;
             let phoneIv: string | undefined;
+            let phoneHash: string | undefined;
             if (dto.phone) {
+                phoneHash = EncryptionUtil.hashPhone(dto.phone);
+                const phoneExists = await prisma.user.findUnique({
+                    where: { phoneHash },
+                    select: { id: true },
+                });
+                if (phoneExists) {
+                    throw new ApiError('Phone number is already in use.', StatusCodes.CONFLICT);
+                }
                 const encrypted = EncryptionUtil.encryptField(dto.phone);
                 phone = encrypted.ciphertext;
                 phoneIv = encrypted.iv;
@@ -101,6 +111,7 @@ export class AuthService {
                         passwordHash,
                         phone,
                         phoneIv,
+                        phoneHash,
                     },
                     select: userSafeSelect,
                 });

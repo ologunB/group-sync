@@ -132,7 +132,7 @@ export const userSafeSelect = {
     preferredLanguage: true,
     createdAt: true,
     updatedAt: true,
-    // Explicitly NOT selected: phone, phoneIv, passwordHash, idDocumentUrl, idDocumentIv
+    // Explicitly NOT selected: phone, phoneIv, phoneHash, passwordHash, idDocumentUrl, idDocumentIv
 } satisfies Prisma.UserSelect;
 
 export type UserSafePayload = Prisma.UserGetPayload<{ select: typeof userSafeSelect }>;

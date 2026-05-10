@@ -3,6 +3,7 @@ model User {
   email                String                                @unique @db.VarChar(255)
   phone                String?
   phoneIv              String?                               @map("phone_iv")
+  phoneHash            String?                               @unique @map("phone_hash")
   passwordHash         String?                               @map("password_hash")
   displayName          String                                @map("display_name") @db.VarChar(100)
   username             String?                               @unique @db.VarChar(50)
