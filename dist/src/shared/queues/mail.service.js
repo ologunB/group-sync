@@ -22,6 +22,7 @@ class EmailService {
             port: app_config_1.config.email.port,
             secure: app_config_1.config.email.port === 465,
             auth: { user: app_config_1.config.email.user, pass: app_config_1.config.email.pass },
+            family: 4,
         });
         if (app_config_1.config.email.fallbackUser && app_config_1.config.email.fallbackPass) {
             EmailService.fallback = nodemailer_1.default.createTransport({
@@ -29,6 +30,7 @@ class EmailService {
                 port: 465,
                 secure: true,
                 auth: { user: app_config_1.config.email.fallbackUser, pass: app_config_1.config.email.fallbackPass },
+                family: 4,
             });
             asLogger_1.asLogger.info('EmailService: Gmail fallback transporter configured');
         }

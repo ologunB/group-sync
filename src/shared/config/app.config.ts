@@ -65,12 +65,12 @@ export const config = {
     },
 
     email: {
-        host: optional_env('SMTP_HOST', 'smtp-relay.brevo.com'),
-        port: parseInt(optional_env('SMTP_PORT', '587'), 10),
+        host: optional_env('SMTP_HOST', 'smtp.gmail.com'),
+        port: parseInt(optional_env('SMTP_PORT', '465'), 10),
         user: optional_env('SMTP_USER', ''),
         pass: optional_env('SMTP_PASS', ''),
         from: optional_env('EMAIL_FROM', 'GroupSync <noreply@groupsync.app>'),
-        // Gmail fallback — kicks in if primary SMTP fails
+        // Second Gmail account — kicks in if primary fails
         fallbackUser: optional_env('SMTP_FALLBACK_USER', ''),
         fallbackPass: optional_env('SMTP_FALLBACK_PASS', ''),
     },
