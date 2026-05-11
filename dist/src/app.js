@@ -132,9 +132,9 @@ class App {
         const { port, nodeEnv, serviceMode } = app_config_1.config.server;
         // 1. Connect to PostgreSQL
         await connection_1.Database.getInstance().connect();
-        // 2. Redis connects lazily on first use — no startup commands means no risk of
-        //    ioredis internal command rejections (CLIENT SETNAME etc.) leaking as
-        //    unhandledRejections when REDIS_URL is unavailable or slow at boot time.
+        // 2. Pre-warm Redis in the background — safe now that commandTimeout is removed.
+        //    Errors surface via the 'error' event listener; startup is never blocked.
+        connection_1.redis.connect().catch(() => { });
         // 3. Run idempotent DB seeds
         await initial_seeder_1.InitialSeeder.seed();
         // 4. Initialize email transporter
