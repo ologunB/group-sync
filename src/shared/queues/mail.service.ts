@@ -1,7 +1,5 @@
 import nodemailer, { Transporter } from 'nodemailer';
-import type SMTPTransport from 'nodemailer/lib/smtp-transport';
-
-type SmtpOptions = SMTPTransport.Options & { family?: number };
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import fs from 'fs';
 import path from 'path';
 import { config } from '../config/app.config';
@@ -28,8 +26,7 @@ export class EmailService {
             port:   config.email.port,
             secure: config.email.port === 465,
             auth:   { user: config.email.user, pass: config.email.pass },
-            family: 4,
-        } as SmtpOptions);
+        } as SMTPTransport.Options);
 
         if (config.email.fallbackUser && config.email.fallbackPass) {
             EmailService.fallback = nodemailer.createTransport({
@@ -37,8 +34,7 @@ export class EmailService {
                 port:   465,
                 secure: true,
                 auth:   { user: config.email.fallbackUser, pass: config.email.fallbackPass },
-                family: 4,
-            } as SmtpOptions);
+            } as SMTPTransport.Options);
             asLogger.info('EmailService: Gmail fallback transporter configured');
         }
 

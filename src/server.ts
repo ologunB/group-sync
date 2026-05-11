@@ -1,3 +1,6 @@
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
+
 // Register process-level handlers FIRST — before any other imports
 process.on('uncaughtException', async (error: Error) => {
     console.error('[uncaughtException]', error.message, error.stack);
