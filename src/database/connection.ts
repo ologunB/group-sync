@@ -17,7 +17,7 @@ class Database {
         this.pool = new Pool({
             connectionString: config.database.url,
             ssl: { rejectUnauthorized: false },
-            max: 10,
+            max: 3,
             idleTimeoutMillis: 30_000,
             connectionTimeoutMillis: 5_000,
         });

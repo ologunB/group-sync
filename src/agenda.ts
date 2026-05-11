@@ -154,6 +154,7 @@ export class AgendaManager {
     // ─── Internal: enqueue ────────────────────────────────────────────────────────
 
     private static async enqueue(name: JobName, data: unknown): Promise<void> {
+        console.log(`Enqueuing job: ${name}`, data);
         if (!AgendaManager.queue) {
             throw new Error('AgendaManager not started. Call AgendaManager.start() first.');
         }

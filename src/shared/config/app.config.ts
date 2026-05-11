@@ -65,14 +65,8 @@ export const config = {
     },
 
     email: {
-        host: optional_env('SMTP_HOST', 'smtp.gmail.com'),
-        port: parseInt(optional_env('SMTP_PORT', '465'), 10),
-        user: optional_env('SMTP_USER', ''),
-        pass: optional_env('SMTP_PASS', ''),
-        from: optional_env('EMAIL_FROM', 'GroupSync <noreply@groupsync.app>'),
-        // Second Gmail account — kicks in if primary fails
-        fallbackUser: optional_env('SMTP_FALLBACK_USER', ''),
-        fallbackPass: optional_env('SMTP_FALLBACK_PASS', ''),
+        resendApiKey: optional_env('RESEND_API_KEY', ''),
+        from: optional_env('EMAIL_FROM', 'GroupSync <noreply@groupsync.me>'),
     },
 
     kyc: {

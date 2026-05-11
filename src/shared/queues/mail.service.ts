@@ -1,5 +1,4 @@
-import nodemailer, { Transporter } from 'nodemailer';
-import SMTPTransport from 'nodemailer/lib/smtp-transport';
+import { Resend } from 'resend';
 import fs from 'fs';
 import path from 'path';
 import { config } from '../config/app.config';
@@ -13,33 +12,20 @@ export interface EmailOptions {
 }
 
 export class EmailService {
-    private static primary:  Transporter;
-    private static fallback: Transporter | null = null;
+    private static client: Resend;
     private static initialized = false;
     private static templateCache = new Map<string, string>();
 
     static initialize(): void {
         if (EmailService.initialized) return;
 
-        EmailService.primary = nodemailer.createTransport({
-            host:   config.email.host,
-            port:   config.email.port,
-            secure: config.email.port === 465,
-            auth:   { user: config.email.user, pass: config.email.pass },
-        } as SMTPTransport.Options);
-
-        if (config.email.fallbackUser && config.email.fallbackPass) {
-            EmailService.fallback = nodemailer.createTransport({
-                host:   'smtp.gmail.com',
-                port:   465,
-                secure: true,
-                auth:   { user: config.email.fallbackUser, pass: config.email.fallbackPass },
-            } as SMTPTransport.Options);
-            asLogger.info('EmailService: Gmail fallback transporter configured');
+        if (!config.email.resendApiKey) {
+            asLogger.warn('EmailService: RESEND_API_KEY not set — emails will not be sent');
         }
 
+        EmailService.client = new Resend(config.email.resendApiKey);
         EmailService.initialized = true;
-        asLogger.info('EmailService initialized');
+        asLogger.info('EmailService initialized (Resend)');
     }
 
     static async send(options: EmailOptions): Promise<void> {
@@ -48,27 +34,20 @@ export class EmailService {
         }
 
         const html = EmailService.renderTemplate(options.template, options.data);
-        const mail = { from: config.email.from, to: options.to, subject: options.subject, html };
 
-        try {
-            await EmailService.primary.sendMail(mail);
-            asLogger.info('Email sent via primary SMTP', { to: options.to, template: options.template });
-        } catch (primaryErr: any) {
-            asLogger.warn('Primary SMTP failed — trying fallback', {
-                error: primaryErr?.message,
-                template: options.template,
-            });
+        const { error } = await EmailService.client.emails.send({
+            from:    config.email.from,
+            to:      options.to,
+            subject: options.subject,
+            html,
+        });
 
-            if (EmailService.fallback) {
-                await EmailService.fallback.sendMail(mail);
-                asLogger.info('Email sent via fallback SMTP', { to: options.to, template: options.template });
-            } else {
-                asLogger.error('No fallback SMTP configured — email not sent', {
-                    to: options.to, template: options.template,
-                });
-                throw primaryErr;
-            }
+        if (error) {
+            asLogger.error('Resend email failed', { to: options.to, template: options.template, error: error.message });
+            throw new Error(error.message);
         }
+
+        asLogger.info('Email sent via Resend', { to: options.to, template: options.template });
     }
 
     // ─── Template rendering ────────────────────────────────────────────────────
