@@ -27,6 +27,8 @@ const makeConnection = () =>
         maxRetriesPerRequest: null,
         enableReadyCheck: false,
         lazyConnect: true,
+        connectTimeout: 5000,
+        commandTimeout: 5000,
         ...(isTlsRedis ? { tls: { rejectUnauthorized: false } } : {}),
     });
 
@@ -53,6 +55,12 @@ export class AgendaManager {
 
         const queueConnection = makeConnection();
         const workerConnection = makeConnection();
+
+        // Pre-warm both connections so the first enqueue never waits for TCP handshake
+        await Promise.all([
+            queueConnection.connect().catch(() => {}),
+            workerConnection.connect().catch(() => {}),
+        ]);
 
         // BullMQ requires noeviction; silently ignored on managed Redis (Upstash, etc.)
         await queueConnection.config('SET', 'maxmemory-policy', 'noeviction').catch(() => {});

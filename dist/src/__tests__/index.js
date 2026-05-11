@@ -1642,6 +1642,22 @@ async function runFeaturesSuite() {
     // ── 12. Platform Admin ────────────────────────────────────────────────────
     section('12. Platform Admin');
     const adminToken = makeAdminToken(creatorId);
+    // super_admin has all admin perms + platform.manage_roles
+    const superAdminToken = encryption_1.EncryptionUtil.generateJWT({
+        userId: creatorId,
+        role: 'super_admin',
+        sessionId: 'test-super-session',
+        permissions: [
+            'platform.admin',
+            'platform.view_users',
+            'platform.manage_users',
+            'platform.view_reports',
+            'platform.manage_reports',
+            'platform.manage_groups',
+            'platform.view_audit_logs',
+            'platform.manage_roles',
+        ],
+    }, 900);
     await test('GET /admin/users without auth returns 401', async () => {
         const { status } = await get('/admin/users');
         assertStatus(status, 401);
@@ -1697,6 +1713,38 @@ async function runFeaturesSuite() {
     });
     await test('GET /admin/audit-logs with filters returns filtered results (200)', async () => {
         const { status } = await get('/admin/audit-logs?action=report&entity_type=report', adminToken);
+        assertStatus(status, 200);
+    });
+    await test('GET /admin/stats returns platform stats (200)', async () => {
+        const { status, data } = await get('/admin/stats', adminToken);
+        assertStatus(status, 200);
+        const stats = data.data;
+        assertHas(stats, 'users');
+        assertHas(stats, 'groups');
+        assertHas(stats, 'content');
+        assertHas(stats, 'moderation');
+        const users = stats.users;
+        assertHas(users, 'total');
+        assertHas(users, 'active');
+    });
+    await test('PATCH /admin/users/:id/role without platform.manage_roles returns 403', async () => {
+        // adminToken only has platform.admin, not platform.manage_roles
+        const { status } = await patch(`/admin/users/${memberId}/role`, { role: 'admin' }, adminToken);
+        assertStatus(status, 403);
+    });
+    await test('PATCH /admin/users/:id/role with super_admin changes role (200)', async () => {
+        const { status, data } = await patch(`/admin/users/${memberId}/role`, { role: 'admin' }, superAdminToken);
+        assertStatus(status, 200);
+        const user = data.data;
+        assert(user.role === 'admin', `Expected role=admin, got: ${user.role}`);
+    });
+    await test('PATCH /admin/users/:id/role self-change returns 403', async () => {
+        // creatorId === superAdminToken.userId — cannot change own role
+        const { status } = await patch(`/admin/users/${creatorId}/role`, { role: 'user' }, superAdminToken);
+        assertStatus(status, 403);
+    });
+    await test('PATCH /admin/users/:id/role restores member role (200)', async () => {
+        const { status } = await patch(`/admin/users/${memberId}/role`, { role: 'user' }, superAdminToken);
         assertStatus(status, 200);
     });
     // ── 13. Messages (Group Chat) ─────────────────────────────────────────────
@@ -1948,9 +1996,14 @@ async function runFeaturesSuite() {
     });
     await test('heartbeat sets presence key in Redis', async () => {
         creatorSocket.emit(socket_events_1.SocketEvents.HEARTBEAT, {});
-        // Give the server a tick to process
-        await new Promise((r) => setTimeout(r, 400));
-        const presence = await connection_1.redis.get(`presence:${creatorId}`);
+        // Retry up to 3 times in case of transient Redis blip
+        let presence = null;
+        for (let i = 0; i < 3; i++) {
+            await new Promise((r) => setTimeout(r, 400));
+            presence = await connection_1.redis.get(`presence:${creatorId}`);
+            if (presence !== null)
+                break;
+        }
         assert(presence === '1', `Expected presence key = '1', got: ${presence}`);
     });
     await test('dm_send via socket delivers dm_received to receiver', async () => {
@@ -1963,8 +2016,8 @@ async function runFeaturesSuite() {
         assert(data?.message?.content === 'Socket DM hello', `DM content mismatch: ${data?.message?.content}`);
     });
     await test('dm_send to user with no shared group emits error', async () => {
-        // Register a lone user (no shared group)
-        const { userId: loneSocketId } = await registerAndLogin(`lone_socket${ts}@test.io`, 'Lone1234!', 'LoneSocket');
+        // Register a lone user (no shared group) — use random suffix to avoid collisions across runs
+        const { userId: loneSocketId } = await registerAndLogin(`lone_socket${ts}_${Math.random().toString(36).slice(2, 8)}@test.io`, 'Lone1234!', 'LoneSocket');
         const errPromise = waitForEvent(creatorSocket, socket_events_1.SocketEvents.ERROR);
         creatorSocket.emit(socket_events_1.SocketEvents.DM_SEND, {
             receiver_id: loneSocketId,
@@ -1985,6 +2038,17 @@ async function runFeaturesSuite() {
     });
     // ── 16. Group Deletion ─────────────────────────────────────────────────────
     section('16. Group Deletion');
+    // Re-login to get fresh tokens — the suite can exceed the 15-min JWT TTL
+    await test('refresh tokens before deletion tests', async () => {
+        const { data: cd } = await post('/auth/login', { email: CREATOR_EMAIL, password: CREATOR_PASS });
+        const { data: od } = await post('/auth/login', { email: OUTSIDER_EMAIL, password: OUTSIDER_PASS });
+        const freshCreator = cd.data?.tokens?.accessToken;
+        const freshOutsider = od.data?.tokens?.accessToken;
+        assert(freshCreator?.length > 0, `Creator re-login failed: ${JSON.stringify(cd)}`);
+        assert(freshOutsider?.length > 0, `Outsider re-login failed: ${JSON.stringify(od)}`);
+        creatorToken = freshCreator;
+        outsiderToken = freshOutsider;
+    });
     await test('DELETE /groups/:id without auth returns 401', async () => {
         const { status } = await del(`/groups/${appGroupId}`);
         assertStatus(status, 401);

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.adminAuditLogsValidator = exports.adminListReportsValidator = exports.adminListGroupsValidator = exports.adminListUsersValidator = exports.adminResolveReportValidator = exports.adminUpdateGroupValidator = exports.adminVerifyIdValidator = exports.adminUpdateUserValidator = exports.reportIdParamValidator = exports.groupIdParamValidator = exports.userIdParamValidator = void 0;
+exports.adminChangeRoleValidator = exports.adminAuditLogsValidator = exports.adminListReportsValidator = exports.adminListGroupsValidator = exports.adminListUsersValidator = exports.adminResolveReportValidator = exports.adminUpdateGroupValidator = exports.adminVerifyIdValidator = exports.adminUpdateUserValidator = exports.reportIdParamValidator = exports.groupIdParamValidator = exports.userIdParamValidator = void 0;
 const express_validator_1 = require("express-validator");
 exports.userIdParamValidator = [
     (0, express_validator_1.param)('id').isUUID().withMessage('User ID must be a valid UUID'),
@@ -62,5 +62,10 @@ exports.adminAuditLogsValidator = [
     (0, express_validator_1.query)('entity_type').optional().isString(),
     (0, express_validator_1.query)('date_from').optional().isISO8601().withMessage('date_from must be a valid ISO 8601 date'),
     (0, express_validator_1.query)('date_to').optional().isISO8601().withMessage('date_to must be a valid ISO 8601 date'),
+];
+exports.adminChangeRoleValidator = [
+    (0, express_validator_1.body)('role')
+        .exists().withMessage('role is required')
+        .isIn(['user', 'admin', 'super_admin']).withMessage('role must be user, admin, or super_admin'),
 ];
 //# sourceMappingURL=admin.validator.js.map

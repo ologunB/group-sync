@@ -8,9 +8,12 @@ const admin_validator_1 = require("./admin.validator");
 const router = (0, express_1.Router)();
 // All admin routes require authentication + platform.admin permission
 router.use(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)('platform.admin'));
+// ── Stats (home page) ─────────────────────────────────────────────────────────
+router.get('/stats', admin_controller_1.adminController.getStats);
 // ── Users ────────────────────────────────────────────────────────────────────
 router.get('/users', (0, validators_1.validateRequest)(admin_validator_1.adminListUsersValidator), admin_controller_1.adminController.listUsers);
 router.patch('/users/:id', (0, validators_1.validateRequest)([...admin_validator_1.userIdParamValidator, ...admin_validator_1.adminUpdateUserValidator]), admin_controller_1.adminController.updateUserStatus);
+router.patch('/users/:id/role', (0, auth_middleware_1.authorize)('platform.manage_roles'), (0, validators_1.validateRequest)([...admin_validator_1.userIdParamValidator, ...admin_validator_1.adminChangeRoleValidator]), admin_controller_1.adminController.changeUserRole);
 router.get('/users/:id/verification', (0, validators_1.validateRequest)(admin_validator_1.userIdParamValidator), admin_controller_1.adminController.getUserVerification);
 router.patch('/users/:id/verification', (0, validators_1.validateRequest)([...admin_validator_1.userIdParamValidator, ...admin_validator_1.adminVerifyIdValidator]), admin_controller_1.adminController.reviewIdVerification);
 // ── Groups ────────────────────────────────────────────────────────────────────

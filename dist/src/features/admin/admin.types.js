@@ -8,6 +8,7 @@ exports.adminUserSelect = {
     username: true,
     profilePhotoUrl: true,
     status: true,
+    role: true,
     idVerificationStatus: true,
     createdAt: true,
     lastLoginAt: true,

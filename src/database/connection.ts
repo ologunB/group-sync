@@ -16,9 +16,10 @@ class Database {
     private constructor() {
         this.pool = new Pool({
             connectionString: config.database.url,
-            ssl: {
-                rejectUnauthorized: false,
-            },
+            ssl: { rejectUnauthorized: false },
+            max: 10,
+            idleTimeoutMillis: 30_000,
+            connectionTimeoutMillis: 5_000,
         });
         const adapter = new PrismaPg(this.pool);
         this._client = new PrismaClient({ adapter });
@@ -65,6 +66,8 @@ export const prisma = Database.getInstance().client;
 export const redis = new IORedis(config.redis.url, {
     maxRetriesPerRequest: null,
     lazyConnect: true,
+    connectTimeout: 5000,
+    commandTimeout: 5000,
     retryStrategy: (times: number) => {
         if (times > 5) {
             asLogger.error('Redis: max retry attempts reached, giving up');

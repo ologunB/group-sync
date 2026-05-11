@@ -132,8 +132,8 @@ class App {
         const { port, nodeEnv, serviceMode } = app_config_1.config.server;
         // 1. Connect to PostgreSQL
         await connection_1.Database.getInstance().connect();
-        // 2. Connect Redis (lazy connection — ensure it's ready)
-        // await redis.connect();
+        // 2. Connect Redis eagerly so first request never waits for TCP handshake
+        await connection_1.redis.connect().catch(() => { }); // error surfaced via 'error' event handler
         // 3. Run idempotent DB seeds
         await initial_seeder_1.InitialSeeder.seed();
         // 4. Initialize email transporter

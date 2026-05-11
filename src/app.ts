@@ -150,8 +150,8 @@ export class App {
     // 1. Connect to PostgreSQL
     await Database.getInstance().connect();
 
-    // 2. Connect Redis (lazy connection — ensure it's ready)
-    // await redis.connect();
+    // 2. Connect Redis eagerly so first request never waits for TCP handshake
+    await redis.connect().catch(() => {});  // error surfaced via 'error' event handler
 
     // 3. Run idempotent DB seeds
     await InitialSeeder.seed();

@@ -96,6 +96,25 @@ class AdminController {
             next(error);
         }
     };
+    // ── Stats ─────────────────────────────────────────────────────────────────
+    getStats = async (_req, res, next) => {
+        try {
+            const stats = await admin_service_1.adminService.getStats();
+            response_helper_1.ResponseHelper.success(res, stats, 'Platform stats retrieved.');
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    changeUserRole = async (req, res, next) => {
+        try {
+            const user = await admin_service_1.adminService.changeUserRole(req.params.id, req.body, req.user);
+            response_helper_1.ResponseHelper.success(res, user, 'User role updated.');
+        }
+        catch (error) {
+            next(error);
+        }
+    };
     // ── Audit logs ────────────────────────────────────────────────────────────
     listAuditLogs = async (req, res, next) => {
         try {

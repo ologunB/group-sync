@@ -16,6 +16,7 @@ exports.userSafeSelect = {
     emailVerifiedAt: true,
     idVerificationStatus: true,
     status: true,
+    role: true,
     lastLoginAt: true,
     preferredLanguage: true,
     createdAt: true,

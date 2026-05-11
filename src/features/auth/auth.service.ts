@@ -67,36 +67,32 @@ export class AuthService {
         const email = dto.email.toLowerCase();
 
         try {
-            // Check duplicate email
-            const existing = await prisma.user.findUnique({
-                where: { email },
-                select: { id: true },
-            });
-            if (existing) {
-                throw new ApiError(Messages.EMAIL_ALREADY_EXISTS, StatusCodes.CONFLICT);
-            }
+            // Compute phone hash early so the uniqueness check can run in parallel
+            const rawPhoneHash = dto.phone ? EncryptionUtil.hashPhone(dto.phone) : undefined;
 
-            const passwordHash = await EncryptionUtil.hashPassword(dto.password);
+            // Parallel: email uniqueness + phone uniqueness + bcrypt hash
+            const [existing, phoneExists, passwordHash] = await Promise.all([
+                prisma.user.findUnique({ where: { email }, select: { id: true } }),
+                rawPhoneHash
+                    ? prisma.user.findUnique({ where: { phoneHash: rawPhoneHash }, select: { id: true } })
+                    : Promise.resolve(null),
+                EncryptionUtil.hashPassword(dto.password),
+            ]);
 
-            // Encrypt the phone if provided, enforce uniqueness via HMAC hash
+            if (existing) throw new ApiError(Messages.EMAIL_ALREADY_EXISTS, StatusCodes.CONFLICT);
+            if (phoneExists) throw new ApiError('Phone number is already in use.', StatusCodes.CONFLICT);
+
+            // Encrypt phone fields (cheap, synchronous)
             let phone: string | undefined;
             let phoneIv: string | undefined;
             let phoneHash: string | undefined;
-            if (dto.phone) {
-                phoneHash = EncryptionUtil.hashPhone(dto.phone);
-                const phoneExists = await prisma.user.findUnique({
-                    where: { phoneHash },
-                    select: { id: true },
-                });
-                if (phoneExists) {
-                    throw new ApiError('Phone number is already in use.', StatusCodes.CONFLICT);
-                }
+            if (dto.phone && rawPhoneHash) {
                 const encrypted = EncryptionUtil.encryptField(dto.phone);
-                phone = encrypted.ciphertext;
-                phoneIv = encrypted.iv;
+                phone    = encrypted.ciphertext;
+                phoneIv  = encrypted.iv;
+                phoneHash = rawPhoneHash;
             }
 
-            // Pre-generate IDs so we can build the JWT payload before the DB writing
             const userId = randomUUID();
             const sessionId = EncryptionUtil.generateRandomToken(16);
             const tokenPayload = buildTokenPayload(userId, sessionId);
@@ -106,69 +102,33 @@ export class AuthService {
             // Atomic: create user + refresh token + session
             const user = await prisma.$transaction(async (tx) => {
                 const newUser = await tx.user.create({
-                    data: {
-                        id: userId,
-                        email,
-                        displayName: dto.display_name,
-                        passwordHash,
-                        phone,
-                        phoneIv,
-                        phoneHash,
-                    },
+                    data: { id: userId, email, displayName: dto.display_name, passwordHash, phone, phoneIv, phoneHash },
                     select: userSafeSelect,
                 });
-
                 await tx.refreshToken.create({
-                    data: {
-                        userId,
-                        token: tokens.refreshToken,
-                        expiresAt: refreshExpiresAt,
-                        createdByIp: ipAddress,
-                    },
+                    data: { userId, token: tokens.refreshToken, expiresAt: refreshExpiresAt, createdByIp: ipAddress },
                 });
-
-                await tx.session.create({
-                    data: {
-                        userId,
-                        ipAddress,
-                        expiresAt: refreshExpiresAt,
-                    },
-                });
-
+                await tx.session.create({ data: { userId, ipAddress, expiresAt: refreshExpiresAt } });
                 return newUser;
             });
 
-            // Queue email verification OTP
+            // Parallel: store OTP in Redis + enqueue verification email
             const otp = EncryptionUtil.generateOTP();
-            await SessionService.setEmailVerificationOTP(email, otp);
-            await AgendaManager.sendEmail({
-                to: email,
-                subject: 'Verify your GroupSync email',
-                template: 'verify_email',
-                data: { displayName: user.displayName, otp, clientUrl: config.server.clientUrl },
-            });
+            await Promise.all([
+                SessionService.setEmailVerificationOTP(email, otp),
+                AgendaManager.sendEmail({
+                    to: email,
+                    subject: 'Verify your GroupSync email',
+                    template: 'verify_email',
+                    data: { displayName: user.displayName, otp, clientUrl: config.server.clientUrl },
+                }),
+            ]);
 
-            await AuditLogger.log(
-                tokenPayload,
-                LogActions.AUTH_REGISTER,
-                ResourceTypes.USER,
-                userId,
-                1,
-                { email },
-                ipAddress,
-            );
+            AuditLogger.log(tokenPayload, LogActions.AUTH_REGISTER, ResourceTypes.USER, userId, 1, { email }, ipAddress);
 
             return { user, tokens };
         } catch (error: any) {
-            await AuditLogger.log(
-                null,
-                LogActions.AUTH_REGISTER,
-                ResourceTypes.USER,
-                null,
-                0,
-                { email, error: error.message },
-                ipAddress,
-            );
+            AuditLogger.log(null, LogActions.AUTH_REGISTER, ResourceTypes.USER, null, 0, { email, error: error.message }, ipAddress);
             if (error instanceof ApiError) throw error;
             asLogger.error('AuthService.register:', error);
             throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
@@ -229,38 +189,26 @@ export class AuthService {
                 throw new ApiError(Messages.INVALID_CREDENTIALS, StatusCodes.UNAUTHORIZED);
             }
 
-            // Clear failure counter on success
-            await SessionService.clearFailedLogins(rawUser.id);
-
             const sessionId = EncryptionUtil.generateRandomToken(16);
             const tokenPayload = buildTokenPayload(rawUser.id, sessionId, rawUser.role);
             const tokens = EncryptionUtil.generateTokens(tokenPayload, ipAddress);
             const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_MS);
 
-            await prisma.$transaction(async (tx) => {
-                await tx.user.update({
-                    where: { id: rawUser.id },
-                    data: { lastLoginAt: new Date() },
-                });
-                await tx.refreshToken.create({
-                    data: {
-                        userId: rawUser.id,
-                        token: tokens.refreshToken,
-                        expiresAt: refreshExpiresAt,
-                        createdByIp: ipAddress,
-                    },
-                });
-                await tx.session.create({
-                    data: { userId: rawUser.id, ipAddress, expiresAt: refreshExpiresAt },
-                });
-            });
+            // Parallel: clear Redis failure counter + write DB session
+            await Promise.all([
+                SessionService.clearFailedLogins(rawUser.id),
+                prisma.$transaction(async (tx) => {
+                    await tx.user.update({ where: { id: rawUser.id }, data: { lastLoginAt: new Date() } });
+                    await tx.refreshToken.create({
+                        data: { userId: rawUser.id, token: tokens.refreshToken, expiresAt: refreshExpiresAt, createdByIp: ipAddress },
+                    });
+                    await tx.session.create({ data: { userId: rawUser.id, ipAddress, expiresAt: refreshExpiresAt } });
+                }),
+            ]);
 
             const user = stripSensitiveFields(rawUser as any);
 
-            await AuditLogger.log(
-                tokenPayload, LogActions.AUTH_LOGIN, ResourceTypes.USER, rawUser.id, 1,
-                { email }, ipAddress,
-            );
+            AuditLogger.log(tokenPayload, LogActions.AUTH_LOGIN, ResourceTypes.USER, rawUser.id, 1, { email }, ipAddress);
 
             return { user, tokens };
         } catch (error: any) {

@@ -82,6 +82,12 @@ export const config = {
         serverKey: optional_env('FCM_SERVER_KEY', ''),
     },
 
+    seed: {
+        adminEmail:       optional_env('ADMIN_EMAIL',        'admin@groupsync.app'),
+        adminPassword:    optional_env('ADMIN_PASSWORD',     'ChangeMe@2025!'),
+        adminDisplayName: optional_env('ADMIN_DISPLAY_NAME', 'Super Admin'),
+    },
+
     oauth: {
         googleClientId: optional_env('GOOGLE_CLIENT_ID', ''),
     },

@@ -98,23 +98,21 @@ class AuditLogger {
      * @param metadata    - Any additional context; mask sensitive values before passing
      * @param ipAddress   - Caller IP address
      */
-    static async log(actor, action, entityType, entityId, status, metadata = {}, ipAddress) {
-        try {
-            await connection_1.prisma.auditLog.create({
-                data: {
-                    userId: actor?.userId ?? null,
-                    action,
-                    entityType,
-                    entityId: entityId ?? undefined,
-                    status,
-                    metadata: metadata,
-                    ipAddress: ipAddress ?? null,
-                },
-            });
-        }
-        catch (err) {
+    // Non-blocking fire-and-forget. Callers may still `await` — it resolves immediately.
+    static log(actor, action, entityType, entityId, status, metadata = {}, ipAddress) {
+        connection_1.prisma.auditLog.create({
+            data: {
+                userId: actor?.userId ?? null,
+                action,
+                entityType,
+                entityId: entityId ?? undefined,
+                status,
+                metadata: metadata,
+                ipAddress: ipAddress ?? null,
+            },
+        }).catch((err) => {
             asLogger_1.asLogger.error('AuditLogger: failed to write audit entry', { action, entityType, err });
-        }
+        });
     }
 }
 exports.AuditLogger = AuditLogger;

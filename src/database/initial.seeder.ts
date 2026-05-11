@@ -1,19 +1,101 @@
-import asLogger from "../shared/utils/asLogger";
+import { randomUUID } from 'crypto';
+import { prisma } from './connection';
+import { EncryptionUtil } from '../shared/utils/encryption';
+import { config } from '../shared/config/app.config';
+import { NOTIFICATION_TYPES } from '../features/notifications/notification.types';
+import asLogger from '../shared/utils/asLogger';
+
+// Platform-level notification types that apply globally (no group_id)
+const PLATFORM_NOTIF_TYPES = NOTIFICATION_TYPES.filter(
+    (t) => t !== 'message' && t !== 'group_announcement',
+);
 
 export class InitialSeeder {
     /**
      * Idempotent — safe to run on every startup.
-     * Populates lookup data that must exist for the app to function.
      */
     static async seed(): Promise<void> {
         try {
-            // Currently no seed data required for the auth module.
-            // Add platform admin user creation, default notification preferences, etc. here
-            // as additional modules are built.
-            asLogger.info('InitialSeeder: completed (nothing to seed yet)');
+            await InitialSeeder.seedSuperAdmin();
+            asLogger.info('InitialSeeder: completed');
         } catch (error) {
             asLogger.error('InitialSeeder: failed', error);
-            throw error; // Re-throw — a failed seed should abort startup
+            throw error;
         }
+    }
+
+    // ── Super-admin user ───────────────────────────────────────────────────────
+
+    private static async seedSuperAdmin(): Promise<void> {
+        const email = config.seed.adminEmail.toLowerCase();
+
+        const existing = await prisma.user.findUnique({
+            where: { email },
+            select: { id: true, role: true },
+        });
+
+        if (existing) {
+            // Ensure the existing account has super_admin role (handles re-seeds after role was added)
+            if (existing.role !== 'super_admin') {
+                await prisma.user.update({
+                    where: { id: existing.id },
+                    data: { role: 'super_admin' },
+                });
+                asLogger.info('InitialSeeder: promoted existing admin account to super_admin', { email });
+            }
+
+            await InitialSeeder.seedNotifPreferences(existing.id);
+            asLogger.info('InitialSeeder: super_admin already exists, skipped creation', { email });
+            return;
+        }
+
+        if (config.seed.adminPassword === 'ChangeMe@2025!') {
+            asLogger.warn(
+                'InitialSeeder: super_admin is being created with the default password. ' +
+                'Set ADMIN_PASSWORD in your environment before deploying to production.',
+            );
+        }
+
+        const passwordHash = await EncryptionUtil.hashPassword(config.seed.adminPassword);
+        const userId = randomUUID();
+
+        await prisma.$transaction(async (tx) => {
+            await tx.user.create({
+                data: {
+                    id: userId,
+                    email,
+                    displayName: config.seed.adminDisplayName,
+                    passwordHash,
+                    role: 'super_admin',
+                    status: 'active',
+                    idVerificationStatus: 'verified',
+                },
+            });
+        });
+
+        await InitialSeeder.seedNotifPreferences(userId);
+
+        asLogger.info('InitialSeeder: super_admin created', { email, userId });
+    }
+
+    // ── Default notification preferences ──────────────────────────────────────
+
+    private static async seedNotifPreferences(userId: string): Promise<void> {
+        // Build upsert data for all platform-level notification types (groupId = null).
+        // Group-specific types (message, group_announcement) have no platform default —
+        // they're created when the user first customises per-group settings.
+        await Promise.all(
+            PLATFORM_NOTIF_TYPES.map(async (prefType) => {
+                const existing = await prisma.notificationPreference.findFirst({
+                    where: { userId, groupId: null, prefType },
+                    select: { id: true },
+                });
+                if (!existing) {
+                    await prisma.notificationPreference.create({
+                        data: { userId, groupId: null, prefType, pushEnabled: true, inAppEnabled: true },
+                    });
+                }
+            }),
+        );
     }
 }
