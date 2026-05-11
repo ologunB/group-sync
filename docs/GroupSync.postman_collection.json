@@ -100,7 +100,7 @@
       "key": "socketUrl",
       "value": "http://localhost:3000",
       "type": "string",
-      "description": "Socket.IO server base URL (no /api/v1 path)"
+      "description": "Socket.IO server root \u2014 no /api/v1 prefix (e.g. http://localhost:3000 or https://group-sync-ovzh.onrender.com)"
     }
   ],
   "auth": {
@@ -4549,20 +4549,20 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/admin/users/:id/role",
+              "raw": "{{baseUrl}}/admin/users/{{targetUserId}}/role",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "admin",
                 "users",
-                ":id",
+                "{{targetUserId}}",
                 "role"
               ],
               "variable": [
                 {
-                  "key": "id",
-                  "value": "{{userId}}",
+                  "key": "targetUserId",
+                  "value": "{{targetUserId}}",
                   "description": "Target user UUID"
                 }
               ]
