@@ -20,6 +20,7 @@ model User {
   idDocumentIv         String?                               @map("id_document_iv")
   idVerifiedAt         DateTime?                             @map("id_verified_at") @db.Timestamptz
   status               String                                @default("active") @db.VarChar(20)
+  role                 String                                @default("user") @db.VarChar(30)
   lastLoginAt          DateTime?                             @map("last_login_at") @db.Timestamptz
   preferredLanguage    String?                               @default("en") @map("preferred_language") @db.VarChar(10)
   createdAt            DateTime                              @default(now()) @map("created_at") @db.Timestamptz
@@ -49,6 +50,7 @@ model User {
   directMessagesRecv   DirectMessage[]           @relation("DMReceiver")
   chatReadReceipts     ChatReadReceipt[]
 
+  @@index([role],   map: "idx_users_role")
   @@index([status], map: "idx_users_status")
   @@index([idVerificationStatus], map: "idx_users_verification")
   @@index([email], map: "idx_users_email")

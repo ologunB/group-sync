@@ -15,6 +15,8 @@ import {
     AdminListReportsQuery,
     AdminResolveReportDTO,
     AdminListAuditLogsQuery,
+    AdminChangeRoleDTO,
+    PlatformStats,
     adminUserSelect,
     adminGroupSelect,
     adminReportSelect,
@@ -272,6 +274,139 @@ export class AdminService {
         } catch (error) {
             if (error instanceof ApiError) throw error;
             asLogger.error('AdminService.listAuditLogs error:', error);
+            throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ── Platform stats ────────────────────────────────────────────────────────
+    // Uses one raw SQL query per table with FILTER clauses — single round-trip per table.
+
+    async getStats(): Promise<PlatformStats> {
+        try {
+            const now = new Date();
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const weekStart  = new Date(todayStart); weekStart.setDate(todayStart.getDate() - 7);
+
+            const [userRow, groupRow, contentRow, modRow] = await Promise.all([
+                prisma.$queryRaw<[{
+                    total: bigint; active: bigint; suspended: bigint; banned: bigint;
+                    new_today: bigint; new_week: bigint; pending_verification: bigint; platform_admins: bigint;
+                }]>`
+                    SELECT
+                        COUNT(*) FILTER (WHERE deleted_at IS NULL)                                     AS total,
+                        COUNT(*) FILTER (WHERE deleted_at IS NULL AND status = 'active')               AS active,
+                        COUNT(*) FILTER (WHERE deleted_at IS NULL AND status = 'suspended')            AS suspended,
+                        COUNT(*) FILTER (WHERE deleted_at IS NULL AND status = 'banned')               AS banned,
+                        COUNT(*) FILTER (WHERE deleted_at IS NULL AND created_at >= ${todayStart})     AS new_today,
+                        COUNT(*) FILTER (WHERE deleted_at IS NULL AND created_at >= ${weekStart})      AS new_week,
+                        COUNT(*) FILTER (WHERE deleted_at IS NULL AND id_verification_status = 'submitted') AS pending_verification,
+                        COUNT(*) FILTER (WHERE deleted_at IS NULL AND role IN ('admin','super_admin')) AS platform_admins
+                    FROM users
+                `,
+
+                prisma.$queryRaw<[{
+                    total: bigint; active: bigint; suspended: bigint; verified: bigint; new_week: bigint;
+                }]>`
+                    SELECT
+                        COUNT(*) FILTER (WHERE deleted_at IS NULL)                                AS total,
+                        COUNT(*) FILTER (WHERE deleted_at IS NULL AND status = 'active')          AS active,
+                        COUNT(*) FILTER (WHERE deleted_at IS NULL AND status = 'suspended')       AS suspended,
+                        COUNT(*) FILTER (WHERE deleted_at IS NULL AND is_verified = TRUE)         AS verified,
+                        COUNT(*) FILTER (WHERE deleted_at IS NULL AND created_at >= ${weekStart}) AS new_week
+                    FROM groups
+                `,
+
+                prisma.$queryRaw<[{
+                    msg_total: bigint; msg_today: bigint; dm_total: bigint; dm_today: bigint;
+                }]>`
+                    SELECT
+                        (SELECT COUNT(*) FROM messages)                                              AS msg_total,
+                        (SELECT COUNT(*) FROM messages  WHERE created_at >= ${todayStart})           AS msg_today,
+                        (SELECT COUNT(*) FROM direct_messages)                                       AS dm_total,
+                        (SELECT COUNT(*) FROM direct_messages WHERE created_at >= ${todayStart})     AS dm_today
+                `,
+
+                prisma.$queryRaw<[{
+                    reports_open: bigint; resolved_today: bigint;
+                }]>`
+                    SELECT
+                        COUNT(*) FILTER (WHERE status = 'open')                                           AS reports_open,
+                        COUNT(*) FILTER (WHERE status = 'resolved' AND reviewed_at >= ${todayStart})      AS resolved_today
+                    FROM reports
+                `,
+            ]);
+
+            const u = userRow[0];
+            const g = groupRow[0];
+            const c = contentRow[0];
+            const m = modRow[0];
+
+            return {
+                users: {
+                    total:                Number(u.total),
+                    active:               Number(u.active),
+                    suspended:            Number(u.suspended),
+                    banned:               Number(u.banned),
+                    new_today:            Number(u.new_today),
+                    new_this_week:        Number(u.new_week),
+                    pending_verification: Number(u.pending_verification),
+                    platform_admins:      Number(u.platform_admins),
+                },
+                groups: {
+                    total:        Number(g.total),
+                    active:       Number(g.active),
+                    suspended:    Number(g.suspended),
+                    verified:     Number(g.verified),
+                    new_this_week:Number(g.new_week),
+                },
+                content: {
+                    messages_total: Number(c.msg_total),
+                    messages_today: Number(c.msg_today),
+                    dms_total:      Number(c.dm_total),
+                    dms_today:      Number(c.dm_today),
+                },
+                moderation: {
+                    reports_open:           Number(m.reports_open),
+                    reports_resolved_today: Number(m.resolved_today),
+                    pending_id_verifications: Number(u.pending_verification),
+                },
+            };
+        } catch (error) {
+            asLogger.error('AdminService.getStats error:', error);
+            throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ── Change user platform role ─────────────────────────────────────────────
+
+    async changeUserRole(userId: string, dto: AdminChangeRoleDTO, actor: TokenPayload): Promise<unknown> {
+        try {
+            // Cannot demote yourself — prevents accidental lockout
+            if (userId === actor.userId) {
+                throw new ApiError('You cannot change your own platform role.', StatusCodes.FORBIDDEN);
+            }
+
+            const user = await prisma.user.findUnique({
+                where: { id: userId, deletedAt: null },
+                select: { id: true, displayName: true },
+            });
+            if (!user) throw new ApiError(Messages.RESOURCE_NOT_FOUND('User'), StatusCodes.NOT_FOUND);
+
+            const updated = await prisma.user.update({
+                where: { id: userId },
+                data: { role: dto.role },
+                select: adminUserSelect,
+            });
+
+            await AuditLogger.log(actor, LogActions.ADMIN_USER_UPDATE, ResourceTypes.USER, userId, 1, {
+                action: 'role_change',
+                new_role: dto.role,
+            });
+
+            return updated;
+        } catch (error) {
+            if (error instanceof ApiError) throw error;
+            asLogger.error('AdminService.changeUserRole error:', error);
             throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }

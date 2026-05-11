@@ -48,6 +48,41 @@ export interface AdminListAuditLogsQuery {
     date_to?: string;
 }
 
+export interface AdminChangeRoleDTO {
+    role: 'user' | 'admin' | 'super_admin';
+}
+
+export interface PlatformStats {
+    users: {
+        total: number;
+        active: number;
+        suspended: number;
+        banned: number;
+        new_today: number;
+        new_this_week: number;
+        pending_verification: number;
+        platform_admins: number;
+    };
+    groups: {
+        total: number;
+        active: number;
+        suspended: number;
+        verified: number;
+        new_this_week: number;
+    };
+    content: {
+        messages_total: number;
+        messages_today: number;
+        dms_total: number;
+        dms_today: number;
+    };
+    moderation: {
+        reports_open: number;
+        reports_resolved_today: number;
+        pending_id_verifications: number;
+    };
+}
+
 export const adminUserSelect = {
     id: true,
     email: true,
@@ -55,6 +90,7 @@ export const adminUserSelect = {
     username: true,
     profilePhotoUrl: true,
     status: true,
+    role: true,
     idVerificationStatus: true,
     createdAt: true,
     lastLoginAt: true,

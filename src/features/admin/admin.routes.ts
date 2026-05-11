@@ -14,6 +14,7 @@ import {
     adminListGroupsValidator,
     adminListReportsValidator,
     adminAuditLogsValidator,
+    adminChangeRoleValidator,
 } from './admin.validator';
 
 const router = Router();
@@ -21,9 +22,17 @@ const router = Router();
 // All admin routes require authentication + platform.admin permission
 router.use(authenticate, authorize('platform.admin'));
 
+// ── Stats (home page) ─────────────────────────────────────────────────────────
+router.get('/stats', adminController.getStats);
+
 // ── Users ────────────────────────────────────────────────────────────────────
 router.get('/users', validateRequest(adminListUsersValidator), adminController.listUsers);
 router.patch('/users/:id', validateRequest([...userIdParamValidator, ...adminUpdateUserValidator]), adminController.updateUserStatus);
+router.patch('/users/:id/role',
+    authorize('platform.manage_roles'),
+    validateRequest([...userIdParamValidator, ...adminChangeRoleValidator]),
+    adminController.changeUserRole,
+);
 router.get('/users/:id/verification', validateRequest(userIdParamValidator), adminController.getUserVerification);
 router.patch('/users/:id/verification', validateRequest([...userIdParamValidator, ...adminVerifyIdValidator]), adminController.reviewIdVerification);
 

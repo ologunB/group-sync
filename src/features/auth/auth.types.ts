@@ -106,6 +106,7 @@ export interface SafeUser {
     emailVerifiedAt: Date | null;
     idVerificationStatus: string;
     status: string;
+    role: string;
     lastLoginAt: Date | null;
     preferredLanguage: string | null;
     createdAt: Date;
@@ -128,6 +129,7 @@ export const userSafeSelect = {
     emailVerifiedAt: true,
     idVerificationStatus: true,
     status: true,
+    role: true,
     lastLoginAt: true,
     preferredLanguage: true,
     createdAt: true,

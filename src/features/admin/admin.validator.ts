@@ -73,3 +73,9 @@ export const adminAuditLogsValidator = [
     query('date_from').optional().isISO8601().withMessage('date_from must be a valid ISO 8601 date'),
     query('date_to').optional().isISO8601().withMessage('date_to must be a valid ISO 8601 date'),
 ];
+
+export const adminChangeRoleValidator = [
+    body('role')
+        .exists().withMessage('role is required')
+        .isIn(['user', 'admin', 'super_admin']).withMessage('role must be user, admin, or super_admin'),
+];

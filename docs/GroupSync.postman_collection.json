@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "groupsync-api-v1",
     "name": "GroupSync API",
-    "description": "Complete API documentation for GroupSync — location-based social platform.\n\n## Quick Setup\n1. Import this collection\n2. Set `baseUrl` to `http://localhost:3000/api/v1`\n3. Run Register or Login — tokens saved automatically\n4. All authenticated requests use `{{accessToken}}` via collection-level Auth\n\n## Variables\n| Variable | Description | Auto-set |\n|---|---|---|\n| `baseUrl` | API base URL | No |\n| `accessToken` | JWT (15 min) | Yes — Login/Register |\n| `refreshToken` | Opaque token (30d) | Yes — Login/Register |\n| `userId` | Auth user UUID | Yes — Login/Register |\n| `targetUserId` | Another user UUID | No — set manually |\n| `groupId` | Group UUID | Yes — Create Group |\n| `groupSlug` | Group slug | Yes — Create Group |\n| `applicationId` | Application UUID | Yes — Apply to Group |\n| `inviteLinkId` | Invite link UUID | Yes — Generate Invite |\n| `inviteToken` | Invite token string | Yes — Generate Invite |\n\n## Response Envelope\n```json\n{ \"success\": true|false, \"message\": \"string\", \"data\": {}|[]|null, \"error\": null }\n```\nPaginated: includes `pagination: { page, limit, total }`",
+    "description": "Complete API documentation for GroupSync \u2014 location-based social platform.\n\n## Quick Setup\n1. Import this collection\n2. Set `baseUrl` to `http://localhost:3000/api/v1`\n3. Run Register or Login \u2014 tokens saved automatically\n4. All authenticated requests use `{{accessToken}}` via collection-level Auth\n\n## Variables\n| Variable | Description | Auto-set |\n|---|---|---|\n| `baseUrl` | API base URL | No |\n| `accessToken` | JWT (15 min) | Yes \u2014 Login/Register |\n| `refreshToken` | Opaque token (30d) | Yes \u2014 Login/Register |\n| `userId` | Auth user UUID | Yes \u2014 Login/Register |\n| `targetUserId` | Another user UUID | No \u2014 set manually |\n| `groupId` | Group UUID | Yes \u2014 Create Group |\n| `groupSlug` | Group slug | Yes \u2014 Create Group |\n| `applicationId` | Application UUID | Yes \u2014 Apply to Group |\n| `inviteLinkId` | Invite link UUID | Yes \u2014 Generate Invite |\n| `inviteToken` | Invite token string | Yes \u2014 Generate Invite |\n\n## Response Envelope\n```json\n{ \"success\": true|false, \"message\": \"string\", \"data\": {}|[]|null, \"error\": null }\n```\nPaginated: includes `pagination: { page, limit, total }`",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "version": {
       "major": 1,
@@ -234,7 +234,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Account created successfully. Please check your email to verify your account.\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"email\": \"testuser@example.com\",\n      \"displayName\": \"Test User\",\n      \"username\": null,\n      \"profilePhotoUrl\": null,\n      \"bio\": null,\n      \"city\": null,\n      \"state\": null,\n      \"country\": \"NG\",\n      \"interests\": [],\n      \"emailVerifiedAt\": null,\n      \"idVerificationStatus\": \"unsubmitted\",\n      \"status\": \"active\",\n      \"lastLoginAt\": null,\n      \"preferredLanguage\": \"en\",\n      \"createdAt\": \"2026-05-03T16:00:00.000Z\",\n      \"updatedAt\": \"2026-05-03T16:00:00.000Z\"\n    },\n    \"tokens\": {\n      \"accessToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n      \"refreshToken\": \"a3f8b2c1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0\",\n      \"expiresIn\": 900\n    }\n  }\n}"
             },
             {
-              "name": "409 Conflict — Email exists",
+              "name": "409 Conflict \u2014 Email exists",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -246,7 +246,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"An account with this email address already exists.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "422 Unprocessable — Validation failed",
+              "name": "422 Unprocessable \u2014 Validation failed",
               "status": "Unprocessable Entity",
               "code": 422,
               "header": [
@@ -324,7 +324,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Login successful.\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"email\": \"testuser@example.com\",\n      \"displayName\": \"Test User\",\n      \"idVerificationStatus\": \"unsubmitted\",\n      \"status\": \"active\",\n      \"lastLoginAt\": \"2026-05-03T16:00:00.000Z\",\n      \"createdAt\": \"2026-05-03T16:00:00.000Z\",\n      \"updatedAt\": \"2026-05-03T16:00:00.000Z\"\n    },\n    \"tokens\": {\n      \"accessToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n      \"refreshToken\": \"a3f8b2c1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0\",\n      \"expiresIn\": 900\n    }\n  }\n}"
             },
             {
-              "name": "401 Unauthorized — Wrong credentials",
+              "name": "401 Unauthorized \u2014 Wrong credentials",
               "status": "Unauthorized",
               "code": 401,
               "header": [
@@ -336,7 +336,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"Invalid email or password.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "429 Too Many Requests — Account locked",
+              "name": "429 Too Many Requests \u2014 Account locked",
               "status": "Too Many Requests",
               "code": 429,
               "header": [
@@ -398,7 +398,7 @@
                 "social"
               ]
             },
-            "description": "Login or register via Google or Apple ID token.\n\nResolution flow:\n1. Provider ID linked → sign in\n2. Email exists, no link → link provider, sign in\n3. Neither → create account + link, sign in\n\nisNewUser=true triggers onboarding flow on client.\nApple returns 501 until Apple JWK verification is configured."
+            "description": "Login or register via Google or Apple ID token.\n\nResolution flow:\n1. Provider ID linked \u2192 sign in\n2. Email exists, no link \u2192 link provider, sign in\n3. Neither \u2192 create account + link, sign in\n\nisNewUser=true triggers onboarding flow on client.\nApple returns 501 until Apple JWK verification is configured."
           },
           "response": [
             {
@@ -414,7 +414,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Login successful.\",\n  \"data\": {\n    \"user\": { \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\", \"email\": \"testuser@gmail.com\", \"displayName\": \"Test User\", \"idVerificationStatus\": \"unsubmitted\", \"status\": \"active\" },\n    \"tokens\": { \"accessToken\": \"eyJhbGci...\", \"refreshToken\": \"a3f8b2c1...\", \"expiresIn\": 900 },\n    \"isNewUser\": false\n  }\n}"
             },
             {
-              "name": "401 Unauthorized — Invalid token",
+              "name": "401 Unauthorized \u2014 Invalid token",
               "status": "Unauthorized",
               "code": 401,
               "header": [
@@ -471,7 +471,7 @@
                 "logout"
               ]
             },
-            "description": "Revoke refresh token and session. Auth required.\n\nAccess token remains valid until 15-min TTL expires (stateless JWT).\nIdempotent — already-revoked tokens return 200.\nClears presence:{userId} in Redis.",
+            "description": "Revoke refresh token and session. Auth required.\n\nAccess token remains valid until 15-min TTL expires (stateless JWT).\nIdempotent \u2014 already-revoked tokens return 200.\nClears presence:{userId} in Redis.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -546,7 +546,7 @@
                 "refresh"
               ]
             },
-            "description": "Exchange refresh token for new token pair. No auth header needed.\n\nToken rotation: old token atomically revoked — each token usable once only.\nCall when access token expires (HTTP 401 TOKEN_EXPIRED)."
+            "description": "Exchange refresh token for new token pair. No auth header needed.\n\nToken rotation: old token atomically revoked \u2014 each token usable once only.\nCall when access token expires (HTTP 401 TOKEN_EXPIRED)."
           },
           "response": [
             {
@@ -562,7 +562,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Tokens refreshed successfully.\",\n  \"data\": {\n    \"tokens\": { \"accessToken\": \"eyJhbGci...\", \"refreshToken\": \"b4c9d0e1...\", \"expiresIn\": 900 }\n  }\n}"
             },
             {
-              "name": "401 Unauthorized — Invalid refresh token",
+              "name": "401 Unauthorized \u2014 Invalid refresh token",
               "status": "Unauthorized",
               "code": 401,
               "header": [
@@ -607,11 +607,11 @@
                 "forgot-password"
               ]
             },
-            "description": "Request 6-digit OTP for password reset.\n\nAlways returns 200 regardless of email existence — prevents enumeration.\nOTP TTL: 10 min (Redis: verify:forgot:{email}).\n\nFlow: forgot-password → verify-forgot-otp → reset-password"
+            "description": "Request 6-digit OTP for password reset.\n\nAlways returns 200 regardless of email existence \u2014 prevents enumeration.\nOTP TTL: 10 min (Redis: verify:forgot:{email}).\n\nFlow: forgot-password \u2192 verify-forgot-otp \u2192 reset-password"
           },
           "response": [
             {
-              "name": "200 OK — Always returned",
+              "name": "200 OK \u2014 Always returned",
               "status": "OK",
               "code": 200,
               "header": [
@@ -673,11 +673,11 @@
                 "verify-forgot-otp"
               ]
             },
-            "description": "Verify forgot-password OTP without DB changes.\n\nDoes NOT consume or extend the OTP — same OTP must be sent to reset-password.\nGate the new password UI behind a 200 from this endpoint."
+            "description": "Verify forgot-password OTP without DB changes.\n\nDoes NOT consume or extend the OTP \u2014 same OTP must be sent to reset-password.\nGate the new password UI behind a 200 from this endpoint."
           },
           "response": [
             {
-              "name": "200 OK — OTP valid",
+              "name": "200 OK \u2014 OTP valid",
               "status": "OK",
               "code": 200,
               "header": [
@@ -689,7 +689,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"OTP is valid.\",\n  \"data\": null\n}"
             },
             {
-              "name": "400 Bad Request — OTP invalid/expired",
+              "name": "400 Bad Request \u2014 OTP invalid/expired",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -750,7 +750,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Password has been reset successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "400 Bad Request — OTP invalid/expired",
+              "name": "400 Bad Request \u2014 OTP invalid/expired",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -792,7 +792,7 @@
                 "change-password"
               ]
             },
-            "description": "Change authenticated user's password. Auth required.\n\nRequires current password — use forgot-password flow if unknown.\nSocial-only accounts: returns 400 (no password set).",
+            "description": "Change authenticated user's password. Auth required.\n\nRequires current password \u2014 use forgot-password flow if unknown.\nSocial-only accounts: returns 400 (no password set).",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -818,7 +818,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Password changed successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "400 Bad Request — Wrong current password",
+              "name": "400 Bad Request \u2014 Wrong current password",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -879,7 +879,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Email verified successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "400 Bad Request — Invalid/expired OTP",
+              "name": "400 Bad Request \u2014 Invalid/expired OTP",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -928,7 +928,7 @@
           },
           "response": [
             {
-              "name": "200 OK — Always returned",
+              "name": "200 OK \u2014 Always returned",
               "status": "OK",
               "code": 200,
               "header": [
@@ -996,7 +996,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Identity document submitted for review.\",\n  \"data\": { \"idVerificationStatus\": \"pending\" }\n}"
             },
             {
-              "name": "409 Conflict — Already pending/verified",
+              "name": "409 Conflict \u2014 Already pending/verified",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -1046,11 +1046,11 @@
                 "kyc-webhook"
               ]
             },
-            "description": "Internal endpoint — called by KYC provider, not client app.\n\nSignature: sha256=HMAC-SHA256(body, KYC_WEBHOOK_SECRET). Invalid → 401.\nIdempotency: event_id cached in Redis 24hr. Duplicates silently ignored.\n\nOn approved: status=verified, document fields nulled, S3 cleanup queued, approval email sent.\nOn rejected: status=rejected, document fields nulled, rejection email sent."
+            "description": "Internal endpoint \u2014 called by KYC provider, not client app.\n\nSignature: sha256=HMAC-SHA256(body, KYC_WEBHOOK_SECRET). Invalid \u2192 401.\nIdempotency: event_id cached in Redis 24hr. Duplicates silently ignored.\n\nOn approved: status=verified, document fields nulled, S3 cleanup queued, approval email sent.\nOn rejected: status=rejected, document fields nulled, rejection email sent."
           },
           "response": [
             {
-              "name": "200 OK — Processed",
+              "name": "200 OK \u2014 Processed",
               "status": "OK",
               "code": 200,
               "header": [
@@ -1062,7 +1062,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Webhook received\",\n  \"data\": null\n}"
             },
             {
-              "name": "401 Unauthorized — Invalid signature",
+              "name": "401 Unauthorized \u2014 Invalid signature",
               "status": "Unauthorized",
               "code": 401,
               "header": [
@@ -1079,7 +1079,7 @@
     },
     {
       "name": "Users",
-      "description": "Profile management, public profiles, interests, group memberships, applications, blocking.\n\nPrivacy rules:\n- phone, phoneIv, passwordHash, idDocumentUrl, idDocumentIv — never returned\n- email — only to owning user (GET /users/me)\n- idVerificationStatus — only to owning user\n- Block in either direction → GET /users/:id returns 404",
+      "description": "Profile management, public profiles, interests, group memberships, applications, blocking.\n\nPrivacy rules:\n- phone, phoneIv, passwordHash, idDocumentUrl, idDocumentIv \u2014 never returned\n- email \u2014 only to owning user (GET /users/me)\n- idVerificationStatus \u2014 only to owning user\n- Block in either direction \u2192 GET /users/:id returns 404",
       "item": [
         {
           "name": "Get My Profile",
@@ -1207,7 +1207,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Profile updated successfully.\",\n  \"data\": {\n    \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"email\": \"testuser@example.com\",\n    \"displayName\": \"Test User Updated\",\n    \"username\": \"test_user\",\n    \"city\": \"Lagos\",\n    \"state\": \"Lagos\",\n    \"country\": \"NG\",\n    \"bio\": \"Lagos-based software engineer passionate about communities.\",\n    \"interests\": [\"tech\"],\n    \"idVerificationStatus\": \"verified\",\n    \"status\": \"active\",\n    \"createdAt\": \"2026-05-03T16:00:00.000Z\",\n    \"updatedAt\": \"2026-05-03T17:00:00.000Z\"\n  }\n}"
             },
             {
-              "name": "409 Conflict — Username taken",
+              "name": "409 Conflict \u2014 Username taken",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -1250,7 +1250,7 @@
                 "me"
               ]
             },
-            "description": "Soft-delete account (GDPR). Auth required.\n\nSets deletedAt, status=banned, rewrites email to deleted_{id}@deleted.groupsync.\nRevokes all refresh tokens and sessions.\nIrreversible from API — requires direct DB restoration.",
+            "description": "Soft-delete account (GDPR). Auth required.\n\nSets deletedAt, status=banned, rewrites email to deleted_{id}@deleted.groupsync.\nRevokes all refresh tokens and sessions.\nIrreversible from API \u2014 requires direct DB restoration.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1512,7 +1512,7 @@
                   "key": "photo",
                   "type": "file",
                   "src": "",
-                  "description": "Profile photo — JPEG, PNG, or WebP, max 5 MB"
+                  "description": "Profile photo \u2014 JPEG, PNG, or WebP, max 5 MB"
                 }
               ]
             },
@@ -1553,7 +1553,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Profile photo updated successfully.\",\n  \"data\": {\n    \"url\": \"https://res.cloudinary.com/dmayydar0/image/upload/groupsync/avatars/user-uuid.jpg\"\n  }\n}"
             },
             {
-              "name": "422 — Invalid file type",
+              "name": "422 \u2014 Invalid file type",
               "status": "Unprocessable Entity",
               "code": 422,
               "header": [
@@ -1565,7 +1565,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"Only JPEG, PNG, and WebP images are allowed\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "400 — No file attached",
+              "name": "400 \u2014 No file attached",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -1700,7 +1700,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"User blocked successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "400 Bad Request — Cannot block yourself",
+              "name": "400 Bad Request \u2014 Cannot block yourself",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -1740,7 +1740,7 @@
                 "block"
               ]
             },
-            "description": "Remove block. Auth required. Idempotent (deleteMany — no error if not blocked).\n400 if self-unblock.",
+            "description": "Remove block. Auth required. Idempotent (deleteMany \u2014 no error if not blocked).\n400 if self-unblock.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1771,7 +1771,7 @@
     },
     {
       "name": "Groups",
-      "description": "Group CRUD — create, list/search, get by slug, update, delete, members, stats.\n\nRole hierarchy: super_admin > admin > moderator > member\nInvite-only groups: hidden from discovery, profile returns 404 for non-members.",
+      "description": "Group CRUD \u2014 create, list/search, get by slug, update, delete, members, stats.\n\nRole hierarchy: super_admin > admin > moderator > member\nInvite-only groups: hidden from discovery, profile returns 404 for non-members.",
       "item": [
         {
           "name": "Create Group",
@@ -1843,7 +1843,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Group created successfully.\",\n  \"data\": {\n    \"id\": \"b2c3d4e5-f6a7-8901-bcde-f12345678901\",\n    \"name\": \"Lagos Tech Community\",\n    \"slug\": \"lagos-tech-community\",\n    \"category\": \"Technology\",\n    \"subcategory\": \"Software Engineering\",\n    \"description\": \"A community for software engineers in Lagos.\",\n    \"coverImageUrl\": \"https://bucket.s3.amazonaws.com/covers/ltc.jpg\",\n    \"logoUrl\": \"https://bucket.s3.amazonaws.com/logos/ltc.png\",\n    \"city\": \"Lagos\",\n    \"state\": \"Lagos\",\n    \"country\": \"NG\",\n    \"membershipType\": \"open\",\n    \"membershipFee\": null,\n    \"membershipFeeCurrency\": \"NGN\",\n    \"membershipFeeFrequency\": null,\n    \"howToJoinContent\": \"Just click join!\",\n    \"rules\": \"Be respectful. No spam.\",\n    \"foundingDate\": null,\n    \"isVerified\": false,\n    \"isDiscoverable\": true,\n    \"memberCount\": 1,\n    \"status\": \"active\",\n    \"createdBy\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"createdAt\": \"2026-05-03T16:00:00.000Z\",\n    \"updatedAt\": \"2026-05-03T16:00:00.000Z\"\n  }\n}"
             },
             {
-              "name": "403 Forbidden — Not verified",
+              "name": "403 Forbidden \u2014 Not verified",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -1855,7 +1855,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"You must complete identity verification to perform this action.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "422 Unprocessable — Validation failed",
+              "name": "422 Unprocessable \u2014 Validation failed",
               "status": "Unprocessable Entity",
               "code": 422,
               "header": [
@@ -1987,7 +1987,7 @@
                 }
               ]
             },
-            "description": "List and search groups. Auth optional — affects invite-only visibility.\n\nSearch: full-text via fts_vector (name, description, category, subcategory).\nDistance filter: requires lat + lng + radius_km.\nDistance sort: requires lat + lng.\nInvite-only groups excluded unless caller is an active member.\nDeleted/inactive groups always excluded."
+            "description": "List and search groups. Auth optional \u2014 affects invite-only visibility.\n\nSearch: full-text via fts_vector (name, description, category, subcategory).\nDistance filter: requires lat + lng + radius_km.\nDistance sort: requires lat + lng.\nInvite-only groups excluded unless caller is an active member.\nDeleted/inactive groups always excluded."
           },
           "response": [
             {
@@ -2134,7 +2134,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Group updated successfully.\",\n  \"data\": {\n    \"id\": \"b2c3d4e5-f6a7-8901-bcde-f12345678901\",\n    \"name\": \"Lagos Tech Community\",\n    \"slug\": \"lagos-tech-community\",\n    \"membershipType\": \"application\",\n    \"status\": \"active\",\n    \"updatedAt\": \"2026-05-03T17:00:00.000Z\"\n  }\n}"
             },
             {
-              "name": "403 Forbidden — Not admin",
+              "name": "403 Forbidden \u2014 Not admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2199,7 +2199,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Group deleted successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "403 Forbidden — Not super_admin",
+              "name": "403 Forbidden \u2014 Not super_admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2381,7 +2381,7 @@
                   "key": "cover",
                   "type": "file",
                   "src": "",
-                  "description": "Cover image — JPEG, PNG, or WebP, max 5 MB. Recommended: 1200×400 px"
+                  "description": "Cover image \u2014 JPEG, PNG, or WebP, max 5 MB. Recommended: 1200\u00d7400 px"
                 }
               ]
             },
@@ -2396,7 +2396,7 @@
                 "cover"
               ]
             },
-            "description": "Upload or replace the group's cover image. Requires admin or super_admin role.\n\nAccepts multipart/form-data with field name `cover`.\nAllowed formats: JPEG, PNG, WebP. Max 5 MB.\nImage is cropped and optimised to 1200×400 px.\n\n403 if caller is not admin/super_admin.",
+            "description": "Upload or replace the group's cover image. Requires admin or super_admin role.\n\nAccepts multipart/form-data with field name `cover`.\nAllowed formats: JPEG, PNG, WebP. Max 5 MB.\nImage is cropped and optimised to 1200\u00d7400 px.\n\n403 if caller is not admin/super_admin.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2422,7 +2422,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Cover image updated successfully.\",\n  \"data\": {\n    \"url\": \"https://res.cloudinary.com/dmayydar0/image/upload/groupsync/groups/group-uuid/cover.jpg\"\n  }\n}"
             },
             {
-              "name": "403 — Not admin",
+              "name": "403 \u2014 Not admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2462,7 +2462,7 @@
                   "key": "logo",
                   "type": "file",
                   "src": "",
-                  "description": "Logo — JPEG, PNG, or WebP, max 5 MB. Recommended: 400×400 px (square)"
+                  "description": "Logo \u2014 JPEG, PNG, or WebP, max 5 MB. Recommended: 400\u00d7400 px (square)"
                 }
               ]
             },
@@ -2477,7 +2477,7 @@
                 "logo"
               ]
             },
-            "description": "Upload or replace the group's logo. Requires admin or super_admin role.\n\nAccepts multipart/form-data with field name `logo`.\nAllowed formats: JPEG, PNG, WebP. Max 5 MB.\nImage is cropped and optimised to 400×400 px.\n\n403 if caller is not admin/super_admin.",
+            "description": "Upload or replace the group's logo. Requires admin or super_admin role.\n\nAccepts multipart/form-data with field name `logo`.\nAllowed formats: JPEG, PNG, WebP. Max 5 MB.\nImage is cropped and optimised to 400\u00d7400 px.\n\n403 if caller is not admin/super_admin.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2503,7 +2503,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Logo updated successfully.\",\n  \"data\": {\n    \"url\": \"https://res.cloudinary.com/dmayydar0/image/upload/groupsync/groups/group-uuid/logo.jpg\"\n  }\n}"
             },
             {
-              "name": "403 — Not admin",
+              "name": "403 \u2014 Not admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2575,7 +2575,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"You have joined the group successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "403 Forbidden — Not open group",
+              "name": "403 Forbidden \u2014 Not open group",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2587,7 +2587,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"This group requires an application. Use POST /groups/:id/apply instead.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "409 Conflict — Already a member",
+              "name": "409 Conflict \u2014 Already a member",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -2671,7 +2671,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Application submitted successfully.\",\n  \"data\": {\n    \"applicationId\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n    \"status\": \"pending\"\n  }\n}"
             },
             {
-              "name": "403 Forbidden — Not application group",
+              "name": "403 Forbidden \u2014 Not application group",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2683,7 +2683,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"This group is open. Use POST /groups/:id/join instead.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "409 Conflict — Pending application exists",
+              "name": "409 Conflict \u2014 Pending application exists",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -2695,7 +2695,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"You already have a pending application for this group.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "422 Unprocessable — Required fields missing",
+              "name": "422 Unprocessable \u2014 Required fields missing",
               "status": "Unprocessable Entity",
               "code": 422,
               "header": [
@@ -2761,7 +2761,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"You have left the group.\",\n  \"data\": null\n}"
             },
             {
-              "name": "403 Forbidden — Owner cannot leave",
+              "name": "403 Forbidden \u2014 Owner cannot leave",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2900,7 +2900,7 @@
           },
           "response": [
             {
-              "name": "200 OK — Approved",
+              "name": "200 OK \u2014 Approved",
               "status": "OK",
               "code": 200,
               "header": [
@@ -2912,7 +2912,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Application approved. Member added to the group.\",\n  \"data\": null\n}"
             },
             {
-              "name": "200 OK — Rejected",
+              "name": "200 OK \u2014 Rejected",
               "status": "OK",
               "code": 200,
               "header": [
@@ -2924,7 +2924,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Application rejected.\",\n  \"data\": null\n}"
             },
             {
-              "name": "409 Conflict — Not pending",
+              "name": "409 Conflict \u2014 Not pending",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -2967,7 +2967,7 @@
                 "{{applicationId}}"
               ]
             },
-            "description": "Reject with a reason. Same endpoint as approve — just set action=reject and include rejection_reason.\n\nrejection_reason is included in the notification email sent to the applicant.\nMax 1000 characters.",
+            "description": "Reject with a reason. Same endpoint as approve \u2014 just set action=reject and include rejection_reason.\n\nrejection_reason is included in the notification email sent to the applicant.\nMax 1000 characters.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -3047,7 +3047,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Application withdrawn successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "409 Conflict — Not pending",
+              "name": "409 Conflict \u2014 Not pending",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -3103,7 +3103,7 @@
           },
           "response": [
             {
-              "name": "200 OK — Form exists",
+              "name": "200 OK \u2014 Form exists",
               "status": "OK",
               "code": 200,
               "header": [
@@ -3115,7 +3115,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"fields\": [\n      { \"id\": \"field_001\", \"type\": \"textarea\", \"label\": \"Why do you want to join?\", \"required\": true },\n      { \"id\": \"field_002\", \"type\": \"select\", \"label\": \"Years of experience\", \"required\": true, \"options\": [\"0-1\", \"2-5\", \"5-10\", \"10+\"] },\n      { \"id\": \"field_003\", \"type\": \"checkbox\", \"label\": \"I agree to the group rules\", \"required\": true }\n    ]\n  }\n}"
             },
             {
-              "name": "200 OK — No form configured",
+              "name": "200 OK \u2014 No form configured",
               "status": "OK",
               "code": 200,
               "header": [
@@ -3239,7 +3239,7 @@
                 "{{targetUserId}}"
               ]
             },
-            "description": "Promote, demote, suspend, or ban a group member. Auth required. Role: admin or super_admin.\n\nRole hierarchy rules:\n- Cannot modify super_admin (403)\n- Admin cannot modify another admin — only super_admin can (403)\n- Can only assign roles BELOW your own rank (403)\n- Caller must outrank target to modify them (403)\n\nCan send role, status, or both.\nroles: admin | moderator | member (cannot set super_admin via this endpoint)\nstatuses: active | suspended | banned\n\nNotifies affected member via BullMQ.",
+            "description": "Promote, demote, suspend, or ban a group member. Auth required. Role: admin or super_admin.\n\nRole hierarchy rules:\n- Cannot modify super_admin (403)\n- Admin cannot modify another admin \u2014 only super_admin can (403)\n- Can only assign roles BELOW your own rank (403)\n- Caller must outrank target to modify them (403)\n\nCan send role, status, or both.\nroles: admin | moderator | member (cannot set super_admin via this endpoint)\nstatuses: active | suspended | banned\n\nNotifies affected member via BullMQ.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -3265,7 +3265,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Member updated successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "403 Forbidden — Cannot modify super_admin",
+              "name": "403 Forbidden \u2014 Cannot modify super_admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -3277,7 +3277,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"The group owner cannot be modified. Transfer ownership first.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "403 Forbidden — Admin vs admin",
+              "name": "403 Forbidden \u2014 Admin vs admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -3321,7 +3321,7 @@
                 "{{targetUserId}}"
               ]
             },
-            "description": "Suspend a member. Same endpoint as role update — set status=suspended.\n\nSuspended members cannot send messages or participate in the group.\nRestored by setting status=active.",
+            "description": "Suspend a member. Same endpoint as role update \u2014 set status=suspended.\n\nSuspended members cannot send messages or participate in the group.\nRestored by setting status=active.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -3518,7 +3518,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Member removed from the group.\",\n  \"data\": null\n}"
             },
             {
-              "name": "403 Forbidden — Cannot remove super_admin",
+              "name": "403 Forbidden \u2014 Cannot remove super_admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -3712,7 +3712,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Invite link revoked.\",\n  \"data\": null\n}"
             },
             {
-              "name": "409 Conflict — Already revoked",
+              "name": "409 Conflict \u2014 Already revoked",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -3779,7 +3779,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"You have joined the group via invite link.\",\n  \"data\": null\n}"
             },
             {
-              "name": "410 Gone — Link revoked/expired/exhausted",
+              "name": "410 Gone \u2014 Link revoked/expired/exhausted",
               "status": "Gone",
               "code": 410,
               "header": [
@@ -3791,7 +3791,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"This invite link has expired.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "409 Conflict — Already a member",
+              "name": "409 Conflict \u2014 Already a member",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -3803,7 +3803,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"You are already a member of this group.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "404 Not Found — Invalid token",
+              "name": "404 Not Found \u2014 Invalid token",
               "status": "Not Found",
               "code": 404,
               "header": [
@@ -4468,6 +4468,30 @@
       "name": "Platform Admin",
       "item": [
         {
+          "name": "Get Platform Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "stats"
+              ]
+            },
+            "description": "Returns platform-wide stats for the admin dashboard home page. Requires platform.admin permission."
+          },
+          "response": []
+        },
+        {
           "name": "List Users",
           "request": {
             "method": "GET",
@@ -4498,6 +4522,52 @@
                 }
               ]
             }
+          },
+          "response": []
+        },
+        {
+          "name": "Change User Platform Role",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/:id/role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                ":id",
+                "role"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{userId}}",
+                  "description": "Target user UUID"
+                }
+              ]
+            },
+            "description": "Changes a user platform role (user | admin | super_admin). Requires platform.manage_roles permission (super_admin only). Cannot change own role."
           },
           "response": []
         },
@@ -4820,7 +4890,7 @@
     },
     {
       "name": "Socket.io / Chat",
-      "description": "Real-time events over Socket.IO namespace `/chat`.\n\n## How to use in Postman\n1. Open any request below — the URL already includes `?token={{accessToken}}`.\n2. Click **Connect**. Postman establishes the Socket.IO handshake.\n3. In the **Messages** tab, enter the **Event name** (shown in each request name) and paste the JSON body as the **Message**. Click **Send**.\n4. Listen for incoming events in the **Messages** panel.\n\n## Authentication\nToken is passed as a query param: `?token={{accessToken}}`. Run Login first so `accessToken` is populated.\n\n## Server → Client events\n| Event | When fired |\n|-------|------------|\n| `new_message` | A new group message was sent |\n| `message_deleted` | A group message was soft-deleted |\n| `message_pinned` | A message was pinned/unpinned |\n| `reaction_added` | Emoji reaction added |\n| `reaction_removed` | Emoji reaction removed |\n| `typing` | Another member is typing |\n| `presence_update` | A user came online / went offline |\n| `chat_lock_changed` | Group chat was locked/unlocked |\n| `kicked_from_group` | You were removed from a group |\n| `dm_received` | Incoming DM |\n| `dm_read` | Receiver read your DMs |\n| `error` | Error in processing your event |",
+      "description": "Real-time events over Socket.IO namespace `/chat`.\n\n## How to use in Postman\n1. Open any request below \u2014 the URL already includes `?token={{accessToken}}`.\n2. Click **Connect**. Postman establishes the Socket.IO handshake.\n3. In the **Messages** tab, enter the **Event name** (shown in each request name) and paste the JSON body as the **Message**. Click **Send**.\n4. Listen for incoming events in the **Messages** panel.\n\n## Authentication\nToken is passed as a query param: `?token={{accessToken}}`. Run Login first so `accessToken` is populated.\n\n## Server \u2192 Client events\n| Event | When fired |\n|-------|------------|\n| `new_message` | A new group message was sent |\n| `message_deleted` | A group message was soft-deleted |\n| `message_pinned` | A message was pinned/unpinned |\n| `reaction_added` | Emoji reaction added |\n| `reaction_removed` | Emoji reaction removed |\n| `typing` | Another member is typing |\n| `presence_update` | A user came online / went offline |\n| `chat_lock_changed` | Group chat was locked/unlocked |\n| `kicked_from_group` | You were removed from a group |\n| `dm_received` | Incoming DM |\n| `dm_read` | Receiver read your DMs |\n| `error` | Error in processing your event |",
       "item": [
         {
           "name": "join_group",
@@ -4830,15 +4900,29 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"group_id\": \"{{groupId}}\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{socketUrl}}/chat?token={{accessToken}}",
-              "host": ["{{socketUrl}}"],
-              "path": ["chat"],
-              "query": [{ "key": "token", "value": "{{accessToken}}", "description": "JWT — auto-set by Login" }]
+              "host": [
+                "{{socketUrl}}"
+              ],
+              "path": [
+                "chat"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "description": "JWT \u2014 auto-set by Login"
+                }
+              ]
             },
-            "description": "**Event name to emit:** `join_group`\n\nJoins the socket to the `group:{groupId}` room. Must be an active member. All subsequent `new_message`, `typing`, `reaction_added`, etc. events for this group will be received.\n\n**Payload:**\n```json\n{ \"group_id\": \"<uuid>\" }\n```\n\n**Error:** If not an active member → `error` event with `{ message: \"Not an active member...\" }`"
+            "description": "**Event name to emit:** `join_group`\n\nJoins the socket to the `group:{groupId}` room. Must be an active member. All subsequent `new_message`, `typing`, `reaction_added`, etc. events for this group will be received.\n\n**Payload:**\n```json\n{ \"group_id\": \"<uuid>\" }\n```\n\n**Error:** If not an active member \u2192 `error` event with `{ message: \"Not an active member...\" }`"
           },
           "response": []
         },
@@ -4850,13 +4934,26 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"group_id\": \"{{groupId}}\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{socketUrl}}/chat?token={{accessToken}}",
-              "host": ["{{socketUrl}}"],
-              "path": ["chat"],
-              "query": [{ "key": "token", "value": "{{accessToken}}" }]
+              "host": [
+                "{{socketUrl}}"
+              ],
+              "path": [
+                "chat"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}"
+                }
+              ]
             },
             "description": "**Event name to emit:** `leave_group`\n\nLeaves the `group:{groupId}` room. You will no longer receive real-time events for this group.\n\n**Payload:**\n```json\n{ \"group_id\": \"<uuid>\" }\n```"
           },
@@ -4870,15 +4967,28 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"group_id\": \"{{groupId}}\",\n  \"content\": \"Hello from Postman!\",\n  \"reply_to_id\": null\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{socketUrl}}/chat?token={{accessToken}}",
-              "host": ["{{socketUrl}}"],
-              "path": ["chat"],
-              "query": [{ "key": "token", "value": "{{accessToken}}" }]
+              "host": [
+                "{{socketUrl}}"
+              ],
+              "path": [
+                "chat"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}"
+                }
+              ]
             },
-            "description": "**Event name to emit:** `send_message`\n\nSend a message to a group room. Rate-limited: 10 messages per 10 seconds. Blocked if chat is locked and caller is not admin/super_admin.\n\n**Payload:**\n```json\n{\n  \"group_id\": \"<uuid>\",\n  \"content\": \"Hello!\",\n  \"reply_to_id\": \"<uuid | null>\"\n}\n```\n\n**Broadcasts:** `new_message` event to all members in the room including sender.\n**Error:** `error` event — locked chat, rate limit, non-member."
+            "description": "**Event name to emit:** `send_message`\n\nSend a message to a group room. Rate-limited: 10 messages per 10 seconds. Blocked if chat is locked and caller is not admin/super_admin.\n\n**Payload:**\n```json\n{\n  \"group_id\": \"<uuid>\",\n  \"content\": \"Hello!\",\n  \"reply_to_id\": \"<uuid | null>\"\n}\n```\n\n**Broadcasts:** `new_message` event to all members in the room including sender.\n**Error:** `error` event \u2014 locked chat, rate limit, non-member."
           },
           "response": []
         },
@@ -4890,15 +5000,28 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"group_id\": \"{{groupId}}\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{socketUrl}}/chat?token={{accessToken}}",
-              "host": ["{{socketUrl}}"],
-              "path": ["chat"],
-              "query": [{ "key": "token", "value": "{{accessToken}}" }]
+              "host": [
+                "{{socketUrl}}"
+              ],
+              "path": [
+                "chat"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}"
+                }
+              ]
             },
-            "description": "**Event name to emit:** `user_typing`\n\nBroadcasts a `typing` event to all other members in the group room.\n\n**Payload:**\n```json\n{ \"group_id\": \"<uuid>\" }\n```\n\n**Broadcasts:** `typing` → `{ user_id, group_id, display_name }` to all room members except sender."
+            "description": "**Event name to emit:** `user_typing`\n\nBroadcasts a `typing` event to all other members in the group room.\n\n**Payload:**\n```json\n{ \"group_id\": \"<uuid>\" }\n```\n\n**Broadcasts:** `typing` \u2192 `{ user_id, group_id, display_name }` to all room members except sender."
           },
           "response": []
         },
@@ -4910,13 +5033,26 @@
             "body": {
               "mode": "raw",
               "raw": "{}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{socketUrl}}/chat?token={{accessToken}}",
-              "host": ["{{socketUrl}}"],
-              "path": ["chat"],
-              "query": [{ "key": "token", "value": "{{accessToken}}" }]
+              "host": [
+                "{{socketUrl}}"
+              ],
+              "path": [
+                "chat"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}"
+                }
+              ]
             },
             "description": "**Event name to emit:** `heartbeat`\n\nRefreshes the caller's presence TTL in Redis (90 s). Call every ~60 s to stay marked online.\n\n**Payload:** `{}` (empty)\n\nNo response event. Side-effect: sets `presence:{userId}` = `1` in Redis with 90 s TTL."
           },
@@ -4930,15 +5066,28 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"receiver_id\": \"{{targetUserId}}\",\n  \"content\": \"Hey! Socket DM test.\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{socketUrl}}/chat?token={{accessToken}}",
-              "host": ["{{socketUrl}}"],
-              "path": ["chat"],
-              "query": [{ "key": "token", "value": "{{accessToken}}" }]
+              "host": [
+                "{{socketUrl}}"
+              ],
+              "path": [
+                "chat"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}"
+                }
+              ]
             },
-            "description": "**Event name to emit:** `dm_send`\n\nSend a direct message via socket. Same business rules as `POST /dm/:userId` — shared-group check and block check both enforced.\n\n**Payload:**\n```json\n{\n  \"receiver_id\": \"<uuid>\",\n  \"content\": \"Hello!\"\n}\n```\n\n**Emits:**\n- `dm_received` → to receiver's personal room `user:{receiverId}`\n- `dm_received` → echoed back to sender (for multi-device)\n\n**Error:** `error` event — no shared group, blocked user, empty content."
+            "description": "**Event name to emit:** `dm_send`\n\nSend a direct message via socket. Same business rules as `POST /dm/:userId` \u2014 shared-group check and block check both enforced.\n\n**Payload:**\n```json\n{\n  \"receiver_id\": \"<uuid>\",\n  \"content\": \"Hello!\"\n}\n```\n\n**Emits:**\n- `dm_received` \u2192 to receiver's personal room `user:{receiverId}`\n- `dm_received` \u2192 echoed back to sender (for multi-device)\n\n**Error:** `error` event \u2014 no shared group, blocked user, empty content."
           },
           "response": []
         }
@@ -4954,15 +5103,37 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/groups/{{groupId}}/messages?limit=50",
-              "host": ["{{baseUrl}}"],
-              "path": ["groups", "{{groupId}}", "messages"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "{{groupId}}",
+                "messages"
+              ],
               "query": [
-                { "key": "limit", "value": "50" },
-                { "key": "cursor", "value": "", "disabled": true }
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                }
               ]
             },
             "description": "Cursor-paginated message list for a group. Also marks messages as read (upserts ChatReadReceipt). Query: limit (max 100), cursor (message ID).",
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "response": []
         },
@@ -4970,24 +5141,46 @@
           "name": "Send Group Message",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"content\": \"Hello everyone!\",\n  \"reply_to_id\": null\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/groups/{{groupId}}/messages",
-              "host": ["{{baseUrl}}"],
-              "path": ["groups", "{{groupId}}", "messages"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "{{groupId}}",
+                "messages"
+              ]
             },
             "description": "Send a message to a group. Requires verified account. Rejected if group chat is locked and caller is not admin/super_admin.",
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "event": [
             {
               "listen": "test",
               "script": {
-                "exec": ["if (pm.response.code === 201) { const d = pm.response.json().data; pm.collectionVariables.set('messageId', d.id); }"],
+                "exec": [
+                  "if (pm.response.code === 201) { const d = pm.response.json().data; pm.collectionVariables.set('messageId', d.id); }"
+                ],
                 "type": "text/javascript"
               }
             }
@@ -5001,11 +5194,27 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/groups/{{groupId}}/messages/pinned",
-              "host": ["{{baseUrl}}"],
-              "path": ["groups", "{{groupId}}", "messages", "pinned"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "{{groupId}}",
+                "messages",
+                "pinned"
+              ]
             },
             "description": "Returns all currently pinned messages in a group.",
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "response": []
         },
@@ -5013,18 +5222,38 @@
           "name": "Toggle Chat Lock",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"is_locked\": true\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/groups/{{groupId}}/chat",
-              "host": ["{{baseUrl}}"],
-              "path": ["groups", "{{groupId}}", "chat"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "{{groupId}}",
+                "chat"
+              ]
             },
             "description": "Lock or unlock group chat. Admin/super_admin only. When locked, only admins can send messages.",
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "response": []
         },
@@ -5035,11 +5264,25 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/messages/{{messageId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["messages", "{{messageId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "messages",
+                "{{messageId}}"
+              ]
             },
             "description": "Soft-delete a message. Allowed for the sender or a group admin/super_admin.",
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "response": []
         },
@@ -5050,11 +5293,26 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/messages/{{messageId}}/pin",
-              "host": ["{{baseUrl}}"],
-              "path": ["messages", "{{messageId}}", "pin"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "messages",
+                "{{messageId}}",
+                "pin"
+              ]
             },
             "description": "Toggle pin status on a message. Group admin/super_admin only.",
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "response": []
         },
@@ -5062,18 +5320,38 @@
           "name": "Add Reaction",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"emoji\": \"👍\"\n}"
+              "raw": "{\n  \"emoji\": \"\ud83d\udc4d\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/messages/{{messageId}}/react",
-              "host": ["{{baseUrl}}"],
-              "path": ["messages", "{{messageId}}", "react"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "messages",
+                "{{messageId}}",
+                "react"
+              ]
             },
             "description": "Add an emoji reaction to a message. Unique per (message, user, emoji).",
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "response": []
         },
@@ -5081,18 +5359,38 @@
           "name": "Remove Reaction",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"emoji\": \"👍\"\n}"
+              "raw": "{\n  \"emoji\": \"\ud83d\udc4d\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/messages/{{messageId}}/react",
-              "host": ["{{baseUrl}}"],
-              "path": ["messages", "{{messageId}}", "react"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "messages",
+                "{{messageId}}",
+                "react"
+              ]
             },
             "description": "Remove an emoji reaction from a message.",
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "response": []
         }
@@ -5108,11 +5406,24 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/conversations",
-              "host": ["{{baseUrl}}"],
-              "path": ["conversations"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations"
+              ]
             },
             "description": "Returns a merged, time-sorted list of all group conversations and personal DM threads the authenticated user participates in. Each item has type ('group' | 'dm'), last_message, and unread_count.",
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "response": []
         },
@@ -5123,15 +5434,36 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/dm/{{targetUserId}}?limit=50",
-              "host": ["{{baseUrl}}"],
-              "path": ["dm", "{{targetUserId}}"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dm",
+                "{{targetUserId}}"
+              ],
               "query": [
-                { "key": "limit", "value": "50" },
-                { "key": "cursor", "value": "", "disabled": true }
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                }
               ]
             },
             "description": "Cursor-paginated DM thread with a specific user. Messages filtered per-side soft-delete.",
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "response": []
         },
@@ -5139,24 +5471,45 @@
           "name": "Send DM",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"content\": \"Hey, how are you?\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/dm/{{targetUserId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["dm", "{{targetUserId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dm",
+                "{{targetUserId}}"
+              ]
             },
             "description": "Send a DM to a user. Requires verified account. Both users must share an active group. Block check (either direction) prevents sending.",
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "event": [
             {
               "listen": "test",
               "script": {
-                "exec": ["if (pm.response.code === 201) { const d = pm.response.json().data; pm.collectionVariables.set('dmId', d.id); }"],
+                "exec": [
+                  "if (pm.response.code === 201) { const d = pm.response.json().data; pm.collectionVariables.set('dmId', d.id); }"
+                ],
                 "type": "text/javascript"
               }
             }
@@ -5170,11 +5523,26 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/dm/{{targetUserId}}/read",
-              "host": ["{{baseUrl}}"],
-              "path": ["dm", "{{targetUserId}}", "read"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dm",
+                "{{targetUserId}}",
+                "read"
+              ]
             },
-            "description": "Mark all unread DMs from the target user as read. Returns { count: N } — number of messages updated.",
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+            "description": "Mark all unread DMs from the target user as read. Returns { count: N } \u2014 number of messages updated.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "response": []
         },
@@ -5185,11 +5553,25 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/dm/{{dmId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["dm", "{{dmId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dm",
+                "{{dmId}}"
+              ]
             },
-            "description": "Soft-delete a single DM. Caller must be the sender or receiver. Sets isDeletedBySender or isDeletedByReceiver — the message is hidden only for that side.",
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+            "description": "Soft-delete a single DM. Caller must be the sender or receiver. Sets isDeletedBySender or isDeletedByReceiver \u2014 the message is hidden only for that side.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "response": []
         }

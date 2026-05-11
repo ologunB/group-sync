@@ -11,6 +11,7 @@ import {
     AdminListReportsQuery,
     AdminResolveReportDTO,
     AdminListAuditLogsQuery,
+    AdminChangeRoleDTO,
 } from './admin.types';
 
 export class AdminController {
@@ -104,6 +105,26 @@ export class AdminController {
         try {
             const report = await adminService.resolveReport(req.params.id, req.body as AdminResolveReportDTO, req.user!);
             ResponseHelper.success(res, report, 'Report resolved.');
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    // ── Stats ─────────────────────────────────────────────────────────────────
+
+    getStats = async (_req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const stats = await adminService.getStats();
+            ResponseHelper.success(res, stats, 'Platform stats retrieved.');
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    changeUserRole = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const user = await adminService.changeUserRole(req.params.id, req.body as AdminChangeRoleDTO, req.user!);
+            ResponseHelper.success(res, user, 'User role updated.');
         } catch (error) {
             next(error);
         }

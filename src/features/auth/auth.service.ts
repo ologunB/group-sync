@@ -10,6 +10,7 @@ import { AgendaManager } from '../../agenda';
 import { SessionService } from './session.service';
 import { config } from '../../shared/config/app.config';
 import { TokenPayload } from '../../shared/types/common.types';
+import { PlatformRolePermissions } from '../../shared/utils/permissions.constants';
 import {
     RegisterDTO,
     LoginDTO,
@@ -38,8 +39,9 @@ const googleClient = new OAuth2Client(config.oauth.googleClientId);
 
 const REFRESH_TOKEN_EXPIRES_MS = config.jwt.refreshExpiresInMs; // 30 days
 
-function buildTokenPayload(userId: string, sessionId: string): TokenPayload {
-    return { userId, role: 'user', sessionId, permissions: [] };
+function buildTokenPayload(userId: string, sessionId: string, role: string = 'user'): TokenPayload {
+    const permissions = (PlatformRolePermissions[role] ?? []) as string[];
+    return { userId, role, sessionId, permissions };
 }
 
 function stripSensitiveFields<T extends Record<string, unknown>>(user: T): SafeUser {
@@ -231,7 +233,7 @@ export class AuthService {
             await SessionService.clearFailedLogins(rawUser.id);
 
             const sessionId = EncryptionUtil.generateRandomToken(16);
-            const tokenPayload = buildTokenPayload(rawUser.id, sessionId);
+            const tokenPayload = buildTokenPayload(rawUser.id, sessionId, rawUser.role);
             const tokens = EncryptionUtil.generateTokens(tokenPayload, ipAddress);
             const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_MS);
 
@@ -360,7 +362,7 @@ export class AuthService {
             });
 
             const sessionId = EncryptionUtil.generateRandomToken(16);
-            const tokenPayload = buildTokenPayload(userId, sessionId);
+            const tokenPayload = buildTokenPayload(userId, sessionId, user.role);
             const tokens = EncryptionUtil.generateTokens(tokenPayload, ipAddress);
             const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_MS);
 
@@ -440,7 +442,7 @@ export class AuthService {
         try {
             const existing = await prisma.refreshToken.findUnique({
                 where: { token: dto.refresh_token },
-                include: { user: { select: { id: true, status: true, deletedAt: true } } },
+                include: { user: { select: { id: true, status: true, role: true, deletedAt: true } } },
             });
 
             if (!existing || existing.revokedAt || existing.expiresAt < new Date()) {
@@ -456,7 +458,7 @@ export class AuthService {
             }
 
             const sessionId = EncryptionUtil.generateRandomToken(16);
-            const tokenPayload = buildTokenPayload(existing.userId, sessionId);
+            const tokenPayload = buildTokenPayload(existing.userId, sessionId, existing.user.role);
             const tokens = EncryptionUtil.generateTokens(tokenPayload, ipAddress);
             const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_MS);
 
