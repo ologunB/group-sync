@@ -91,7 +91,7 @@ model UserBlock {
 
 model Report {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  reporterId  String    @map("reporter_id") @db.Uuid
+  reporterId  String?   @map("reporter_id") @db.Uuid
   targetType  String    @map("target_type") @db.VarChar(20)
   targetId    String    @map("target_id") @db.Uuid
   reason      String    @db.VarChar(80)
@@ -101,8 +101,8 @@ model Report {
   reviewedAt  DateTime? @map("reviewed_at") @db.Timestamptz
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  reporter User  @relation("ReporterRelation", fields: [reporterId], references: [id])
-  reviewer User? @relation("ReviewerRelation", fields: [reviewedBy], references: [id])
+  reporter User? @relation("ReporterRelation", fields: [reporterId], references: [id], onDelete: SetNull)
+  reviewer User? @relation("ReviewerRelation", fields: [reviewedBy], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt], map: "idx_reports_status")
   @@index([targetType, targetId], map: "idx_reports_target")

@@ -623,10 +623,10 @@ class MembershipService {
                 expiresAt: inviteLink.expiresAt,
                 revokedAt: inviteLink.revokedAt,
                 createdAt: inviteLink.createdAt,
-                createdBy: {
+                createdBy: inviteLink.creator ? {
                     displayName: inviteLink.creator.displayName,
                     username: inviteLink.creator.username,
-                },
+                } : null,
             };
         }
         catch (error) {
@@ -663,10 +663,10 @@ class MembershipService {
                 expiresAt: l.expiresAt,
                 revokedAt: l.revokedAt,
                 createdAt: l.createdAt,
-                createdBy: {
+                createdBy: l.creator ? {
                     displayName: l.creator.displayName,
                     username: l.creator.username,
-                },
+                } : null,
             }));
         }
         catch (error) {

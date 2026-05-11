@@ -74,7 +74,7 @@ export interface InviteLinkItem {
     createdBy: {
         displayName: string;
         username:    string | null;
-    };
+    } | null;
 }
 
 // ─── Paginated result ─────────────────────────────────────────────────────────

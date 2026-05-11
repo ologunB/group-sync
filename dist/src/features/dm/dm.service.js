@@ -73,7 +73,7 @@ class DmService {
                     last_message: lastMsg ? {
                         id: lastMsg.id,
                         content: lastMsg.isDeleted ? null : lastMsg.content,
-                        sender_name: lastMsg.sender.displayName,
+                        sender_name: lastMsg.sender?.displayName ?? null,
                         created_at: lastMsg.createdAt,
                         is_deleted: lastMsg.isDeleted,
                     } : null,

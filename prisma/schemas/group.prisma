@@ -24,13 +24,13 @@ model Group {
   isDiscoverable         Boolean                               @default(true) @map("is_discoverable")
   isChatLocked           Boolean                               @default(false) @map("is_chat_locked")
   memberCount            Int                                   @default(0) @map("member_count")
-  createdBy              String                                @map("created_by") @db.Uuid
+  createdBy              String?                               @map("created_by") @db.Uuid
   status                 String                                @default("active") @db.VarChar(20) @map("status")
   createdAt              DateTime                              @default(now()) @map("created_at") @db.Timestamptz
   updatedAt              DateTime                              @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt              DateTime?                             @map("deleted_at") @db.Timestamptz
 
-  creator               User                     @relation("GroupCreator", fields: [createdBy], references: [id])
+  creator               User?                    @relation("GroupCreator", fields: [createdBy], references: [id], onDelete: SetNull)
   memberships           Membership[]
   applications          Application[]
   inviteLinks           InviteLink[]
@@ -97,7 +97,7 @@ model Application {
 
   user     User  @relation("ApplicationUser", fields: [userId], references: [id], onDelete: Cascade)
   group    Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  reviewer User? @relation("ApplicationReviewer", fields: [reviewedBy], references: [id])
+  reviewer User? @relation("ApplicationReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
 
   @@unique([userId, groupId])
   @@index([groupId, status], map: "idx_applications_group_status")
@@ -111,7 +111,7 @@ model InviteLink {
   id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   groupId   String    @map("group_id") @db.Uuid
   token     String    @unique @db.VarChar(64)
-  createdBy String    @map("created_by") @db.Uuid
+  createdBy String?   @map("created_by") @db.Uuid
   maxUses   Int?      @map("max_uses")
   useCount  Int       @default(0) @map("use_count")
   expiresAt DateTime? @map("expires_at") @db.Timestamptz
@@ -119,7 +119,7 @@ model InviteLink {
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  creator User  @relation("InviteLinkCreator", fields: [createdBy], references: [id])
+  creator User? @relation("InviteLinkCreator", fields: [createdBy], references: [id], onDelete: SetNull)
 
   @@index([token], map: "idx_invite_token")
   @@index([groupId], map: "idx_invite_group")

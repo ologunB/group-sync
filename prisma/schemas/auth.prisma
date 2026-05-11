@@ -41,7 +41,7 @@ model AuditLog {
   metadata    Json     @default("{}")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  user User? @relation(fields: [userId], references: [id])
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId], map: "idx_audit_user")
   @@index([entityType, entityId], map: "idx_audit_entity")

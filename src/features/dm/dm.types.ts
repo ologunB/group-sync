@@ -39,7 +39,7 @@ export interface ConversationItem {
     last_message: {
         id: string;
         content: string | null;
-        sender_name: string;
+        sender_name: string | null;
         created_at: Date;
         is_deleted?: boolean;
     } | null;

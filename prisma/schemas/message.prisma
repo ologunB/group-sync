@@ -3,7 +3,7 @@
 model Message {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   groupId       String   @map("group_id") @db.Uuid
-  senderId      String   @map("sender_id") @db.Uuid
+  senderId      String?  @map("sender_id") @db.Uuid
   content       String?
   messageType   String   @default("text") @map("message_type") @db.VarChar(20)
   mediaUrl      String?  @map("media_url")
@@ -15,7 +15,7 @@ model Message {
   updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   group     Group             @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  sender    User              @relation("MessageSender", fields: [senderId], references: [id])
+  sender    User?             @relation("MessageSender", fields: [senderId], references: [id], onDelete: SetNull)
   replyTo   Message?          @relation("MessageReplies", fields: [replyToId], references: [id])
   replies   Message[]         @relation("MessageReplies")
   reactions MessageReaction[]

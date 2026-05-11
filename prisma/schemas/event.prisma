@@ -3,7 +3,7 @@
 model Event {
   id           String                                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   groupId      String                                @map("group_id") @db.Uuid
-  createdBy    String                                @map("created_by") @db.Uuid
+  createdBy    String?                               @map("created_by") @db.Uuid
   title        String                                @db.VarChar(200)
   description  String?
   locationName String?                               @map("location_name") @db.VarChar(255)
@@ -17,7 +17,7 @@ model Event {
   updatedAt    DateTime                              @updatedAt @map("updated_at") @db.Timestamptz
 
   group   Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  creator User        @relation("EventCreator", fields: [createdBy], references: [id])
+  creator User?       @relation("EventCreator", fields: [createdBy], references: [id], onDelete: SetNull)
   rsvps   EventRsvp[]
 
   @@index([groupId, startsAt], map: "idx_events_group_starts")
