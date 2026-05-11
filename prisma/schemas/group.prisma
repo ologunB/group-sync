@@ -22,6 +22,7 @@ model Group {
   foundingDate           DateTime?                             @map("founding_date") @db.Date
   isVerified             Boolean                               @default(false) @map("is_verified")
   isDiscoverable         Boolean                               @default(true) @map("is_discoverable")
+  isChatLocked           Boolean                               @default(false) @map("is_chat_locked")
   memberCount            Int                                   @default(0) @map("member_count")
   createdBy              String                                @map("created_by") @db.Uuid
   status                 String                                @default("active") @db.VarChar(20) @map("status")
@@ -36,6 +37,8 @@ model Group {
   groupForm             GroupForm?
   events                Event[]
   notificationPrefs     NotificationPreference[]
+  messages              Message[]
+  chatReadReceipts      ChatReadReceipt[]
 
   @@index([category], map: "idx_groups_category")
   @@index([slug], map: "idx_groups_slug")

@@ -20,6 +20,6 @@ exports.userSafeSelect = {
     preferredLanguage: true,
     createdAt: true,
     updatedAt: true,
-    // Explicitly NOT selected: phone, phoneIv, passwordHash, idDocumentUrl, idDocumentIv
+    // Explicitly NOT selected: phone, phoneIv, phoneHash, passwordHash, idDocumentUrl, idDocumentIv
 };
 //# sourceMappingURL=auth.types.js.map

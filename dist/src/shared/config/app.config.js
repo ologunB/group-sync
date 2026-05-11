@@ -24,6 +24,7 @@ exports.config = {
         corsOrigins: optional_env('CORS_ORIGIN', 'http://localhost:3000').split(',').map((s) => s.trim()),
         clientUrl: optional_env('CLIENT_URL', 'http://localhost:3000'),
         isProduction: optional_env('NODE_ENV', 'development') === 'production',
+        serviceMode: optional_env('SERVICE_MODE', 'both'),
     },
     database: {
         url: require_env('DATABASE_URL'),

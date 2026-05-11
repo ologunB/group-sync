@@ -85,6 +85,22 @@
       "key": "reportId",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "messageId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "dmId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "socketUrl",
+      "value": "http://localhost:3000",
+      "type": "string",
+      "description": "Socket.IO server base URL (no /api/v1 path)"
     }
   ],
   "auth": {
@@ -4797,6 +4813,383 @@
                 }
               ]
             }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Socket.io / Chat",
+      "description": "Real-time events over Socket.IO namespace `/chat`.\n\n## How to use in Postman\n1. Open any request below — the URL already includes `?token={{accessToken}}`.\n2. Click **Connect**. Postman establishes the Socket.IO handshake.\n3. In the **Messages** tab, enter the **Event name** (shown in each request name) and paste the JSON body as the **Message**. Click **Send**.\n4. Listen for incoming events in the **Messages** panel.\n\n## Authentication\nToken is passed as a query param: `?token={{accessToken}}`. Run Login first so `accessToken` is populated.\n\n## Server → Client events\n| Event | When fired |\n|-------|------------|\n| `new_message` | A new group message was sent |\n| `message_deleted` | A group message was soft-deleted |\n| `message_pinned` | A message was pinned/unpinned |\n| `reaction_added` | Emoji reaction added |\n| `reaction_removed` | Emoji reaction removed |\n| `typing` | Another member is typing |\n| `presence_update` | A user came online / went offline |\n| `chat_lock_changed` | Group chat was locked/unlocked |\n| `kicked_from_group` | You were removed from a group |\n| `dm_received` | Incoming DM |\n| `dm_read` | Receiver read your DMs |\n| `error` | Error in processing your event |",
+      "item": [
+        {
+          "name": "join_group",
+          "request": {
+            "method": "SOCKETIO",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"group_id\": \"{{groupId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{socketUrl}}/chat?token={{accessToken}}",
+              "host": ["{{socketUrl}}"],
+              "path": ["chat"],
+              "query": [{ "key": "token", "value": "{{accessToken}}", "description": "JWT — auto-set by Login" }]
+            },
+            "description": "**Event name to emit:** `join_group`\n\nJoins the socket to the `group:{groupId}` room. Must be an active member. All subsequent `new_message`, `typing`, `reaction_added`, etc. events for this group will be received.\n\n**Payload:**\n```json\n{ \"group_id\": \"<uuid>\" }\n```\n\n**Error:** If not an active member → `error` event with `{ message: \"Not an active member...\" }`"
+          },
+          "response": []
+        },
+        {
+          "name": "leave_group",
+          "request": {
+            "method": "SOCKETIO",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"group_id\": \"{{groupId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{socketUrl}}/chat?token={{accessToken}}",
+              "host": ["{{socketUrl}}"],
+              "path": ["chat"],
+              "query": [{ "key": "token", "value": "{{accessToken}}" }]
+            },
+            "description": "**Event name to emit:** `leave_group`\n\nLeaves the `group:{groupId}` room. You will no longer receive real-time events for this group.\n\n**Payload:**\n```json\n{ \"group_id\": \"<uuid>\" }\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "send_message",
+          "request": {
+            "method": "SOCKETIO",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"group_id\": \"{{groupId}}\",\n  \"content\": \"Hello from Postman!\",\n  \"reply_to_id\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{socketUrl}}/chat?token={{accessToken}}",
+              "host": ["{{socketUrl}}"],
+              "path": ["chat"],
+              "query": [{ "key": "token", "value": "{{accessToken}}" }]
+            },
+            "description": "**Event name to emit:** `send_message`\n\nSend a message to a group room. Rate-limited: 10 messages per 10 seconds. Blocked if chat is locked and caller is not admin/super_admin.\n\n**Payload:**\n```json\n{\n  \"group_id\": \"<uuid>\",\n  \"content\": \"Hello!\",\n  \"reply_to_id\": \"<uuid | null>\"\n}\n```\n\n**Broadcasts:** `new_message` event to all members in the room including sender.\n**Error:** `error` event — locked chat, rate limit, non-member."
+          },
+          "response": []
+        },
+        {
+          "name": "user_typing",
+          "request": {
+            "method": "SOCKETIO",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"group_id\": \"{{groupId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{socketUrl}}/chat?token={{accessToken}}",
+              "host": ["{{socketUrl}}"],
+              "path": ["chat"],
+              "query": [{ "key": "token", "value": "{{accessToken}}" }]
+            },
+            "description": "**Event name to emit:** `user_typing`\n\nBroadcasts a `typing` event to all other members in the group room.\n\n**Payload:**\n```json\n{ \"group_id\": \"<uuid>\" }\n```\n\n**Broadcasts:** `typing` → `{ user_id, group_id, display_name }` to all room members except sender."
+          },
+          "response": []
+        },
+        {
+          "name": "heartbeat",
+          "request": {
+            "method": "SOCKETIO",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{socketUrl}}/chat?token={{accessToken}}",
+              "host": ["{{socketUrl}}"],
+              "path": ["chat"],
+              "query": [{ "key": "token", "value": "{{accessToken}}" }]
+            },
+            "description": "**Event name to emit:** `heartbeat`\n\nRefreshes the caller's presence TTL in Redis (90 s). Call every ~60 s to stay marked online.\n\n**Payload:** `{}` (empty)\n\nNo response event. Side-effect: sets `presence:{userId}` = `1` in Redis with 90 s TTL."
+          },
+          "response": []
+        },
+        {
+          "name": "dm_send",
+          "request": {
+            "method": "SOCKETIO",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiver_id\": \"{{targetUserId}}\",\n  \"content\": \"Hey! Socket DM test.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{socketUrl}}/chat?token={{accessToken}}",
+              "host": ["{{socketUrl}}"],
+              "path": ["chat"],
+              "query": [{ "key": "token", "value": "{{accessToken}}" }]
+            },
+            "description": "**Event name to emit:** `dm_send`\n\nSend a direct message via socket. Same business rules as `POST /dm/:userId` — shared-group check and block check both enforced.\n\n**Payload:**\n```json\n{\n  \"receiver_id\": \"<uuid>\",\n  \"content\": \"Hello!\"\n}\n```\n\n**Emits:**\n- `dm_received` → to receiver's personal room `user:{receiverId}`\n- `dm_received` → echoed back to sender (for multi-device)\n\n**Error:** `error` event — no shared group, blocked user, empty content."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Messages (Group Chat)",
+      "item": [
+        {
+          "name": "List Group Messages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/groups/{{groupId}}/messages?limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["groups", "{{groupId}}", "messages"],
+              "query": [
+                { "key": "limit", "value": "50" },
+                { "key": "cursor", "value": "", "disabled": true }
+              ]
+            },
+            "description": "Cursor-paginated message list for a group. Also marks messages as read (upserts ChatReadReceipt). Query: limit (max 100), cursor (message ID).",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+          },
+          "response": []
+        },
+        {
+          "name": "Send Group Message",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Hello everyone!\",\n  \"reply_to_id\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/groups/{{groupId}}/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["groups", "{{groupId}}", "messages"]
+            },
+            "description": "Send a message to a group. Requires verified account. Rejected if group chat is locked and caller is not admin/super_admin.",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["if (pm.response.code === 201) { const d = pm.response.json().data; pm.collectionVariables.set('messageId', d.id); }"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "List Pinned Messages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/groups/{{groupId}}/messages/pinned",
+              "host": ["{{baseUrl}}"],
+              "path": ["groups", "{{groupId}}", "messages", "pinned"]
+            },
+            "description": "Returns all currently pinned messages in a group.",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+          },
+          "response": []
+        },
+        {
+          "name": "Toggle Chat Lock",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_locked\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/groups/{{groupId}}/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["groups", "{{groupId}}", "chat"]
+            },
+            "description": "Lock or unlock group chat. Admin/super_admin only. When locked, only admins can send messages.",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Message",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/messages/{{messageId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", "{{messageId}}"]
+            },
+            "description": "Soft-delete a message. Allowed for the sender or a group admin/super_admin.",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+          },
+          "response": []
+        },
+        {
+          "name": "Pin / Unpin Message",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/messages/{{messageId}}/pin",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", "{{messageId}}", "pin"]
+            },
+            "description": "Toggle pin status on a message. Group admin/super_admin only.",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Reaction",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emoji\": \"👍\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/messages/{{messageId}}/react",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", "{{messageId}}", "react"]
+            },
+            "description": "Add an emoji reaction to a message. Unique per (message, user, emoji).",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Reaction",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emoji\": \"👍\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/messages/{{messageId}}/react",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", "{{messageId}}", "react"]
+            },
+            "description": "Remove an emoji reaction from a message.",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Direct Messages (DMs)",
+      "item": [
+        {
+          "name": "Unified Conversations Inbox",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["conversations"]
+            },
+            "description": "Returns a merged, time-sorted list of all group conversations and personal DM threads the authenticated user participates in. Each item has type ('group' | 'dm'), last_message, and unread_count.",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get DM Thread",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dm/{{targetUserId}}?limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["dm", "{{targetUserId}}"],
+              "query": [
+                { "key": "limit", "value": "50" },
+                { "key": "cursor", "value": "", "disabled": true }
+              ]
+            },
+            "description": "Cursor-paginated DM thread with a specific user. Messages filtered per-side soft-delete.",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+          },
+          "response": []
+        },
+        {
+          "name": "Send DM",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Hey, how are you?\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dm/{{targetUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["dm", "{{targetUserId}}"]
+            },
+            "description": "Send a DM to a user. Requires verified account. Both users must share an active group. Block check (either direction) prevents sending.",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["if (pm.response.code === 201) { const d = pm.response.json().data; pm.collectionVariables.set('dmId', d.id); }"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Mark DM Thread as Read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dm/{{targetUserId}}/read",
+              "host": ["{{baseUrl}}"],
+              "path": ["dm", "{{targetUserId}}", "read"]
+            },
+            "description": "Mark all unread DMs from the target user as read. Returns { count: N } — number of messages updated.",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete DM",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dm/{{dmId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["dm", "{{dmId}}"]
+            },
+            "description": "Soft-delete a single DM. Caller must be the sender or receiver. Sets isDeletedBySender or isDeletedByReceiver — the message is hidden only for that side.",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] }
           },
           "response": []
         }

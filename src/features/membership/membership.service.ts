@@ -2,6 +2,7 @@ import { StatusCodes } from 'http-status-codes';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../database/connection';
 import { redis } from '../../database/connection';
+import { SocketService } from '../../shared/socket/socket.service';
 import { EncryptionUtil } from '../../shared/utils/encryption';
 import { ApiError } from '../../shared/middleware/error.middleware';
 import { Messages } from '../../shared/utils/response.constants';
@@ -670,6 +671,11 @@ export class MembershipService {
                 data:  updateData,
             });
 
+            // Kick from socket room if suspended or banned
+            if (dto.status === 'suspended' || dto.status === 'banned') {
+                SocketService.kickFromRoom(targetUserId, groupId);
+            }
+
             // Notify the affected member
             await AgendaManager.runNow('notify-group-members', {
                 groupId,
@@ -748,6 +754,9 @@ export class MembershipService {
             await prisma.membership.delete({
                 where: { userId_groupId: { userId: targetUserId, groupId } },
             });
+
+            // Force-remove from socket room
+            SocketService.kickFromRoom(targetUserId, groupId);
 
             // Notify removed member
             await AgendaManager.runNow('notify-group-members', {

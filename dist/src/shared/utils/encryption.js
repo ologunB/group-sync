@@ -57,6 +57,11 @@ class EncryptionUtil {
             expiresIn: app_config_1.config.jwt.expiresInSeconds,
         };
     }
+    // ─── Deterministic phone hash for uniqueness checks ─────────────────────────
+    static hashPhone(phone) {
+        const normalized = phone.trim().replace(/\s+/g, '');
+        return crypto_1.default.createHmac('sha256', app_config_1.config.encryption.key).update(normalized).digest('hex');
+    }
     // ─── AES-256-CBC field encryption (phone, id_document_url) ─────────────────
     static encryptField(plaintext) {
         const key = Buffer.from(app_config_1.config.encryption.key, 'hex');

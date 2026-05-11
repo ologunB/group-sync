@@ -22,7 +22,7 @@ function buildTokenPayload(userId, sessionId) {
     return { userId, role: 'user', sessionId, permissions: [] };
 }
 function stripSensitiveFields(user) {
-    const { passwordHash: _ph, phone: _p, phoneIv: _piv, idDocumentUrl: _idu, idDocumentIv: _idiv, deletedAt: _da, ...safe } = user;
+    const { passwordHash: _ph, phone: _p, phoneIv: _piv, phoneHash: _phash, idDocumentUrl: _idu, idDocumentIv: _idiv, deletedAt: _da, ...safe } = user;
     return safe;
 }
 // ─── AuthService ──────────────────────────────────────────────────────────────
@@ -40,10 +40,19 @@ class AuthService {
                 throw new error_middleware_1.ApiError(response_constants_1.Messages.EMAIL_ALREADY_EXISTS, http_status_codes_1.StatusCodes.CONFLICT);
             }
             const passwordHash = await encryption_1.EncryptionUtil.hashPassword(dto.password);
-            // Encrypt the phone if provided
+            // Encrypt the phone if provided, enforce uniqueness via HMAC hash
             let phone;
             let phoneIv;
+            let phoneHash;
             if (dto.phone) {
+                phoneHash = encryption_1.EncryptionUtil.hashPhone(dto.phone);
+                const phoneExists = await connection_1.prisma.user.findUnique({
+                    where: { phoneHash },
+                    select: { id: true },
+                });
+                if (phoneExists) {
+                    throw new error_middleware_1.ApiError('Phone number is already in use.', http_status_codes_1.StatusCodes.CONFLICT);
+                }
                 const encrypted = encryption_1.EncryptionUtil.encryptField(dto.phone);
                 phone = encrypted.ciphertext;
                 phoneIv = encrypted.iv;
@@ -64,6 +73,7 @@ class AuthService {
                         passwordHash,
                         phone,
                         phoneIv,
+                        phoneHash,
                     },
                     select: auth_types_1.userSafeSelect,
                 });

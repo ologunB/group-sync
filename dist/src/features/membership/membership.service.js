@@ -4,6 +4,7 @@ exports.MembershipService = void 0;
 const http_status_codes_1 = require("http-status-codes");
 const connection_1 = require("../../database/connection");
 const connection_2 = require("../../database/connection");
+const socket_service_1 = require("../../shared/socket/socket.service");
 const encryption_1 = require("../../shared/utils/encryption");
 const error_middleware_1 = require("../../shared/middleware/error.middleware");
 const response_constants_1 = require("../../shared/utils/response.constants");
@@ -497,6 +498,10 @@ class MembershipService {
                 where: { userId_groupId: { userId: targetUserId, groupId } },
                 data: updateData,
             });
+            // Kick from socket room if suspended or banned
+            if (dto.status === 'suspended' || dto.status === 'banned') {
+                socket_service_1.SocketService.kickFromRoom(targetUserId, groupId);
+            }
             // Notify the affected member
             await agenda_1.AgendaManager.runNow('notify-group-members', {
                 groupId,
@@ -550,6 +555,8 @@ class MembershipService {
             await connection_1.prisma.membership.delete({
                 where: { userId_groupId: { userId: targetUserId, groupId } },
             });
+            // Force-remove from socket room
+            socket_service_1.SocketService.kickFromRoom(targetUserId, groupId);
             // Notify removed member
             await agenda_1.AgendaManager.runNow('notify-group-members', {
                 groupId,

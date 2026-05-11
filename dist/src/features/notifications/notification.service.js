@@ -139,26 +139,31 @@ class NotificationService {
     // ── Update notification preferences ───────────────────────────────────────
     async updatePreferences(dto, actor) {
         try {
-            await connection_1.prisma.$transaction(dto.preferences.map((pref) => connection_1.prisma.notificationPreference.upsert({
-                where: {
-                    userId_groupId_prefType: {
-                        userId: actor.userId,
-                        groupId: pref.group_id ?? '',
-                        prefType: pref.pref_type,
-                    },
-                },
-                create: {
-                    userId: actor.userId,
-                    groupId: pref.group_id ?? null,
-                    prefType: pref.pref_type,
-                    pushEnabled: pref.push_enabled,
-                    inAppEnabled: pref.in_app_enabled,
-                },
-                update: {
-                    pushEnabled: pref.push_enabled,
-                    inAppEnabled: pref.in_app_enabled,
-                },
-            })));
+            // Upsert each preference individually — prisma upsert with nullable groupId in composite
+            // unique key is unreliable because NULL != NULL in SQL unique constraints.
+            for (const pref of dto.preferences) {
+                const existing = await connection_1.prisma.notificationPreference.findFirst({
+                    where: { userId: actor.userId, groupId: pref.group_id ?? null, prefType: pref.pref_type },
+                    select: { id: true },
+                });
+                if (existing) {
+                    await connection_1.prisma.notificationPreference.update({
+                        where: { id: existing.id },
+                        data: { pushEnabled: pref.push_enabled, inAppEnabled: pref.in_app_enabled },
+                    });
+                }
+                else {
+                    await connection_1.prisma.notificationPreference.create({
+                        data: {
+                            userId: actor.userId,
+                            groupId: pref.group_id ?? null,
+                            prefType: pref.pref_type,
+                            pushEnabled: pref.push_enabled,
+                            inAppEnabled: pref.in_app_enabled,
+                        },
+                    });
+                }
+            }
             await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.NOTIFICATION_PREF_UPDATE, audit_logger_1.ResourceTypes.NOTIFICATION, null, 1);
             return this.getPreferences(actor);
         }

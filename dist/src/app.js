@@ -26,6 +26,9 @@ const notification_routes_1 = __importDefault(require("./features/notifications/
 const event_routes_1 = __importDefault(require("./features/events/event.routes"));
 const report_routes_1 = __importDefault(require("./features/reports/report.routes"));
 const admin_routes_1 = __importDefault(require("./features/admin/admin.routes"));
+const message_routes_1 = __importDefault(require("./features/messages/message.routes"));
+const dm_routes_1 = __importDefault(require("./features/dm/dm.routes"));
+const socket_service_1 = require("./shared/socket/socket.service");
 class App {
     app;
     httpServer;
@@ -50,28 +53,33 @@ class App {
     }
     // ─── Routes ──────────────────────────────────────────────────────────────────
     configureRoutes() {
-        const { apiPrefix } = app_config_1.config.server;
-        // Health check — always first, not rate-limited
+        const { apiPrefix, serviceMode } = app_config_1.config.server;
+        // Health check — always present regardless of service mode
         this.app.get(`${apiPrefix}/health`, (_req, res) => {
             response_helper_1.ResponseHelper.success(res, {
                 status: "ok",
+                mode: serviceMode,
                 environment: app_config_1.config.server.nodeEnv,
                 timestamp: new Date().toISOString(),
             });
         });
-        // Feature routes
-        this.app.use(`${apiPrefix}/auth`, auth_routes_1.default);
-        this.app.use(`${apiPrefix}/users`, user_routes_1.default);
-        this.app.use(`${apiPrefix}/groups`, group_routes_1.default);
-        this.app.use(`${apiPrefix}/groups`, membership_routes_1.default);
-        this.app.use(`${apiPrefix}/notifications`, notification_routes_1.default);
-        this.app.use(`${apiPrefix}`, event_routes_1.default);
-        this.app.use(`${apiPrefix}/reports`, report_routes_1.default);
-        this.app.use(`${apiPrefix}/admin`, admin_routes_1.default);
-        // Route manifest
-        this.app.get(`${apiPrefix}/routes`, (_req, res) => {
-            response_helper_1.ResponseHelper.success(res, this.listRoutes(), "Route manifest");
-        });
+        // REST routes are only mounted when mode is 'api' or 'both'
+        if (serviceMode === 'api' || serviceMode === 'both') {
+            this.app.use(`${apiPrefix}/auth`, auth_routes_1.default);
+            this.app.use(`${apiPrefix}/users`, user_routes_1.default);
+            this.app.use(`${apiPrefix}/groups`, group_routes_1.default);
+            this.app.use(`${apiPrefix}/groups`, membership_routes_1.default);
+            this.app.use(`${apiPrefix}/notifications`, notification_routes_1.default);
+            this.app.use(`${apiPrefix}`, event_routes_1.default);
+            this.app.use(`${apiPrefix}/reports`, report_routes_1.default);
+            this.app.use(`${apiPrefix}/admin`, admin_routes_1.default);
+            this.app.use(`${apiPrefix}`, message_routes_1.default);
+            this.app.use(`${apiPrefix}`, dm_routes_1.default);
+            // Route manifest
+            this.app.get(`${apiPrefix}/routes`, (_req, res) => {
+                response_helper_1.ResponseHelper.success(res, this.listRoutes(), "Route manifest");
+            });
+        }
     }
     listRoutes() {
         const routes = [];
@@ -121,6 +129,7 @@ class App {
     }
     // ─── Startup sequence ────────────────────────────────────────────────────────
     async start() {
+        const { port, nodeEnv, serviceMode } = app_config_1.config.server;
         // 1. Connect to PostgreSQL
         await connection_1.Database.getInstance().connect();
         // 2. Connect Redis (lazy connection — ensure it's ready)
@@ -131,10 +140,11 @@ class App {
         mail_service_1.EmailService.initialize();
         // 5. Start BullMQ queue + worker + cron jobs
         await agenda_1.AgendaManager.start();
-        // 6. Socket.io will be attached here when the socket module is built:
-        // SocketService.attach(this.httpServer);
+        // 6. Socket.io — only when mode is 'socket' or 'both'
+        if (serviceMode === 'socket' || serviceMode === 'both') {
+            socket_service_1.SocketService.attach(this.httpServer);
+        }
         // 7. Start listening
-        const { port, nodeEnv } = app_config_1.config.server;
         this.httpServer.listen(port, () => {
             asLogger_1.asLogger.info(`GroupSync API listening on port ${port} [${nodeEnv}]`);
         });

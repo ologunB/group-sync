@@ -10,6 +10,8 @@
 
 import { redis, prisma } from '../database/connection';
 import { EncryptionUtil } from '../shared/utils/encryption';
+import { io as ioClient, Socket as ClientSocket } from 'socket.io-client';
+import { SocketEvents } from '../shared/socket/socket.events';
 
 const BASE = Boolean(false) ? 'https://group-sync-ovzh.onrender.com/api/v1' : 'http://localhost:3000/api/v1';
 const ts = Date.now();
@@ -221,7 +223,7 @@ async function runAuthSuite(): Promise<void> {
     await test('register with valid phone number returns 201', async () => {
         const { status } = await post('/auth/register', {
             email: `withphone${ts}@test.io`, password: PASSWORD,
-            display_name: 'Phone User', phone: '+2348012345678',
+            display_name: 'Phone User', phone: `+234${String(ts).slice(-10)}`,
         });
         assertStatus(status, 201);
     });
@@ -2356,9 +2358,358 @@ async function runFeaturesSuite(): Promise<void> {
         assertStatus(status, 200);
     });
 
-    // ── 13. Group Deletion ─────────────────────────────────────────────────────
+    // ── 13. Messages (Group Chat) ─────────────────────────────────────────────
 
-    section('13. Group Deletion');
+    section('13. Messages (Group Chat)');
+
+    let messageId = '';
+    let pinnedMessageId = '';
+
+    await test('POST /groups/:id/messages without auth returns 401', async () => {
+        const { status } = await post(`/groups/${openGroupId}/messages`, { content: 'Hi' });
+        assertStatus(status, 401);
+    });
+
+    await test('POST /groups/:id/messages as non-member returns 403', async () => {
+        // Register a fresh user who is not a member
+        const { token: stranger } = await registerAndLogin(`stranger${ts}@test.io`, 'Stranger1!', 'Stranger');
+        const { status } = await post(`/groups/${openGroupId}/messages`, { content: 'Sneaky' }, stranger);
+        assertStatus(status, 403);
+    });
+
+    await test('POST /groups/:id/messages as member sends message (201)', async () => {
+        const { status, data } = await post(`/groups/${openGroupId}/messages`, { content: 'Hello group!' }, memberToken);
+        assertStatus(status, 201);
+        const msg = data.data as Record<string, unknown>;
+        assertHas(msg, 'id');
+        messageId = msg.id as string;
+        assert(msg.content === 'Hello group!', `content mismatch: ${msg.content}`);
+    });
+
+    await test('POST /groups/:id/messages with reply_to_id sends threaded reply (201)', async () => {
+        const { status, data } = await post(
+            `/groups/${openGroupId}/messages`,
+            { content: 'Reply!', reply_to_id: messageId },
+            creatorToken,
+        );
+        assertStatus(status, 201);
+        const msg = data.data as Record<string, unknown>;
+        assert(msg.replyToId === messageId, `replyToId mismatch: ${msg.replyToId}`);
+        pinnedMessageId = msg.id as string;
+    });
+
+    await test('GET /groups/:id/messages as member returns list (200)', async () => {
+        const { status, data } = await get(`/groups/${openGroupId}/messages`, memberToken);
+        assertStatus(status, 200);
+        assert(Array.isArray(data.data), 'expected array of messages');
+        assert((data.data as any[]).length >= 1, 'expected at least one message');
+    });
+
+    await test('GET /groups/:id/messages without auth returns 401', async () => {
+        const { status } = await get(`/groups/${openGroupId}/messages`);
+        assertStatus(status, 401);
+    });
+
+    await test('POST /messages/:id/react adds reaction (201)', async () => {
+        const { status } = await post(`/messages/${messageId}/react`, { emoji: '👍' }, memberToken);
+        assertStatus(status, 201);
+    });
+
+    await test('POST /messages/:id/react duplicate returns 409', async () => {
+        const { status } = await post(`/messages/${messageId}/react`, { emoji: '👍' }, memberToken);
+        assertStatus(status, 409);
+    });
+
+    await test('DELETE /messages/:id/react removes reaction (200)', async () => {
+        const { status } = await del(`/messages/${messageId}/react`, memberToken, { emoji: '👍' });
+        assertStatus(status, 200);
+    });
+
+    await test('PATCH /messages/:id/pin as admin pins message (200)', async () => {
+        const { status, data } = await patch(`/messages/${pinnedMessageId}/pin`, {}, creatorToken);
+        assertStatus(status, 200);
+        const msg = data.data as Record<string, unknown>;
+        assert(msg.isPinned === true, `expected isPinned=true: ${msg.isPinned}`);
+    });
+
+    await test('PATCH /messages/:id/pin as non-admin returns 403', async () => {
+        const { status } = await patch(`/messages/${pinnedMessageId}/pin`, {}, memberToken);
+        assertStatus(status, 403);
+    });
+
+    await test('GET /groups/:id/messages/pinned returns pinned list (200)', async () => {
+        const { status, data } = await get(`/groups/${openGroupId}/messages/pinned`, memberToken);
+        assertStatus(status, 200);
+        assert(Array.isArray(data.data), 'expected array');
+        assert((data.data as any[]).some((m: any) => m.id === pinnedMessageId), 'pinned message not in list');
+    });
+
+    await test('PATCH /groups/:id/chat as non-admin returns 403', async () => {
+        const { status } = await patch(`/groups/${openGroupId}/chat`, { locked: true }, memberToken);
+        assertStatus(status, 403);
+    });
+
+    await test('PATCH /groups/:id/chat as admin locks chat (200)', async () => {
+        const { status, data } = await patch(`/groups/${openGroupId}/chat`, { locked: true }, creatorToken);
+        assertStatus(status, 200);
+        assert((data.data as any).is_chat_locked === true, 'expected chat to be locked');
+    });
+
+    await test('POST /groups/:id/messages while chat locked as member returns 403', async () => {
+        const { status } = await post(`/groups/${openGroupId}/messages`, { content: 'Blocked' }, memberToken);
+        assertStatus(status, 403);
+    });
+
+    await test('POST /groups/:id/messages while chat locked as admin succeeds (201)', async () => {
+        const { status } = await post(`/groups/${openGroupId}/messages`, { content: 'Admin msg' }, creatorToken);
+        assertStatus(status, 201);
+    });
+
+    await test('PATCH /groups/:id/chat unlocks chat (200)', async () => {
+        const { status, data } = await patch(`/groups/${openGroupId}/chat`, { locked: false }, creatorToken);
+        assertStatus(status, 200);
+        assert((data.data as any).is_chat_locked === false, 'expected chat to be unlocked');
+    });
+
+    await test('DELETE /messages/:id as sender soft-deletes message (200)', async () => {
+        const { status } = await del(`/messages/${messageId}`, memberToken);
+        assertStatus(status, 200);
+    });
+
+    await test('DELETE /messages/:id already deleted returns 404', async () => {
+        const { status } = await del(`/messages/${messageId}`, memberToken);
+        assertStatus(status, 404);
+    });
+
+    // ── 14. Direct Messages ───────────────────────────────────────────────────
+
+    section('14. Direct Messages');
+
+    let dmId = '';
+
+    await test('GET /conversations without auth returns 401', async () => {
+        const { status } = await get('/conversations');
+        assertStatus(status, 401);
+    });
+
+    await test('GET /conversations returns unified list (200)', async () => {
+        const { status, data } = await get('/conversations', creatorToken);
+        assertStatus(status, 200);
+        assert(Array.isArray(data.data), 'expected array');
+    });
+
+    await test('POST /dm/:userId without auth returns 401', async () => {
+        const { status } = await post(`/dm/${memberId}`, { content: 'Hey' });
+        assertStatus(status, 401);
+    });
+
+    await test('POST /dm/:userId to self returns 422', async () => {
+        const { status } = await post(`/dm/${creatorId}`, { content: 'Hello me' }, creatorToken);
+        assertStatus(status, 422);
+    });
+
+    await test('POST /dm/:userId to user in same group sends DM (201)', async () => {
+        // creator and member both belong to openGroup
+        const { status, data } = await post(`/dm/${memberId}`, { content: 'Hey member!' }, creatorToken);
+        assertStatus(status, 201);
+        const dm = data.data as Record<string, unknown>;
+        assertHas(dm, 'id');
+        dmId = dm.id as string;
+        assert(dm.content === 'Hey member!', `content mismatch: ${dm.content}`);
+    });
+
+    await test('POST /dm/:userId to user in no shared group returns 403', async () => {
+        // Register a completely new user with no group membership
+        const { userId: lonerId } = await registerAndLogin(`loner${ts}@test.io`, 'Loner1234!', 'Loner');
+        const { status } = await post(`/dm/${lonerId}`, { content: 'Hi stranger' }, creatorToken);
+        assertStatus(status, 403);
+    });
+
+    await test('GET /dm/:userId returns thread (200)', async () => {
+        const { status, data } = await get(`/dm/${memberId}`, creatorToken);
+        assertStatus(status, 200);
+        assert(Array.isArray(data.data), 'expected array');
+        assert((data.data as any[]).some((m: any) => m.id === dmId), 'sent DM not in thread');
+    });
+
+    await test('PATCH /dm/:userId/read marks thread as read (200)', async () => {
+        // memberToken reads the thread from creator
+        const { status, data } = await patch(`/dm/${creatorId}/read`, {}, memberToken);
+        assertStatus(status, 200);
+        assert(typeof (data.data as any).count === 'number', 'expected count field');
+    });
+
+    await test('GET /conversations after DM shows DM entry (200)', async () => {
+        const { status, data } = await get('/conversations', creatorToken);
+        assertStatus(status, 200);
+        const items = data.data as any[];
+        const hasDm = items.some((i) => i.type === 'dm' && i.id === memberId);
+        assert(hasDm, 'DM conversation not found in unified list');
+    });
+
+    await test('DELETE /dm/:dmId soft-deletes DM (200)', async () => {
+        const { status } = await del(`/dm/${dmId}`, creatorToken);
+        assertStatus(status, 200);
+    });
+
+    // ── 15. Socket.io ────────────────────────────────────────────────────────
+
+    section('15. Socket.io');
+
+    const SOCKET_URL = 'http://localhost:3000/chat';
+
+    function connectSocket(token: string): Promise<ClientSocket> {
+        return new Promise((resolve, reject) => {
+            const s = ioClient(SOCKET_URL, {
+                auth: { token },
+                transports: ['websocket'],
+                timeout: 5000,
+                reconnection: false,
+            });
+            s.once('connect', () => resolve(s));
+            s.once('connect_error', (err) => { s.disconnect(); reject(err); });
+        });
+    }
+
+    function waitForEvent(s: ClientSocket, event: string, timeoutMs = 3000): Promise<unknown> {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(
+                () => reject(new Error(`Timeout (${timeoutMs}ms) waiting for "${event}"`)),
+                timeoutMs,
+            );
+            s.once(event, (data) => { clearTimeout(timer); resolve(data); });
+        });
+    }
+
+    let creatorSocket: ClientSocket | null = null;
+    let memberSocket: ClientSocket | null = null;
+
+    await test('connect without token returns connect_error', async () => {
+        await new Promise<void>((resolve, reject) => {
+            const s = ioClient(SOCKET_URL, { transports: ['websocket'], reconnection: false, timeout: 4000 });
+            s.once('connect_error', () => { s.disconnect(); resolve(); });
+            s.once('connect', () => { s.disconnect(); reject(new Error('Should not connect without token')); });
+        });
+    });
+
+    await test('connect with invalid token returns connect_error', async () => {
+        await new Promise<void>((resolve, reject) => {
+            const s = ioClient(SOCKET_URL, {
+                auth: { token: 'not.a.valid.jwt' },
+                transports: ['websocket'],
+                reconnection: false,
+                timeout: 4000,
+            });
+            s.once('connect_error', () => { s.disconnect(); resolve(); });
+            s.once('connect', () => { s.disconnect(); reject(new Error('Should not connect with invalid token')); });
+        });
+    });
+
+    await test('connect with valid token connects successfully', async () => {
+        creatorSocket = await connectSocket(creatorToken);
+        memberSocket  = await connectSocket(memberToken);
+        assert(creatorSocket.connected, 'creator socket should be connected');
+        assert(memberSocket.connected,  'member socket should be connected');
+    });
+
+    await test('join_group as active member receives no error', async () => {
+        // Set up error listener before emitting — if error fires within 1 s, fail
+        const errPromise = waitForEvent(creatorSocket!, SocketEvents.ERROR, 1000).then(
+            (d) => { throw new Error(`Unexpected error: ${JSON.stringify(d)}`); },
+            () => { /* timeout = no error = pass */ },
+        );
+        creatorSocket!.emit(SocketEvents.JOIN_GROUP, { group_id: openGroupId });
+        memberSocket!.emit(SocketEvents.JOIN_GROUP, { group_id: openGroupId });
+        await errPromise;
+    });
+
+    await test('join_group for unknown group emits error event', async () => {
+        const fakeId = '00000000-0000-0000-0000-000000000000';
+        const errPromise = waitForEvent(creatorSocket!, SocketEvents.ERROR);
+        creatorSocket!.emit(SocketEvents.JOIN_GROUP, { group_id: fakeId });
+        const data = await errPromise as Record<string, string>;
+        assert(typeof data.message === 'string', 'error payload should have message');
+    });
+
+    await test('send_message via socket broadcasts new_message to room members', async () => {
+        // Member listens for the new_message that creator will send
+        const newMsgPromise = waitForEvent(memberSocket!, SocketEvents.NEW_MESSAGE);
+        creatorSocket!.emit(SocketEvents.SEND_MESSAGE, {
+            group_id: openGroupId,
+            content: 'Socket test message',
+        });
+        const data = await newMsgPromise as { message: Record<string, unknown> };
+        assert(data?.message?.content === 'Socket test message', `content mismatch: ${data?.message?.content}`);
+    });
+
+    await test('send_message to locked group as non-admin emits error', async () => {
+        // Lock the chat via REST first
+        await patch(`/groups/${openGroupId}/chat`, { locked: true }, creatorToken);
+        const errPromise = waitForEvent(memberSocket!, SocketEvents.ERROR);
+        memberSocket!.emit(SocketEvents.SEND_MESSAGE, {
+            group_id: openGroupId,
+            content: 'Should be blocked',
+        });
+        const data = await errPromise as Record<string, string>;
+        assert(data.message?.toLowerCase().includes('locked'), `Expected lock error, got: ${data.message}`);
+        // Unlock for subsequent tests
+        await patch(`/groups/${openGroupId}/chat`, { locked: false }, creatorToken);
+    });
+
+    await test('user_typing emits typing event to group room', async () => {
+        const typingPromise = waitForEvent(memberSocket!, SocketEvents.TYPING);
+        creatorSocket!.emit(SocketEvents.USER_TYPING, { group_id: openGroupId });
+        const data = await typingPromise as Record<string, string>;
+        assert(data.user_id === creatorId,    `user_id mismatch: ${data.user_id}`);
+        assert(data.group_id === openGroupId, `group_id mismatch: ${data.group_id}`);
+    });
+
+    await test('heartbeat sets presence key in Redis', async () => {
+        creatorSocket!.emit(SocketEvents.HEARTBEAT, {});
+        // Give the server a tick to process
+        await new Promise((r) => setTimeout(r, 400));
+        const presence = await redis.get(`presence:${creatorId}`);
+        assert(presence === '1', `Expected presence key = '1', got: ${presence}`);
+    });
+
+    await test('dm_send via socket delivers dm_received to receiver', async () => {
+        const dmPromise = waitForEvent(memberSocket!, SocketEvents.DM_RECEIVED);
+        creatorSocket!.emit(SocketEvents.DM_SEND, {
+            receiver_id: memberId,
+            content: 'Socket DM hello',
+        });
+        const data = await dmPromise as { message: Record<string, unknown> };
+        assert(data?.message?.content === 'Socket DM hello', `DM content mismatch: ${data?.message?.content}`);
+    });
+
+    await test('dm_send to user with no shared group emits error', async () => {
+        // Register a lone user (no shared group)
+        const { userId: loneSocketId } = await registerAndLogin(
+            `lone_socket${ts}@test.io`, 'Lone1234!', 'LoneSocket',
+        );
+        const errPromise = waitForEvent(creatorSocket!, SocketEvents.ERROR);
+        creatorSocket!.emit(SocketEvents.DM_SEND, {
+            receiver_id: loneSocketId,
+            content: 'Should be rejected',
+        });
+        const data = await errPromise as Record<string, string>;
+        assert(data.message?.toLowerCase().includes('group'), `Expected shared-group error, got: ${data.message}`);
+    });
+
+    await test('disconnect clears presence key from Redis', async () => {
+        // Set presence for creator first
+        creatorSocket!.emit(SocketEvents.HEARTBEAT, {});
+        await new Promise((r) => setTimeout(r, 300));
+        creatorSocket!.disconnect();
+        memberSocket!.disconnect();
+        await new Promise((r) => setTimeout(r, 500));
+        const presence = await redis.get(`presence:${creatorId}`);
+        assert(presence === null, `Presence should be null after disconnect, got: ${presence}`);
+    });
+
+    // ── 16. Group Deletion ─────────────────────────────────────────────────────
+
+    section('16. Group Deletion');
 
     await test('DELETE /groups/:id without auth returns 401', async () => {
         const { status } = await del(`/groups/${appGroupId}`);
@@ -2385,9 +2736,9 @@ async function runFeaturesSuite(): Promise<void> {
         assertStatus(status, 404);
     });
 
-    // ── 14. Account Deletion ───────────────────────────────────────────────────
+    // ── 17. Account Deletion ───────────────────────────────────────────────────
 
-    section('14. Account Deletion');
+    section('17. Account Deletion');
 
     await test('DELETE /users/me without auth returns 401', async () => {
         const { status } = await del('/users/me');

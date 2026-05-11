@@ -765,7 +765,112 @@ All admin routes use `authorize('platform.admin')` — this checks `req.user.per
 
 ---
 
-## 23. Reference Files
+## 22. Group Chat (Messages)
+
+### Architecture
+- REST API for CRUD operations; Socket.io `/chat` namespace for real-time delivery.
+- `Message` model lives in `prisma/schemas/message.prisma`.
+- Read receipts: `ChatReadReceipt` table with composite PK `(user_id, group_id)`, updated on every `GET /groups/:id/messages` call (upsert `lastReadAt = now()`).
+
+### Chat lock
+`group.isChatLocked` — when `true`, only members whose `membership.role` is `super_admin` or `admin` may send messages. Enforced in `MessageService.sendMessage()` **and** in the socket `send_message` handler.
+
+### Endpoint table (no sub-prefix — mounted at `apiPrefix`)
+| Method | Path | Guard | Description |
+|--------|------|-------|-------------|
+| GET | `/groups/:id/messages` | `authenticate` | Cursor-paginated message list; marks read |
+| POST | `/groups/:id/messages` | `authenticateVerified` | Send message to group |
+| GET | `/groups/:id/messages/pinned` | `authenticate` | All pinned messages |
+| PATCH | `/groups/:id/chat` | `authenticate` | Toggle chat lock (admin only) |
+| DELETE | `/messages/:id` | `authenticate` | Soft-delete (sender or group admin) |
+| PATCH | `/messages/:id/pin` | `authenticate` | Pin/unpin (group admin) |
+| POST | `/messages/:id/react` | `authenticate` | Add emoji reaction |
+| DELETE | `/messages/:id/react` | `authenticate` | Remove emoji reaction |
+
+### Socket events (namespace `/chat`)
+| Event (client→server) | Payload | Description |
+|---|---|---|
+| `join_group` | `{ group_id }` | Join group room (membership checked) |
+| `leave_group` | `{ group_id }` | Leave group room |
+| `send_message` | `{ group_id, content, reply_to_id? }` | Rate-limited (10/10 s), chat-lock checked |
+| `user_typing` | `{ group_id }` | Broadcasts `typing` to group room |
+| `heartbeat` | `{ status }` | Updates presence; broadcasts `presence_update` |
+
+| Event (server→client) | Payload | Description |
+|---|---|---|
+| `new_message` | `{ message }` | Broadcast to group room |
+| `message_deleted` | `{ message_id }` | Broadcast to group room |
+| `message_pinned` | `{ message }` | Broadcast to group room |
+| `reaction_added` | `{ message_id, emoji, user_id }` | Broadcast to group room |
+| `reaction_removed` | `{ message_id, emoji, user_id }` | Broadcast to group room |
+| `typing` | `{ user_id, group_id }` | Broadcast to group room |
+| `presence_update` | `{ user_id, status }` | Broadcast to group room |
+| `chat_lock_changed` | `{ group_id, is_locked }` | Broadcast to group room |
+| `kicked_from_group` | `{ group_id }` | Emitted to personal room `user:{id}` |
+
+### Rate limiting (socket)
+Redis key `msg:rate:{userId}:{groupId}` with `INCR` + 10-second TTL. Reject with `error` event if count > 10.
+
+### Kick on remove/ban
+`MembershipService.updateMember()` and `removeMember()` call `SocketService.kickFromRoom(userId, groupId)`, which calls `chatNsp.in('user:{userId}').socketsLeave('group:{groupId}')` and emits `kicked_from_group` to the personal room.
+
+---
+
+## 23. Direct Messages (DMs)
+
+### Rules
+- Both users must be **active members** of at least one common group (checked via raw SQL JOIN on `memberships`).
+- Either direction block (`userBlock`) prevents sending.
+- Per-side soft-delete: `isDeletedBySender` / `isDeletedByReceiver`.
+
+### Endpoint table
+| Method | Path | Guard | Description |
+|--------|------|-------|-------------|
+| GET | `/conversations` | `authenticate` | Unified inbox (groups + DMs merged) |
+| GET | `/dm/:userId` | `authenticate` | Cursor-paginated DM thread |
+| POST | `/dm/:userId` | `authenticateVerified` | Send DM |
+| PATCH | `/dm/:userId/read` | `authenticate` | Mark all unread DMs from user as read |
+| DELETE | `/dm/:dmId` | `authenticate` | Soft-delete a single DM (per side) |
+
+### Unified inbox (`GET /conversations`)
+Returns `ConversationItem[]` sorted by `last_message.created_at DESC`. Each item has `type: 'group' | 'dm'`.
+
+Group conversations use Prisma with nested `messages` (take: 1) and a batch raw-SQL unread count query.
+
+DM conversations use a single raw SQL `DISTINCT ON (LEAST(sender_id, receiver_id), GREATEST(...))` query to get the latest message per unique conversation partner, plus inline unread count subquery.
+
+### Socket events (DMs)
+| Event (client→server) | Payload | Description |
+|---|---|---|
+| `dm_send` | `{ receiver_id, content, media_url? }` | Shared-group + block check; creates DB record |
+
+| Event (server→client) | Payload | Description |
+|---|---|---|
+| `dm_received` | `{ message }` | Emitted to `user:{receiverId}` personal room |
+| `dm_read` | `{ sender_id }` | Emitted to `user:{senderId}` personal room on mark-read |
+
+---
+
+## 24. SERVICE_MODE
+
+Controls what each process serves. Set via env var `SERVICE_MODE`.
+
+| Value | Behaviour |
+|---|---|
+| `both` (default) | REST routes **and** Socket.io attached |
+| `api` | REST routes only — no socket |
+| `socket` | Socket.io only — no REST routes mounted |
+
+Configured in `src/shared/config/app.config.ts` as `config.server.serviceMode`. Applied in `src/app.ts` `start()`:
+```typescript
+if (serviceMode === 'api' || serviceMode === 'both') { /* mount REST routes */ }
+if (serviceMode === 'socket' || serviceMode === 'both') { SocketService.attach(httpServer); }
+```
+Health check (`GET /health`) is always available regardless of mode, and includes `mode: serviceMode` in the response body.
+
+---
+
+## 25. Reference Files
 
 | File | Purpose |
 |---|---|

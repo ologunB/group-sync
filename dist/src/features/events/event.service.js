@@ -9,6 +9,15 @@ const asLogger_1 = require("../../shared/utils/asLogger");
 const audit_logger_1 = require("../../shared/utils/audit.logger");
 const agenda_1 = require("../../agenda");
 const event_types_1 = require("./event.types");
+async function requireGroupAdmin(groupId, userId) {
+    const membership = await connection_1.prisma.membership.findUnique({
+        where: { userId_groupId: { userId, groupId } },
+        select: { role: true, status: true },
+    });
+    if (!membership || membership.status !== 'active' || !['super_admin', 'admin'].includes(membership.role)) {
+        throw new error_middleware_1.ApiError(response_constants_1.Messages.FORBIDDEN, http_status_codes_1.StatusCodes.FORBIDDEN);
+    }
+}
 class EventService {
     // ── createEvent ───────────────────────────────────────────────────────────
     async createEvent(groupId, dto, actor) {
@@ -118,6 +127,7 @@ class EventService {
             if (!existing) {
                 throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('Event'), http_status_codes_1.StatusCodes.NOT_FOUND);
             }
+            await requireGroupAdmin(existing.groupId, actor.userId);
             const event = await connection_1.prisma.event.update({
                 where: { id: eventId },
                 data: {
@@ -159,6 +169,7 @@ class EventService {
             if (!existing) {
                 throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('Event'), http_status_codes_1.StatusCodes.NOT_FOUND);
             }
+            await requireGroupAdmin(existing.groupId, actor.userId);
             await connection_1.prisma.event.update({
                 where: { id: eventId },
                 data: { status: 'cancelled' },
@@ -296,12 +307,13 @@ class EventService {
         }
     }
     // ── listRsvps ─────────────────────────────────────────────────────────────
-    async listRsvps(eventId, page, limit) {
+    async listRsvps(eventId, page, limit, actor) {
         try {
-            const event = await connection_1.prisma.event.findUnique({ where: { id: eventId }, select: { id: true } });
+            const event = await connection_1.prisma.event.findUnique({ where: { id: eventId }, select: { id: true, groupId: true } });
             if (!event) {
                 throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('Event'), http_status_codes_1.StatusCodes.NOT_FOUND);
             }
+            await requireGroupAdmin(event.groupId, actor.userId);
             const skip = (page - 1) * limit;
             const where = { eventId };
             const [data, total] = await Promise.all([

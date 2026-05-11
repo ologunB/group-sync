@@ -58,6 +58,15 @@ exports.LogActions = {
     ADMIN_USER_VERIFY_ID: 'admin.user_verify_id',
     ADMIN_GROUP_UPDATE: 'admin.group_update',
     ADMIN_REPORT_RESOLVE: 'admin.report_resolve',
+    // Messages
+    MESSAGE_SEND: 'message.send',
+    MESSAGE_DELETE: 'message.delete',
+    MESSAGE_PIN: 'message.pin',
+    // DMs
+    DM_SEND: 'dm.send',
+    // Chat admin
+    CHAT_LOCK: 'chat.lock',
+    CHAT_UNLOCK: 'chat.unlock',
 };
 // ─── Resource type constants ──────────────────────────────────────────────────
 exports.ResourceTypes = {
@@ -73,6 +82,7 @@ exports.ResourceTypes = {
     NOTIFICATION: 'notification',
     REPORT: 'report',
     GROUP_FORM: 'group_form',
+    DM: 'dm',
 };
 // ─── AuditLogger ──────────────────────────────────────────────────────────────
 class AuditLogger {

@@ -13,6 +13,12 @@ function optional_env(key: string, fallback: string): string {
     return process.env[key] ?? fallback;
 }
 
+// SERVICE_MODE controls what this process serves:
+//   'api'    — REST API only (no Socket.io)
+//   'socket' — Socket.io only (no REST routes)
+//   'both'   — full server (default, for monolith / local dev)
+export type ServiceMode = 'api' | 'socket' | 'both';
+
 export const config = {
     server: {
         port: parseInt(optional_env('PORT', '3000'), 10),
@@ -21,6 +27,7 @@ export const config = {
         corsOrigins: optional_env('CORS_ORIGIN', 'http://localhost:3000').split(',').map((s) => s.trim()),
         clientUrl: optional_env('CLIENT_URL', 'http://localhost:3000'),
         isProduction: optional_env('NODE_ENV', 'development') === 'production',
+        serviceMode: optional_env('SERVICE_MODE', 'both') as ServiceMode,
     },
 
     database: {

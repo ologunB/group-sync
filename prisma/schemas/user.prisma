@@ -43,6 +43,11 @@ model User {
   notificationPrefs    NotificationPreference[]
   reportsGiven         Report[]                  @relation("ReporterRelation")
   reportsReviewed      Report[]                  @relation("ReviewerRelation")
+  messagesSent         Message[]                 @relation("MessageSender")
+  messageReactions     MessageReaction[]
+  directMessagesSent   DirectMessage[]           @relation("DMSender")
+  directMessagesRecv   DirectMessage[]           @relation("DMReceiver")
+  chatReadReceipts     ChatReadReceipt[]
 
   @@index([status], map: "idx_users_status")
   @@index([idVerificationStatus], map: "idx_users_verification")

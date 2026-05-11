@@ -1,0 +1,79 @@
+// ─── Message (group chat) ─────────────────────────────────────────────────────
+
+model Message {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  groupId       String   @map("group_id") @db.Uuid
+  senderId      String   @map("sender_id") @db.Uuid
+  content       String?
+  messageType   String   @default("text") @map("message_type") @db.VarChar(20)
+  mediaUrl      String?  @map("media_url")
+  mediaMimeType String?  @map("media_mime_type") @db.VarChar(100)
+  replyToId     String?  @map("reply_to_id") @db.Uuid
+  isPinned      Boolean  @default(false) @map("is_pinned")
+  isDeleted     Boolean  @default(false) @map("is_deleted")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  group     Group             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sender    User              @relation("MessageSender", fields: [senderId], references: [id])
+  replyTo   Message?          @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies   Message[]         @relation("MessageReplies")
+  reactions MessageReaction[]
+
+  @@index([groupId, createdAt(sort: Desc)], map: "idx_messages_group_created")
+  @@index([senderId], map: "idx_messages_sender")
+  @@index([groupId, isPinned], map: "idx_messages_pinned")
+  @@map("messages")
+}
+
+// ─── MessageReaction ─────────────────────────────────────────────────────────
+
+model MessageReaction {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  emoji     String   @db.VarChar(10)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId], map: "idx_reactions_message")
+  @@map("message_reactions")
+}
+
+// ─── DirectMessage ────────────────────────────────────────────────────────────
+
+model DirectMessage {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  senderId            String   @map("sender_id") @db.Uuid
+  receiverId          String   @map("receiver_id") @db.Uuid
+  content             String?
+  mediaUrl            String?  @map("media_url")
+  isRead              Boolean  @default(false) @map("is_read")
+  isDeletedBySender   Boolean  @default(false) @map("is_deleted_by_sender")
+  isDeletedByReceiver Boolean  @default(false) @map("is_deleted_by_receiver")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  sender   User @relation("DMSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("DMReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt(sort: Desc)], map: "idx_dm_created")
+  @@index([receiverId, isRead], map: "idx_dm_receiver_unread")
+  @@map("direct_messages")
+}
+
+// ─── ChatReadReceipt ──────────────────────────────────────────────────────────
+
+model ChatReadReceipt {
+  userId     String   @map("user_id") @db.Uuid
+  groupId    String   @map("group_id") @db.Uuid
+  lastReadAt DateTime @map("last_read_at") @db.Timestamptz
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([userId, groupId])
+  @@map("chat_read_receipts")
+}
