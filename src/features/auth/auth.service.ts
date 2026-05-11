@@ -627,7 +627,7 @@ export class AuthService {
 
             const user = await prisma.user.findUnique({
                 where: { email },
-                select: { id: true, emailVerifiedAt: true, deletedAt: true },
+                select: { id: true, displayName: true, emailVerifiedAt: true, deletedAt: true },
             });
 
             if (!user || user.deletedAt) {
@@ -646,7 +646,7 @@ export class AuthService {
                 to: email,
                 subject: 'Welcome to GroupSync!',
                 template: 'welcome',
-                data: { clientUrl: config.server.clientUrl },
+                data: { displayName: user.displayName, clientUrl: config.server.clientUrl },
             });
 
             await AuditLogger.log(

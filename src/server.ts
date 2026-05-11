@@ -23,11 +23,21 @@ import { App } from './app';
 import { AgendaManager } from './agenda';
 import { Database, redis } from './database/connection';
 
+let shuttingDown = false;
+
 async function shutdownGracefully(code: number): Promise<never> {
+    // Guard against concurrent shutdown calls (e.g. multiple unhandledRejections)
+    if (shuttingDown) {
+        process.exit(code);
+    }
+    shuttingDown = true;
+
     try {
         await AgendaManager.stop();
         await Database.getInstance().disconnect();
-        await redis.quit();
+        if (redis.status !== 'end') {
+            await redis.quit().catch(() => {});
+        }
     } catch (err) {
         console.error('Error during shutdown:', err);
     }

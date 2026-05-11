@@ -22,15 +22,20 @@ export type JobName =
 const redisUrl = config.redis.url;
 const isTlsRedis = redisUrl.startsWith('rediss://');
 
-const makeConnection = () =>
-    new IORedis(redisUrl, {
-        maxRetriesPerRequest: null,
+const makeConnection = () => {
+    const conn = new IORedis(redisUrl, {
+        maxRetriesPerRequest: null,  // BullMQ requirement — commands queue until Redis is ready
         enableReadyCheck: false,
         lazyConnect: true,
         connectTimeout: 5000,
-        commandTimeout: 5000,
+        // No commandTimeout — it would cause Command timed out unhandledRejections
+        // while the connection is retrying. maxRetriesPerRequest: null handles backpressure.
         ...(isTlsRedis ? { tls: { rejectUnauthorized: false } } : {}),
     });
+    // Prevent unhandled 'error' events from crashing the process during reconnection
+    conn.on('error', (err) => asLogger.warn('BullMQ Redis connection error:', err.message));
+    return conn;
+};
 
 // ─── Queue defaults ───────────────────────────────────────────────────────────
 
@@ -56,14 +61,10 @@ export class AgendaManager {
         const queueConnection = makeConnection();
         const workerConnection = makeConnection();
 
-        // Pre-warm both connections so the first enqueue never waits for TCP handshake
-        await Promise.all([
-            queueConnection.connect().catch(() => {}),
-            workerConnection.connect().catch(() => {}),
-        ]);
-
-        // BullMQ requires noeviction; silently ignored on managed Redis (Upstash, etc.)
-        await queueConnection.config('SET', 'maxmemory-policy', 'noeviction').catch(() => {});
+        // BullMQ manages its own reconnection. noeviction is best-effort on managed Redis.
+        queueConnection.once('ready', () => {
+            queueConnection.config('SET', 'maxmemory-policy', 'noeviction').catch(() => {});
+        });
 
         const queueOptions: QueueOptions = {
             connection: queueConnection,
@@ -95,11 +96,13 @@ export class AgendaManager {
             asLogger.error('BullMQ worker error:', err);
         });
 
-        // Register recurring cron jobs
-        await AgendaManager.registerCronJobs();
-
         AgendaManager.started = true;
         asLogger.info('AgendaManager started');
+
+        // Register cron jobs fire-and-forget — they complete once Redis is ready
+        AgendaManager.registerCronJobs().catch((err) => {
+            asLogger.error('AgendaManager: failed to register cron jobs', err);
+        });
     }
 
     static async stop(): Promise<void> {

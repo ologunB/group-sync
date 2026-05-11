@@ -47,9 +47,10 @@ class Database {
     }
 
     async disconnect(): Promise<void> {
-        await this._client.$disconnect();
-        await this.pool.end();
-        this._connected = false;
+        if (!this._connected) return;
+        this._connected = false;  // set first to block concurrent calls
+        try { await this._client.$disconnect(); } catch { /* already disconnected */ }
+        try { await this.pool.end(); } catch { /* already ended */ }
         asLogger.info('PostgreSQL disconnected');
     }
 
