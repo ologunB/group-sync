@@ -68,13 +68,16 @@ export const redis = new IORedis(config.redis.url, {
     maxRetriesPerRequest: null,
     lazyConnect: true,
     connectTimeout: 5000,
-    commandTimeout: 5000,
+    // No commandTimeout — ioredis applies it to its own internal setup commands
+    // (CLIENT SETNAME, AUTH) whose promise rejections aren't always caught internally,
+    // leaking as unhandledRejections. Request-level failures are handled by try-catch
+    // in service code plus retryStrategy giving up.
     retryStrategy: (times: number) => {
         if (times > 5) {
             asLogger.error('Redis: max retry attempts reached, giving up');
             return null;
         }
-        const delay = Math.min(times * 100, 3000);
+        const delay = Math.min(times * 200, 3000);
         asLogger.warn(`Redis: retrying in ${delay}ms (attempt ${times})`);
         return delay;
     },

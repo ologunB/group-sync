@@ -8,7 +8,7 @@ import {
   notFoundMiddleware,
 } from "./shared/middleware/error.middleware";
 import { ResponseHelper } from "./shared/utils/response.helper";
-import { Database, redis } from "./database/connection";
+import { Database } from "./database/connection";
 import { InitialSeeder } from "./database/initial.seeder";
 import { EmailService } from "./shared/queues/mail.service";
 import { AgendaManager } from "./agenda";
@@ -150,8 +150,9 @@ export class App {
     // 1. Connect to PostgreSQL
     await Database.getInstance().connect();
 
-    // 2. Connect Redis eagerly so first request never waits for TCP handshake
-    await redis.connect().catch(() => {});  // error surfaced via 'error' event handler
+    // 2. Redis connects lazily on first use — no startup commands means no risk of
+    //    ioredis internal command rejections (CLIENT SETNAME etc.) leaking as
+    //    unhandledRejections when REDIS_URL is unavailable or slow at boot time.
 
     // 3. Run idempotent DB seeds
     await InitialSeeder.seed();
