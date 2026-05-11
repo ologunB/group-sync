@@ -55,11 +55,14 @@ exports.config = {
         bucketName: optional_env('S3_BUCKET_NAME', ''),
     },
     email: {
-        host: optional_env('SMTP_HOST', 'smtp.mailtrap.io'),
+        host: optional_env('SMTP_HOST', 'smtp-relay.brevo.com'),
         port: parseInt(optional_env('SMTP_PORT', '587'), 10),
         user: optional_env('SMTP_USER', ''),
         pass: optional_env('SMTP_PASS', ''),
-        from: optional_env('EMAIL_FROM', 'noreply@groupsync.app'),
+        from: optional_env('EMAIL_FROM', 'GroupSync <noreply@groupsync.app>'),
+        // Gmail fallback — kicks in if primary SMTP fails
+        fallbackUser: optional_env('SMTP_FALLBACK_USER', ''),
+        fallbackPass: optional_env('SMTP_FALLBACK_PASS', ''),
     },
     kyc: {
         apiKey: optional_env('KYC_PROVIDER_API_KEY', ''),

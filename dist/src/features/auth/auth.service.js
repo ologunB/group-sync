@@ -469,7 +469,7 @@ class AuthService {
             }
             const user = await connection_1.prisma.user.findUnique({
                 where: { email },
-                select: { id: true, emailVerifiedAt: true, deletedAt: true },
+                select: { id: true, displayName: true, emailVerifiedAt: true, deletedAt: true },
             });
             if (!user || user.deletedAt) {
                 throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('User'), http_status_codes_1.StatusCodes.NOT_FOUND);
@@ -484,7 +484,7 @@ class AuthService {
                 to: email,
                 subject: 'Welcome to GroupSync!',
                 template: 'welcome',
-                data: { clientUrl: app_config_1.config.server.clientUrl },
+                data: { displayName: user.displayName, clientUrl: app_config_1.config.server.clientUrl },
             });
             await audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_VERIFY_EMAIL, audit_logger_1.ResourceTypes.USER, user.id, 1, { email }, ipAddress);
         }

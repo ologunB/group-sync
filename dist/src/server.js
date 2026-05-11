@@ -20,11 +20,19 @@ process.on('SIGINT', async () => {
 const app_1 = require("./app");
 const agenda_1 = require("./agenda");
 const connection_1 = require("./database/connection");
+let shuttingDown = false;
 async function shutdownGracefully(code) {
+    // Guard against concurrent shutdown calls (e.g. multiple unhandledRejections)
+    if (shuttingDown) {
+        process.exit(code);
+    }
+    shuttingDown = true;
     try {
         await agenda_1.AgendaManager.stop();
         await connection_1.Database.getInstance().disconnect();
-        await connection_1.redis.quit();
+        if (connection_1.redis.status !== 'end') {
+            await connection_1.redis.quit().catch(() => { });
+        }
     }
     catch (err) {
         console.error('Error during shutdown:', err);

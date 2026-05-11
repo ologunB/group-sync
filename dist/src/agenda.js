@@ -12,14 +12,20 @@ const mail_service_1 = require("./shared/queues/mail.service");
 // ─── Connection (BullMQ requires maxRetriesPerRequest: null) ──────────────────
 const redisUrl = app_config_1.config.redis.url;
 const isTlsRedis = redisUrl.startsWith('rediss://');
-const makeConnection = () => new ioredis_1.default(redisUrl, {
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
-    lazyConnect: true,
-    connectTimeout: 5000,
-    commandTimeout: 5000,
-    ...(isTlsRedis ? { tls: { rejectUnauthorized: false } } : {}),
-});
+const makeConnection = () => {
+    const conn = new ioredis_1.default(redisUrl, {
+        maxRetriesPerRequest: null, // BullMQ requirement — commands queue until Redis is ready
+        enableReadyCheck: false,
+        lazyConnect: true,
+        connectTimeout: 5000,
+        // No commandTimeout — it would cause Command timed out unhandledRejections
+        // while the connection is retrying. maxRetriesPerRequest: null handles backpressure.
+        ...(isTlsRedis ? { tls: { rejectUnauthorized: false } } : {}),
+    });
+    // Prevent unhandled 'error' events from crashing the process during reconnection
+    conn.on('error', (err) => asLogger_1.asLogger.warn('BullMQ Redis connection error:', err.message));
+    return conn;
+};
 // ─── Queue defaults ───────────────────────────────────────────────────────────
 const QUEUE_NAME = 'system-jobs';
 const defaultJobOptions = {
@@ -38,13 +44,10 @@ class AgendaManager {
             return;
         const queueConnection = makeConnection();
         const workerConnection = makeConnection();
-        // Pre-warm both connections so the first enqueue never waits for TCP handshake
-        await Promise.all([
-            queueConnection.connect().catch(() => { }),
-            workerConnection.connect().catch(() => { }),
-        ]);
-        // BullMQ requires noeviction; silently ignored on managed Redis (Upstash, etc.)
-        await queueConnection.config('SET', 'maxmemory-policy', 'noeviction').catch(() => { });
+        // BullMQ manages its own reconnection. noeviction is best-effort on managed Redis.
+        queueConnection.once('ready', () => {
+            queueConnection.config('SET', 'maxmemory-policy', 'noeviction').catch(() => { });
+        });
         const queueOptions = {
             connection: queueConnection,
             defaultJobOptions,
@@ -64,10 +67,12 @@ class AgendaManager {
         AgendaManager.worker.on('error', (err) => {
             asLogger_1.asLogger.error('BullMQ worker error:', err);
         });
-        // Register recurring cron jobs
-        await AgendaManager.registerCronJobs();
         AgendaManager.started = true;
         asLogger_1.asLogger.info('AgendaManager started');
+        // Register cron jobs fire-and-forget — they complete once Redis is ready
+        AgendaManager.registerCronJobs().catch((err) => {
+            asLogger_1.asLogger.error('AgendaManager: failed to register cron jobs', err);
+        });
     }
     static async stop() {
         if (!AgendaManager.started)
