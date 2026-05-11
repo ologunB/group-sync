@@ -179,10 +179,9 @@
                 "exec": [
                   "if (pm.response.code === 201) {",
                   "  const b = pm.response.json();",
-                  "  pm.collectionVariables.set('accessToken',  b.data.tokens.accessToken);",
-                  "  pm.collectionVariables.set('refreshToken', b.data.tokens.refreshToken);",
-                  "  pm.collectionVariables.set('myUserId',     b.data.user.id);",
+                  "  pm.collectionVariables.set('myUserId', b.data.user.id);",
                   "  pm.test('Registration successful', () => pm.expect(b.success).to.be.true);",
+                  "  pm.test('No tokens on register', () => pm.expect(b.data).to.not.have.property('tokens'));",
                   "}"
                 ]
               }
@@ -231,7 +230,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Account created successfully. Please check your email to verify your account.\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"email\": \"testuser@example.com\",\n      \"displayName\": \"Test User\",\n      \"username\": null,\n      \"profilePhotoUrl\": null,\n      \"bio\": null,\n      \"city\": null,\n      \"state\": null,\n      \"country\": \"NG\",\n      \"interests\": [],\n      \"emailVerifiedAt\": null,\n      \"idVerificationStatus\": \"unsubmitted\",\n      \"status\": \"active\",\n      \"lastLoginAt\": null,\n      \"preferredLanguage\": \"en\",\n      \"createdAt\": \"2026-05-03T16:00:00.000Z\",\n      \"updatedAt\": \"2026-05-03T16:00:00.000Z\"\n    },\n    \"tokens\": {\n      \"accessToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n      \"refreshToken\": \"a3f8b2c1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0\",\n      \"expiresIn\": 900\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Account created successfully. Please check your email to verify your account.\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"email\": \"testuser@example.com\",\n      \"displayName\": \"Test User\",\n      \"username\": null,\n      \"profilePhotoUrl\": null,\n      \"bio\": null,\n      \"city\": null,\n      \"state\": null,\n      \"country\": \"NG\",\n      \"interests\": [],\n      \"emailVerifiedAt\": null,\n      \"idVerificationStatus\": \"unsubmitted\",\n      \"status\": \"active\",\n      \"lastLoginAt\": null,\n      \"preferredLanguage\": \"en\",\n      \"createdAt\": \"2026-05-03T16:00:00.000Z\",\n      \"updatedAt\": \"2026-05-03T16:00:00.000Z\"\n    }\n  }\n}"
             },
             {
               "name": "409 Conflict \u2014 Email exists",
@@ -308,7 +307,7 @@
                 "login"
               ]
             },
-            "description": "Authenticate with email and password.\n\nAccount lockout: 5 consecutive failures locks account for 15 min.\nlastLoginAt updated on every successful login."
+            "description": "Authenticate with email and password.\n\nRequires email verification — returns 403 if the account email has not been verified yet.\n\nAccount lockout: 5 consecutive failures locks account for 15 min.\nlastLoginAt updated on every successful login."
           },
           "response": [
             {
@@ -334,6 +333,18 @@
                 }
               ],
               "body": "{\n  \"success\": false,\n  \"message\": \"Invalid email or password.\",\n  \"data\": null,\n  \"error\": null\n}"
+            },
+            {
+              "name": "403 Forbidden \u2014 Email not verified",
+              "status": "Forbidden",
+              "code": 403,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Please verify your email address before proceeding.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
               "name": "429 Too Many Requests \u2014 Account locked",
@@ -833,6 +844,23 @@
         },
         {
           "name": "Verify Email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const b = pm.response.json();",
+                  "  pm.collectionVariables.set('accessToken',  b.data.tokens.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', b.data.tokens.refreshToken);",
+                  "  pm.collectionVariables.set('myUserId',     b.data.user.id);",
+                  "  pm.test('Verification returns tokens', () => pm.expect(b.data).to.have.property('tokens'));",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "auth": {
               "type": "noauth"
@@ -863,7 +891,7 @@
                 "verify-email"
               ]
             },
-            "description": "Verify email using OTP from registration or resend-verification.\n\nSide effects: emailVerifiedAt set, OTP deleted, welcome email queued.\nOTP TTL: 10 min. No auth header needed."
+            "description": "Verify email using OTP from registration or resend-verification.\n\nOn success, returns the user object and a token pair — this is the first point at which the client receives auth tokens.\n\nSide effects: emailVerifiedAt set, OTP deleted, session created, welcome email queued.\nOTP TTL: 10 min. No auth header needed."
           },
           "response": [
             {
@@ -876,7 +904,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Email verified successfully.\",\n  \"data\": null\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Email verified successfully.\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"email\": \"testuser@example.com\",\n      \"displayName\": \"Test User\",\n      \"emailVerifiedAt\": \"2026-05-03T16:05:00.000Z\",\n      \"idVerificationStatus\": \"unsubmitted\",\n      \"status\": \"active\"\n    },\n    \"tokens\": {\n      \"accessToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n      \"refreshToken\": \"a3f8b2c1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0\",\n      \"expiresIn\": 900\n    }\n  }\n}"
             },
             {
               "name": "400 Bad Request \u2014 Invalid/expired OTP",

@@ -25,6 +25,7 @@ import {
     SubmitIdVerificationDTO,
     KycWebhookDTO,
     AuthResult,
+    RegisterResult,
     TokenPair,
     SafeUser,
     userSafeSelect, VerifyForgotOtpDTO,
@@ -63,7 +64,7 @@ function stripSensitiveFields<T extends Record<string, unknown>>(user: T): SafeU
 export class AuthService {
     // ── register ─────────────────────────────────────────────────────────────────
 
-    async register(dto: RegisterDTO, ipAddress: string): Promise<AuthResult> {
+    async register(dto: RegisterDTO, ipAddress: string): Promise<RegisterResult> {
         const email = dto.email.toLowerCase();
 
         try {
@@ -94,22 +95,10 @@ export class AuthService {
             }
 
             const userId = randomUUID();
-            const sessionId = EncryptionUtil.generateRandomToken(16);
-            const tokenPayload = buildTokenPayload(userId, sessionId);
-            const tokens = EncryptionUtil.generateTokens(tokenPayload, ipAddress);
-            const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_MS);
 
-            // Atomic: create user + refresh token + session
-            const user = await prisma.$transaction(async (tx) => {
-                const newUser = await tx.user.create({
-                    data: { id: userId, email, displayName: dto.display_name, passwordHash, phone, phoneIv, phoneHash },
-                    select: userSafeSelect,
-                });
-                await tx.refreshToken.create({
-                    data: { userId, token: tokens.refreshToken, expiresAt: refreshExpiresAt, createdByIp: ipAddress },
-                });
-                await tx.session.create({ data: { userId, ipAddress, expiresAt: refreshExpiresAt } });
-                return newUser;
+            const user = await prisma.user.create({
+                data: { id: userId, email, displayName: dto.display_name, passwordHash, phone, phoneIv, phoneHash },
+                select: userSafeSelect,
             });
 
             // Parallel: store OTP in Redis + enqueue verification email
@@ -124,9 +113,12 @@ export class AuthService {
                 }),
             ]);
 
-            AuditLogger.log(tokenPayload, LogActions.AUTH_REGISTER, ResourceTypes.USER, userId, 1, { email }, ipAddress);
+            AuditLogger.log(
+                buildTokenPayload(userId, 'pre-verify'),
+                LogActions.AUTH_REGISTER, ResourceTypes.USER, userId, 1, { email }, ipAddress,
+            );
 
-            return { user, tokens };
+            return { user };
         } catch (error: any) {
             AuditLogger.log(null, LogActions.AUTH_REGISTER, ResourceTypes.USER, null, 0, { email, error: error.message }, ipAddress);
             if (error instanceof ApiError) throw error;
@@ -147,6 +139,7 @@ export class AuthService {
                     ...userSafeSelect,
                     passwordHash: true,
                     deletedAt: true,
+                    emailVerifiedAt: true,
                 },
             });
 
@@ -187,6 +180,11 @@ export class AuthService {
                     throw new ApiError(Messages.ACCOUNT_LOCKED, StatusCodes.TOO_MANY_REQUESTS);
                 }
                 throw new ApiError(Messages.INVALID_CREDENTIALS, StatusCodes.UNAUTHORIZED);
+            }
+
+            // Password is valid — now gate on email verification
+            if (!rawUser.emailVerifiedAt) {
+                throw new ApiError(Messages.EMAIL_NOT_VERIFIED, StatusCodes.FORBIDDEN);
             }
 
             const sessionId = EncryptionUtil.generateRandomToken(16);
@@ -615,7 +613,7 @@ export class AuthService {
 
     // ── verifyEmail ───────────────────────────────────────────────────────────────
 
-    async verifyEmail(dto: VerifyEmailDTO, ipAddress: string): Promise<void> {
+    async verifyEmail(dto: VerifyEmailDTO, ipAddress: string): Promise<AuthResult> {
         const email = dto.email.toLowerCase();
 
         try {
@@ -625,18 +623,31 @@ export class AuthService {
                 throw new ApiError(Messages.INVALID_VERIFICATION_CODE, StatusCodes.BAD_REQUEST);
             }
 
-            const user = await prisma.user.findUnique({
+            const rawUser = await prisma.user.findUnique({
                 where: { email },
-                select: { id: true, displayName: true, emailVerifiedAt: true, deletedAt: true },
+                select: { ...userSafeSelect, deletedAt: true },
             });
 
-            if (!user || user.deletedAt) {
+            if (!rawUser || rawUser.deletedAt) {
                 throw new ApiError(Messages.RESOURCE_NOT_FOUND('User'), StatusCodes.NOT_FOUND);
             }
 
-            await prisma.user.update({
-                where: { id: user.id },
-                data: { emailVerifiedAt: new Date() },
+            const sessionId = EncryptionUtil.generateRandomToken(16);
+            const tokenPayload = buildTokenPayload(rawUser.id, sessionId, rawUser.role);
+            const tokens = EncryptionUtil.generateTokens(tokenPayload, ipAddress);
+            const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_MS);
+
+            const user = await prisma.$transaction(async (tx) => {
+                const updated = await tx.user.update({
+                    where: { id: rawUser.id },
+                    data: { emailVerifiedAt: new Date() },
+                    select: userSafeSelect,
+                });
+                await tx.refreshToken.create({
+                    data: { userId: rawUser.id, token: tokens.refreshToken, expiresAt: refreshExpiresAt, createdByIp: ipAddress },
+                });
+                await tx.session.create({ data: { userId: rawUser.id, ipAddress, expiresAt: refreshExpiresAt } });
+                return updated;
             });
 
             await SessionService.deleteEmailVerificationOTP(email);
@@ -650,9 +661,11 @@ export class AuthService {
             });
 
             await AuditLogger.log(
-                null, LogActions.AUTH_VERIFY_EMAIL, ResourceTypes.USER, user.id, 1,
+                tokenPayload, LogActions.AUTH_VERIFY_EMAIL, ResourceTypes.USER, user.id, 1,
                 { email }, ipAddress,
             );
+
+            return { user, tokens };
         } catch (error: any) {
             await AuditLogger.log(
                 null, LogActions.AUTH_VERIFY_EMAIL, ResourceTypes.USER, null, 0,

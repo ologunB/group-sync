@@ -159,8 +159,8 @@ export class AuthController {
     ): Promise<void> => {
         try {
             const ipAddress = (req.ip ?? req.socket.remoteAddress ?? 'unknown') as string;
-            await authService.verifyEmail(req.body, ipAddress);
-            ResponseHelper.success(res, null, Messages.EMAIL_VERIFIED);
+            const result = await authService.verifyEmail(req.body, ipAddress);
+            ResponseHelper.success(res, result, Messages.EMAIL_VERIFIED);
         } catch (error) {
             next(error);
         }

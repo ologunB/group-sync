@@ -109,8 +109,8 @@ class AuthController {
     verifyEmail = async (req, res, next) => {
         try {
             const ipAddress = (req.ip ?? req.socket.remoteAddress ?? 'unknown');
-            await authService.verifyEmail(req.body, ipAddress);
-            response_helper_1.ResponseHelper.success(res, null, response_constants_1.Messages.EMAIL_VERIFIED);
+            const result = await authService.verifyEmail(req.body, ipAddress);
+            response_helper_1.ResponseHelper.success(res, result, response_constants_1.Messages.EMAIL_VERIFIED);
         }
         catch (error) {
             next(error);

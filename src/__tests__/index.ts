@@ -114,9 +114,17 @@ async function registerAndLogin(
     if (reg.status !== 201) {
         throw new Error(`Registration failed for ${email}: ${JSON.stringify(reg.data)}`);
     }
-    const payload = reg.data.data as Record<string, unknown>;
-    const tokens  = payload.tokens as Record<string, unknown>;
-    const user    = payload.user   as Record<string, unknown>;
+    const regPayload = reg.data.data as Record<string, unknown>;
+    const user = regPayload.user as Record<string, unknown>;
+
+    // Verify email — this is now what issues the tokens
+    const otp = await getOtp('verify:email', email);
+    const verify = await post('/auth/verify-email', { email, otp });
+    if (verify.status !== 200) {
+        throw new Error(`Email verification failed for ${email}: ${JSON.stringify(verify.data)}`);
+    }
+    const verifyPayload = verify.data.data as Record<string, unknown>;
+    const tokens = verifyPayload.tokens as Record<string, unknown>;
     return { token: tokens.accessToken as string, userId: user.id as string };
 }
 
@@ -164,7 +172,7 @@ async function runAuthSuite(): Promise<void> {
 
     section('1. Registration');
 
-    await test('valid registration returns 201 with user + tokens', async () => {
+    await test('valid registration returns 201 with user (no tokens)', async () => {
         const { status, data } = await post('/auth/register', {
             email: EMAIL, password: PASSWORD, display_name: 'Auth Tester',
         });
@@ -172,12 +180,7 @@ async function runAuthSuite(): Promise<void> {
         assert(data.success === true, 'success should be true');
         const payload = data.data as Record<string, unknown>;
         assertHas(payload, 'user');
-        assertHas(payload, 'tokens');
-        const tokens = payload.tokens as Record<string, unknown>;
-        assertHas(tokens, 'accessToken');
-        assertHas(tokens, 'refreshToken');
-        accessToken  = tokens.accessToken  as string;
-        refreshToken = tokens.refreshToken as string;
+        assert(!('tokens' in payload), 'register should not return tokens');
     });
 
     await test('duplicate email returns 409', async () => {
@@ -240,12 +243,9 @@ async function runAuthSuite(): Promise<void> {
 
     section('2. Login');
 
-    await test('valid credentials return 200 with tokens', async () => {
-        const { status, data } = await post('/auth/login', { email: EMAIL, password: PASSWORD });
-        assertStatus(status, 200);
-        const tokens = (data.data as Record<string, unknown>).tokens as Record<string, unknown>;
-        accessToken  = tokens.accessToken  as string;
-        refreshToken = tokens.refreshToken as string;
+    await test('unverified user login returns 403', async () => {
+        const { status } = await post('/auth/login', { email: EMAIL, password: PASSWORD });
+        assertStatus(status, 403);
     });
 
     await test('wrong password returns 401', async () => {
@@ -261,16 +261,6 @@ async function runAuthSuite(): Promise<void> {
     await test('missing password returns 422', async () => {
         const { status } = await post('/auth/login', { email: EMAIL });
         assert(status >= 400 && status < 500, `Expected 4xx, got ${status}`);
-    });
-
-    await test('login with uppercase email normalizes and succeeds (200)', async () => {
-        const { status, data } = await post('/auth/login', {
-            email: EMAIL.toUpperCase(), password: PASSWORD,
-        });
-        assertStatus(status, 200);
-        const tokens = (data.data as Record<string, unknown>).tokens as Record<string, unknown>;
-        accessToken  = tokens.accessToken  as string;
-        refreshToken = tokens.refreshToken as string;
     });
 
     await test('login with missing email returns 422', async () => {
@@ -307,10 +297,26 @@ async function runAuthSuite(): Promise<void> {
         assertStatus(status, 400);
     });
 
-    await test('valid OTP from Redis verifies email (200)', async () => {
+    await test('valid OTP from Redis verifies email and returns user + tokens (200)', async () => {
         const otp = await getOtp('verify:email', EMAIL);
-        const { status } = await post('/auth/verify-email', { email: EMAIL, otp });
+        const { status, data } = await post('/auth/verify-email', { email: EMAIL, otp });
         assertStatus(status, 200);
+        const payload = data.data as Record<string, unknown>;
+        assertHas(payload, 'user');
+        assertHas(payload, 'tokens');
+        const tokens = payload.tokens as Record<string, unknown>;
+        assertHas(tokens, 'accessToken');
+        assertHas(tokens, 'refreshToken');
+        accessToken  = tokens.accessToken  as string;
+        refreshToken = tokens.refreshToken as string;
+    });
+
+    await test('verified user can now log in and receives tokens (200)', async () => {
+        const { status, data } = await post('/auth/login', { email: EMAIL, password: PASSWORD });
+        assertStatus(status, 200);
+        const tokens = (data.data as Record<string, unknown>).tokens as Record<string, unknown>;
+        accessToken  = tokens.accessToken  as string;
+        refreshToken = tokens.refreshToken as string;
     });
 
     await test('replaying the same OTP after consumption returns 400', async () => {

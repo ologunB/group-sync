@@ -58,21 +58,9 @@ class AuthService {
                 phoneHash = rawPhoneHash;
             }
             const userId = (0, crypto_1.randomUUID)();
-            const sessionId = encryption_1.EncryptionUtil.generateRandomToken(16);
-            const tokenPayload = buildTokenPayload(userId, sessionId);
-            const tokens = encryption_1.EncryptionUtil.generateTokens(tokenPayload, ipAddress);
-            const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_MS);
-            // Atomic: create user + refresh token + session
-            const user = await connection_1.prisma.$transaction(async (tx) => {
-                const newUser = await tx.user.create({
-                    data: { id: userId, email, displayName: dto.display_name, passwordHash, phone, phoneIv, phoneHash },
-                    select: auth_types_1.userSafeSelect,
-                });
-                await tx.refreshToken.create({
-                    data: { userId, token: tokens.refreshToken, expiresAt: refreshExpiresAt, createdByIp: ipAddress },
-                });
-                await tx.session.create({ data: { userId, ipAddress, expiresAt: refreshExpiresAt } });
-                return newUser;
+            const user = await connection_1.prisma.user.create({
+                data: { id: userId, email, displayName: dto.display_name, passwordHash, phone, phoneIv, phoneHash },
+                select: auth_types_1.userSafeSelect,
             });
             // Parallel: store OTP in Redis + enqueue verification email
             const otp = encryption_1.EncryptionUtil.generateOTP();
@@ -85,8 +73,8 @@ class AuthService {
                     data: { displayName: user.displayName, otp, clientUrl: app_config_1.config.server.clientUrl },
                 }),
             ]);
-            audit_logger_1.AuditLogger.log(tokenPayload, audit_logger_1.LogActions.AUTH_REGISTER, audit_logger_1.ResourceTypes.USER, userId, 1, { email }, ipAddress);
-            return { user, tokens };
+            audit_logger_1.AuditLogger.log(buildTokenPayload(userId, 'pre-verify'), audit_logger_1.LogActions.AUTH_REGISTER, audit_logger_1.ResourceTypes.USER, userId, 1, { email }, ipAddress);
+            return { user };
         }
         catch (error) {
             audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_REGISTER, audit_logger_1.ResourceTypes.USER, null, 0, { email, error: error.message }, ipAddress);
@@ -106,6 +94,7 @@ class AuthService {
                     ...auth_types_1.userSafeSelect,
                     passwordHash: true,
                     deletedAt: true,
+                    emailVerifiedAt: true,
                 },
             });
             // Always throw the same error to prevent email enumeration
@@ -135,6 +124,10 @@ class AuthService {
                     throw new error_middleware_1.ApiError(response_constants_1.Messages.ACCOUNT_LOCKED, http_status_codes_1.StatusCodes.TOO_MANY_REQUESTS);
                 }
                 throw new error_middleware_1.ApiError(response_constants_1.Messages.INVALID_CREDENTIALS, http_status_codes_1.StatusCodes.UNAUTHORIZED);
+            }
+            // Password is valid — now gate on email verification
+            if (!rawUser.emailVerifiedAt) {
+                throw new error_middleware_1.ApiError(response_constants_1.Messages.EMAIL_NOT_VERIFIED, http_status_codes_1.StatusCodes.FORBIDDEN);
             }
             const sessionId = encryption_1.EncryptionUtil.generateRandomToken(16);
             const tokenPayload = buildTokenPayload(rawUser.id, sessionId, rawUser.role);
@@ -467,16 +460,28 @@ class AuthService {
             if (!storedOtp || storedOtp !== dto.otp) {
                 throw new error_middleware_1.ApiError(response_constants_1.Messages.INVALID_VERIFICATION_CODE, http_status_codes_1.StatusCodes.BAD_REQUEST);
             }
-            const user = await connection_1.prisma.user.findUnique({
+            const rawUser = await connection_1.prisma.user.findUnique({
                 where: { email },
-                select: { id: true, displayName: true, emailVerifiedAt: true, deletedAt: true },
+                select: { ...auth_types_1.userSafeSelect, deletedAt: true },
             });
-            if (!user || user.deletedAt) {
+            if (!rawUser || rawUser.deletedAt) {
                 throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('User'), http_status_codes_1.StatusCodes.NOT_FOUND);
             }
-            await connection_1.prisma.user.update({
-                where: { id: user.id },
-                data: { emailVerifiedAt: new Date() },
+            const sessionId = encryption_1.EncryptionUtil.generateRandomToken(16);
+            const tokenPayload = buildTokenPayload(rawUser.id, sessionId, rawUser.role);
+            const tokens = encryption_1.EncryptionUtil.generateTokens(tokenPayload, ipAddress);
+            const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_MS);
+            const user = await connection_1.prisma.$transaction(async (tx) => {
+                const updated = await tx.user.update({
+                    where: { id: rawUser.id },
+                    data: { emailVerifiedAt: new Date() },
+                    select: auth_types_1.userSafeSelect,
+                });
+                await tx.refreshToken.create({
+                    data: { userId: rawUser.id, token: tokens.refreshToken, expiresAt: refreshExpiresAt, createdByIp: ipAddress },
+                });
+                await tx.session.create({ data: { userId: rawUser.id, ipAddress, expiresAt: refreshExpiresAt } });
+                return updated;
             });
             await session_service_1.SessionService.deleteEmailVerificationOTP(email);
             // Queue welcome email
@@ -486,7 +491,8 @@ class AuthService {
                 template: 'welcome',
                 data: { displayName: user.displayName, clientUrl: app_config_1.config.server.clientUrl },
             });
-            await audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_VERIFY_EMAIL, audit_logger_1.ResourceTypes.USER, user.id, 1, { email }, ipAddress);
+            await audit_logger_1.AuditLogger.log(tokenPayload, audit_logger_1.LogActions.AUTH_VERIFY_EMAIL, audit_logger_1.ResourceTypes.USER, user.id, 1, { email }, ipAddress);
+            return { user, tokens };
         }
         catch (error) {
             await audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_VERIFY_EMAIL, audit_logger_1.ResourceTypes.USER, null, 0, { email, error: error.message }, ipAddress);

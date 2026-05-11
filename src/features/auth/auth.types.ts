@@ -84,6 +84,10 @@ export interface TokenPair {
     expiresIn: number;
 }
 
+export interface RegisterResult {
+    user: SafeUser;
+}
+
 export interface AuthResult {
     user: SafeUser;
     tokens: TokenPair;
