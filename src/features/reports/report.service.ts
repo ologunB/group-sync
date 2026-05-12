@@ -54,7 +54,7 @@ export class ReportService {
                 reason: dto.reason,
             });
 
-            await AuditLogger.log(actor, LogActions.REPORT_SUBMIT, ResourceTypes.REPORT, report.id, 1, {
+            AuditLogger.log(actor, LogActions.REPORT_SUBMIT, ResourceTypes.REPORT, report.id, 1, {
                 targetType: dto.target_type,
                 targetId: dto.target_id,
                 reason: dto.reason,
@@ -62,7 +62,7 @@ export class ReportService {
 
             return report;
         } catch (error) {
-            await AuditLogger.log(actor, LogActions.REPORT_SUBMIT, ResourceTypes.REPORT, null, 0, { error });
+            AuditLogger.log(actor, LogActions.REPORT_SUBMIT, ResourceTypes.REPORT, null, 0, { error });
             if (error instanceof ApiError) throw error;
             asLogger.error('ReportService.submitReport error:', error);
             throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);

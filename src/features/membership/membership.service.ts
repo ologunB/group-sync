@@ -98,12 +98,12 @@ export class MembershipService {
                 data: { newMemberId: actor.userId },
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_JOIN, ResourceTypes.MEMBERSHIP, groupId, 1,
                 { groupName: group.name },
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_JOIN, ResourceTypes.MEMBERSHIP, groupId, 0,
                 { error: error.message },
             );
@@ -231,14 +231,14 @@ export class MembershipService {
                 data: { applicantId: actor.userId, applicationId: application.id },
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_APPLY, ResourceTypes.APPLICATION, application.id, 1,
                 { groupId, groupName: group.name },
             );
 
             return { applicationId: application.id, status: application.status };
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_APPLY, ResourceTypes.APPLICATION, null, 0,
                 { groupId, error: error.message },
             );
@@ -284,11 +284,11 @@ export class MembershipService {
                 where: { userId_groupId: { userId: actor.userId, groupId } },
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_LEAVE, ResourceTypes.MEMBERSHIP, groupId, 1, {},
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_LEAVE, ResourceTypes.MEMBERSHIP, groupId, 0,
                 { error: error.message },
             );
@@ -461,12 +461,12 @@ export class MembershipService {
                 });
             }
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_APPLICATION_REVIEW, ResourceTypes.APPLICATION, applicationId, 1,
                 { action: dto.action, groupId: application.groupId },
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_APPLICATION_REVIEW, ResourceTypes.APPLICATION, applicationId, 0,
                 { error: error.message },
             );
@@ -506,11 +506,11 @@ export class MembershipService {
                 data: { status: 'withdrawn' },
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_APPLICATION_WITHDRAW, ResourceTypes.APPLICATION, applicationId, 1, {},
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_APPLICATION_WITHDRAW, ResourceTypes.APPLICATION, applicationId, 0,
                 { error: error.message },
             );
@@ -573,14 +573,14 @@ export class MembershipService {
                 select: { fields: true },
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_FORM_UPSERT, ResourceTypes.GROUP_FORM, groupId, 1,
                 { fieldCount: dto.fields.length },
             );
 
             return { fields: form.fields as unknown[] };
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_FORM_UPSERT, ResourceTypes.GROUP_FORM, groupId, 0,
                 { error: error.message },
             );
@@ -684,12 +684,12 @@ export class MembershipService {
                 data:      { role: dto.role, status: dto.status, updatedBy: actor.userId },
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_MEMBER_UPDATE, ResourceTypes.MEMBERSHIP, groupId, 1,
                 { targetUserId, role: dto.role, status: dto.status },
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_MEMBER_UPDATE, ResourceTypes.MEMBERSHIP, groupId, 0,
                 { targetUserId, error: error.message },
             );
@@ -766,12 +766,12 @@ export class MembershipService {
                 data:      { action: 'removed', removedBy: actor.userId },
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_MEMBER_REMOVE, ResourceTypes.MEMBERSHIP, groupId, 1,
                 { targetUserId },
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_MEMBER_REMOVE, ResourceTypes.MEMBERSHIP, groupId, 0,
                 { targetUserId, error: error.message },
             );
@@ -830,7 +830,7 @@ export class MembershipService {
             // Cache for fast lookups
             await redis.setex(inviteKey(token), INVITE_CACHE_TTL, groupId);
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_INVITE_GENERATE, ResourceTypes.INVITE_LINK, inviteLink.id, 1,
                 { groupId, maxUses: dto.max_uses, expiresAt },
             );
@@ -850,7 +850,7 @@ export class MembershipService {
                 } : null,
             };
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_INVITE_GENERATE, ResourceTypes.INVITE_LINK, null, 0,
                 { groupId, error: error.message },
             );
@@ -925,12 +925,12 @@ export class MembershipService {
             // Remove from Redis cache
             await redis.del(inviteKey(link.token));
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_INVITE_REVOKE, ResourceTypes.INVITE_LINK, inviteLinkId, 1,
                 { groupId: link.groupId },
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_INVITE_REVOKE, ResourceTypes.INVITE_LINK, inviteLinkId, 0,
                 { error: error.message },
             );
@@ -1018,12 +1018,12 @@ export class MembershipService {
             // Refresh Redis cache TTL
             await redis.setex(inviteKey(token), INVITE_CACHE_TTL, groupId);
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_INVITE_ACCEPT, ResourceTypes.MEMBERSHIP, groupId, 1,
                 { token: token.slice(0, 8) + '...', groupName: inviteLink.group.name },
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_INVITE_ACCEPT, ResourceTypes.MEMBERSHIP, null, 0,
                 { error: error.message },
             );

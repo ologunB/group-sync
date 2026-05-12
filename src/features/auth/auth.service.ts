@@ -173,7 +173,7 @@ export class AuthService {
             if (!passwordValid) {
                 const failedCount = await SessionService.incrementFailedLogin(rawUser.id);
                 if (failedCount >= 5) {
-                    await AuditLogger.log(
+                    AuditLogger.log(
                         null, LogActions.AUTH_LOGIN, ResourceTypes.USER, rawUser.id, 0,
                         { email, reason: 'account_locked_after_failures' }, ipAddress,
                     );
@@ -322,14 +322,14 @@ export class AuthService {
                 });
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 tokenPayload, LogActions.AUTH_SOCIAL_LOGIN, ResourceTypes.USER, userId, 1,
                 { provider: dto.provider, isNewUser }, ipAddress,
             );
 
             return { user, tokens, isNewUser };
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 null, LogActions.AUTH_SOCIAL_LOGIN, ResourceTypes.USER, null, 0,
                 { provider: dto.provider, error: error.message }, ipAddress,
             );
@@ -368,11 +368,11 @@ export class AuthService {
 
             await SessionService.clearPresence(actor.userId);
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.AUTH_LOGOUT, ResourceTypes.SESSION, actor.userId, 1, {}, ipAddress,
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.AUTH_LOGOUT, ResourceTypes.SESSION, actor.userId, 0,
                 { error: error.message }, ipAddress,
             );
@@ -424,7 +424,7 @@ export class AuthService {
                 });
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 tokenPayload, LogActions.AUTH_REFRESH_TOKEN, ResourceTypes.REFRESH_TOKEN,
                 existing.userId, 1, {}, ipAddress,
             );
@@ -459,7 +459,7 @@ export class AuthService {
                     data: { displayName: user.displayName, otp, clientUrl: config.server.clientUrl },
                 });
 
-                await AuditLogger.log(
+                AuditLogger.log(
                     null, LogActions.AUTH_FORGOT_PASSWORD, ResourceTypes.USER, user.id, 1,
                     { email }, ipAddress,
                 );
@@ -483,7 +483,7 @@ export class AuthService {
             }
 
             // OTP is valid — do NOT delete it here, so resetPassword can still consume it
-            await AuditLogger.log(
+            AuditLogger.log(
                 null,
                 LogActions.AUTH_FORGOT_PASSWORD,
                 ResourceTypes.USER,
@@ -493,7 +493,7 @@ export class AuthService {
                 ipAddress,
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 null,
                 LogActions.AUTH_FORGOT_PASSWORD,
                 ResourceTypes.USER,
@@ -543,12 +543,12 @@ export class AuthService {
             await SessionService.deleteForgotPasswordOTP(email);
             await SessionService.clearFailedLogins(user.id);
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 null, LogActions.AUTH_RESET_PASSWORD, ResourceTypes.USER, user.id, 1,
                 { email }, ipAddress,
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 null, LogActions.AUTH_RESET_PASSWORD, ResourceTypes.USER, null, 0,
                 { email, error: error.message }, ipAddress,
             );
@@ -597,11 +597,11 @@ export class AuthService {
                 data: { passwordHash: newPasswordHash },
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.AUTH_CHANGE_PASSWORD, ResourceTypes.USER, user.id, 1, {}, ipAddress,
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.AUTH_CHANGE_PASSWORD, ResourceTypes.USER, actor.userId, 0,
                 { error: error.message }, ipAddress,
             );
@@ -660,14 +660,14 @@ export class AuthService {
                 data: { displayName: user.displayName, clientUrl: config.server.clientUrl },
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 tokenPayload, LogActions.AUTH_VERIFY_EMAIL, ResourceTypes.USER, user.id, 1,
                 { email }, ipAddress,
             );
 
             return { user, tokens };
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 null, LogActions.AUTH_VERIFY_EMAIL, ResourceTypes.USER, null, 0,
                 { email, error: error.message }, ipAddress,
             );
@@ -705,7 +705,7 @@ export class AuthService {
                 data: { displayName: user.displayName, otp, clientUrl: config.server.clientUrl },
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 null, LogActions.AUTH_RESEND_VERIFICATION, ResourceTypes.USER, user.id, 1,
                 { email }, ipAddress,
             );
@@ -760,14 +760,14 @@ export class AuthService {
                 documentUrl: dto.document_url, // Raw URL sent to KYC provider in the worker
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.AUTH_SUBMIT_ID_VERIFICATION, ResourceTypes.USER, user.id, 1,
                 { documentType: dto.document_type }, ipAddress,
             );
 
             return { idVerificationStatus: 'pending' };
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.AUTH_SUBMIT_ID_VERIFICATION, ResourceTypes.USER, actor.userId, 0,
                 { error: error.message }, ipAddress,
             );
@@ -859,12 +859,12 @@ export class AuthService {
                 });
             }
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 null, LogActions.AUTH_KYC_WEBHOOK, ResourceTypes.USER, user.id, 1,
                 { eventId: dto.event_id, status: dto.status }, ipAddress,
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 null, LogActions.AUTH_KYC_WEBHOOK, ResourceTypes.USER, dto.user_id ?? null, 0,
                 { eventId: dto.event_id, error: error.message }, ipAddress,
             );

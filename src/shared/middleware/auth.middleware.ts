@@ -131,8 +131,7 @@ export const authorizeGroupRole = (...roles: string[]) => {
                 return next(new ApiError(Messages.FORBIDDEN, StatusCodes.FORBIDDEN));
             }
 
-            // prisma.membership is available once prisma/schemas/group.prisma is added
-            const membership = await (prisma as any).membership.findUnique({
+            const membership = await prisma.membership.findUnique({
                 where: { userId_groupId: { userId: req.user.userId, groupId } },
                 select: { role: true, status: true },
             });

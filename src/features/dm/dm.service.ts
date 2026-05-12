@@ -282,7 +282,7 @@ export class DmService {
                 referenceId: dm.id,
             });
 
-            await AuditLogger.log(actor, LogActions.DM_SEND, ResourceTypes.DM, dm.id, 1, { receiverId: otherUserId });
+            AuditLogger.log(actor, LogActions.DM_SEND, ResourceTypes.DM, dm.id, 1, { receiverId: otherUserId });
 
             return dm;
         } catch (error) {

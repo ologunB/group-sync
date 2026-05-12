@@ -66,11 +66,11 @@ export class AdminService {
                 select: adminUserSelect,
             });
 
-            await AuditLogger.log(actor, LogActions.ADMIN_USER_UPDATE, ResourceTypes.USER, userId, 1, { status: dto.status });
+            AuditLogger.log(actor, LogActions.ADMIN_USER_UPDATE, ResourceTypes.USER, userId, 1, { status: dto.status });
 
             return updated;
         } catch (error) {
-            await AuditLogger.log(actor, LogActions.ADMIN_USER_UPDATE, ResourceTypes.USER, userId, 0, { error });
+            AuditLogger.log(actor, LogActions.ADMIN_USER_UPDATE, ResourceTypes.USER, userId, 0, { error });
             if (error instanceof ApiError) throw error;
             asLogger.error('AdminService.updateUserStatus error:', error);
             throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
@@ -121,14 +121,14 @@ export class AdminService {
                 select: adminUserSelect,
             });
 
-            await AuditLogger.log(actor, LogActions.ADMIN_USER_VERIFY_ID, ResourceTypes.USER, userId, 1, {
+            AuditLogger.log(actor, LogActions.ADMIN_USER_VERIFY_ID, ResourceTypes.USER, userId, 1, {
                 decision: dto.decision,
                 rejection_reason: dto.rejection_reason,
             });
 
             return updated;
         } catch (error) {
-            await AuditLogger.log(actor, LogActions.ADMIN_USER_VERIFY_ID, ResourceTypes.USER, userId, 0, { error });
+            AuditLogger.log(actor, LogActions.ADMIN_USER_VERIFY_ID, ResourceTypes.USER, userId, 0, { error });
             if (error instanceof ApiError) throw error;
             asLogger.error('AdminService.reviewIdVerification error:', error);
             throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
@@ -179,11 +179,11 @@ export class AdminService {
                 select: adminGroupSelect,
             });
 
-            await AuditLogger.log(actor, LogActions.ADMIN_GROUP_UPDATE, ResourceTypes.GROUP, groupId, 1, dto as Record<string, unknown>);
+            AuditLogger.log(actor, LogActions.ADMIN_GROUP_UPDATE, ResourceTypes.GROUP, groupId, 1, dto as Record<string, unknown>);
 
             return updated;
         } catch (error) {
-            await AuditLogger.log(actor, LogActions.ADMIN_GROUP_UPDATE, ResourceTypes.GROUP, groupId, 0, { error });
+            AuditLogger.log(actor, LogActions.ADMIN_GROUP_UPDATE, ResourceTypes.GROUP, groupId, 0, { error });
             if (error instanceof ApiError) throw error;
             asLogger.error('AdminService.updateGroup error:', error);
             throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
@@ -229,7 +229,7 @@ export class AdminService {
                 select: adminReportSelect,
             });
 
-            await AuditLogger.log(actor, LogActions.ADMIN_REPORT_RESOLVE, ResourceTypes.REPORT, reportId, 1, { action: dto.action });
+            AuditLogger.log(actor, LogActions.ADMIN_REPORT_RESOLVE, ResourceTypes.REPORT, reportId, 1, { action: dto.action });
 
             return updated;
         } catch (error) {
@@ -398,7 +398,7 @@ export class AdminService {
                 select: adminUserSelect,
             });
 
-            await AuditLogger.log(actor, LogActions.ADMIN_USER_UPDATE, ResourceTypes.USER, userId, 1, {
+            AuditLogger.log(actor, LogActions.ADMIN_USER_UPDATE, ResourceTypes.USER, userId, 1, {
                 action: 'role_change',
                 new_role: dto.role,
             });

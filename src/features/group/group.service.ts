@@ -83,14 +83,14 @@ export class GroupService {
         `;
             }
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_CREATE, ResourceTypes.GROUP, group.id, 1,
                 { name: group.name, slug: group.slug, membershipType: group.membershipType },
             );
 
             return group;
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_CREATE, ResourceTypes.GROUP, null, 0,
                 { name: dto.name, error: error.message },
             );
@@ -408,14 +408,14 @@ export class GroupService {
                 updatedGroup.slug = newSlug;
             }
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_UPDATE, ResourceTypes.GROUP, groupId, 1,
                 { updatedFields: Object.keys(updateData) },
             );
 
             return updatedGroup;
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_UPDATE, ResourceTypes.GROUP, groupId, 0,
                 { error: error.message },
             );
@@ -464,12 +464,12 @@ export class GroupService {
                 memberIds: activeMembers.map((m) => m.userId),
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_DELETE, ResourceTypes.GROUP, groupId, 1,
                 { groupName: group.name, notifiedCount: activeMembers.length },
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor, LogActions.GROUP_DELETE, ResourceTypes.GROUP, groupId, 0,
                 { error: error.message },
             );

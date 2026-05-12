@@ -132,7 +132,7 @@ export class MessageService {
             });
 
             SocketService.emitToRoom(`group:${groupId}`, SocketEvents.NEW_MESSAGE, { message });
-            await AuditLogger.log(actor, LogActions.MESSAGE_SEND, ResourceTypes.MESSAGE, message.id, 1, { groupId });
+            AuditLogger.log(actor, LogActions.MESSAGE_SEND, ResourceTypes.MESSAGE, message.id, 1, { groupId });
 
             return message;
         } catch (error) {
@@ -168,7 +168,7 @@ export class MessageService {
                 message_id: messageId,
                 group_id: message.groupId,
             });
-            await AuditLogger.log(actor, LogActions.MESSAGE_DELETE, ResourceTypes.MESSAGE, messageId, 1);
+            AuditLogger.log(actor, LogActions.MESSAGE_DELETE, ResourceTypes.MESSAGE, messageId, 1);
         } catch (error) {
             if (error instanceof ApiError) throw error;
             asLogger.error('MessageService.deleteMessage error:', error);
@@ -201,7 +201,7 @@ export class MessageService {
                 group_id: message.groupId,
                 is_pinned: updated.isPinned,
             });
-            await AuditLogger.log(actor, LogActions.MESSAGE_PIN, ResourceTypes.MESSAGE, messageId, 1);
+            AuditLogger.log(actor, LogActions.MESSAGE_PIN, ResourceTypes.MESSAGE, messageId, 1);
 
             return updated;
         } catch (error) {
@@ -317,7 +317,7 @@ export class MessageService {
                 locked_by: actor.userId,
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor,
                 locked ? LogActions.CHAT_LOCK : LogActions.CHAT_UNLOCK,
                 ResourceTypes.GROUP,

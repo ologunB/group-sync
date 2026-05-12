@@ -35,7 +35,7 @@ export class UserService {
                 throw new ApiError(Messages.RESOURCE_NOT_FOUND('User'), StatusCodes.NOT_FOUND);
             }
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor,
                 LogActions.USER_UPDATE_PROFILE, // reuse closest action — read has no dedicated constant yet
                 ResourceTypes.USER,
@@ -132,7 +132,7 @@ export class UserService {
                 });
             }
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor,
                 LogActions.USER_UPDATE_PROFILE,
                 ResourceTypes.USER,
@@ -143,7 +143,7 @@ export class UserService {
 
             return updatedUser;
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor,
                 LogActions.USER_UPDATE_PROFILE,
                 ResourceTypes.USER,
@@ -197,7 +197,7 @@ export class UserService {
                 });
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor,
                 LogActions.USER_DELETE_ACCOUNT,
                 ResourceTypes.USER,
@@ -206,7 +206,7 @@ export class UserService {
                 {},
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor,
                 LogActions.USER_DELETE_ACCOUNT,
                 ResourceTypes.USER,
@@ -378,7 +378,7 @@ export class UserService {
                 select: { interests: true },
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor,
                 LogActions.USER_UPDATE_PROFILE,
                 ResourceTypes.USER,
@@ -389,7 +389,7 @@ export class UserService {
 
             return { interests: updated.interests };
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor,
                 LogActions.USER_UPDATE_PROFILE,
                 ResourceTypes.USER,
@@ -503,7 +503,7 @@ export class UserService {
                 update: {}, // already exists — no-op
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor,
                 LogActions.USER_BLOCK,
                 ResourceTypes.USER,
@@ -512,7 +512,7 @@ export class UserService {
                 {},
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor,
                 LogActions.USER_BLOCK,
                 ResourceTypes.USER,
@@ -544,7 +544,7 @@ export class UserService {
                 },
             });
 
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor,
                 LogActions.USER_UNBLOCK,
                 ResourceTypes.USER,
@@ -553,7 +553,7 @@ export class UserService {
                 {},
             );
         } catch (error: any) {
-            await AuditLogger.log(
+            AuditLogger.log(
                 actor,
                 LogActions.USER_UNBLOCK,
                 ResourceTypes.USER,

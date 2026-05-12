@@ -87,7 +87,7 @@ export class NotificationService {
                 select: notificationSelect,
             });
 
-            await AuditLogger.log(actor, LogActions.NOTIFICATION_READ, ResourceTypes.NOTIFICATION, notificationId, 1);
+            AuditLogger.log(actor, LogActions.NOTIFICATION_READ, ResourceTypes.NOTIFICATION, notificationId, 1);
 
             return updated;
         } catch (error) {
@@ -106,7 +106,7 @@ export class NotificationService {
                 data: { isRead: true },
             });
 
-            await AuditLogger.log(actor, LogActions.NOTIFICATION_READ_ALL, ResourceTypes.NOTIFICATION, null, 1, { count: result.count });
+            AuditLogger.log(actor, LogActions.NOTIFICATION_READ_ALL, ResourceTypes.NOTIFICATION, null, 1, { count: result.count });
 
             return { count: result.count };
         } catch (error) {
@@ -135,7 +135,7 @@ export class NotificationService {
 
             await prisma.notification.delete({ where: { id: notificationId } });
 
-            await AuditLogger.log(actor, LogActions.NOTIFICATION_DELETE, ResourceTypes.NOTIFICATION, notificationId, 1);
+            AuditLogger.log(actor, LogActions.NOTIFICATION_DELETE, ResourceTypes.NOTIFICATION, notificationId, 1);
         } catch (error) {
             if (error instanceof ApiError) throw error;
             asLogger.error('NotificationService.deleteNotification error:', error);
@@ -188,7 +188,7 @@ export class NotificationService {
                 }
             }
 
-            await AuditLogger.log(actor, LogActions.NOTIFICATION_PREF_UPDATE, ResourceTypes.NOTIFICATION, null, 1);
+            AuditLogger.log(actor, LogActions.NOTIFICATION_PREF_UPDATE, ResourceTypes.NOTIFICATION, null, 1);
 
             return this.getPreferences(actor);
         } catch (error) {
