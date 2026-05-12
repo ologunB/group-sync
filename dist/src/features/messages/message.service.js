@@ -107,7 +107,7 @@ class MessageService {
                 select: message_types_1.messageSelect,
             });
             socket_service_1.SocketService.emitToRoom(`group:${groupId}`, socket_events_1.SocketEvents.NEW_MESSAGE, { message });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.MESSAGE_SEND, audit_logger_1.ResourceTypes.MESSAGE, message.id, 1, { groupId });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.MESSAGE_SEND, audit_logger_1.ResourceTypes.MESSAGE, message.id, 1, { groupId });
             return message;
         }
         catch (error) {
@@ -139,7 +139,7 @@ class MessageService {
                 message_id: messageId,
                 group_id: message.groupId,
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.MESSAGE_DELETE, audit_logger_1.ResourceTypes.MESSAGE, messageId, 1);
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.MESSAGE_DELETE, audit_logger_1.ResourceTypes.MESSAGE, messageId, 1);
         }
         catch (error) {
             if (error instanceof error_middleware_1.ApiError)
@@ -169,7 +169,7 @@ class MessageService {
                 group_id: message.groupId,
                 is_pinned: updated.isPinned,
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.MESSAGE_PIN, audit_logger_1.ResourceTypes.MESSAGE, messageId, 1);
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.MESSAGE_PIN, audit_logger_1.ResourceTypes.MESSAGE, messageId, 1);
             return updated;
         }
         catch (error) {
@@ -275,7 +275,7 @@ class MessageService {
                 is_chat_locked: locked,
                 locked_by: actor.userId,
             });
-            await audit_logger_1.AuditLogger.log(actor, locked ? audit_logger_1.LogActions.CHAT_LOCK : audit_logger_1.LogActions.CHAT_UNLOCK, audit_logger_1.ResourceTypes.GROUP, groupId, 1);
+            audit_logger_1.AuditLogger.log(actor, locked ? audit_logger_1.LogActions.CHAT_LOCK : audit_logger_1.LogActions.CHAT_UNLOCK, audit_logger_1.ResourceTypes.GROUP, groupId, 1);
             return { is_chat_locked: locked };
         }
         catch (error) {

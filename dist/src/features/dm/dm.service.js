@@ -249,7 +249,7 @@ class DmService {
                 referenceType: 'dm',
                 referenceId: dm.id,
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.DM_SEND, audit_logger_1.ResourceTypes.DM, dm.id, 1, { receiverId: otherUserId });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.DM_SEND, audit_logger_1.ResourceTypes.DM, dm.id, 1, { receiverId: otherUserId });
             return dm;
         }
         catch (error) {

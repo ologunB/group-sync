@@ -47,7 +47,7 @@ class ReportService {
                 targetId: dto.target_id,
                 reason: dto.reason,
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.REPORT_SUBMIT, audit_logger_1.ResourceTypes.REPORT, report.id, 1, {
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.REPORT_SUBMIT, audit_logger_1.ResourceTypes.REPORT, report.id, 1, {
                 targetType: dto.target_type,
                 targetId: dto.target_id,
                 reason: dto.reason,
@@ -55,7 +55,7 @@ class ReportService {
             return report;
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.REPORT_SUBMIT, audit_logger_1.ResourceTypes.REPORT, null, 0, { error });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.REPORT_SUBMIT, audit_logger_1.ResourceTypes.REPORT, null, 0, { error });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('ReportService.submitReport error:', error);

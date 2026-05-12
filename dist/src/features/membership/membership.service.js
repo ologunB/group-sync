@@ -72,10 +72,10 @@ class MembershipService {
                 memberIds: admins.map((a) => a.userId),
                 data: { newMemberId: actor.userId },
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_JOIN, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 1, { groupName: group.name });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_JOIN, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 1, { groupName: group.name });
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_JOIN, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 0, { error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_JOIN, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 0, { error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('MembershipService.joinGroup:', error);
@@ -166,11 +166,11 @@ class MembershipService {
                 memberIds: admins.map((a) => a.userId),
                 data: { applicantId: actor.userId, applicationId: application.id },
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_APPLY, audit_logger_1.ResourceTypes.APPLICATION, application.id, 1, { groupId, groupName: group.name });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_APPLY, audit_logger_1.ResourceTypes.APPLICATION, application.id, 1, { groupId, groupName: group.name });
             return { applicationId: application.id, status: application.status };
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_APPLY, audit_logger_1.ResourceTypes.APPLICATION, null, 0, { groupId, error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_APPLY, audit_logger_1.ResourceTypes.APPLICATION, null, 0, { groupId, error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('MembershipService.applyToGroup:', error);
@@ -204,10 +204,10 @@ class MembershipService {
             await connection_1.prisma.membership.delete({
                 where: { userId_groupId: { userId: actor.userId, groupId } },
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_LEAVE, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 1, {});
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_LEAVE, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 1, {});
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_LEAVE, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 0, { error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_LEAVE, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 0, { error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('MembershipService.leaveGroup:', error);
@@ -351,10 +351,10 @@ class MembershipService {
                     },
                 });
             }
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_APPLICATION_REVIEW, audit_logger_1.ResourceTypes.APPLICATION, applicationId, 1, { action: dto.action, groupId: application.groupId });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_APPLICATION_REVIEW, audit_logger_1.ResourceTypes.APPLICATION, applicationId, 1, { action: dto.action, groupId: application.groupId });
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_APPLICATION_REVIEW, audit_logger_1.ResourceTypes.APPLICATION, applicationId, 0, { error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_APPLICATION_REVIEW, audit_logger_1.ResourceTypes.APPLICATION, applicationId, 0, { error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('MembershipService.reviewApplication:', error);
@@ -382,10 +382,10 @@ class MembershipService {
                 where: { id: applicationId },
                 data: { status: 'withdrawn' },
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_APPLICATION_WITHDRAW, audit_logger_1.ResourceTypes.APPLICATION, applicationId, 1, {});
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_APPLICATION_WITHDRAW, audit_logger_1.ResourceTypes.APPLICATION, applicationId, 1, {});
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_APPLICATION_WITHDRAW, audit_logger_1.ResourceTypes.APPLICATION, applicationId, 0, { error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_APPLICATION_WITHDRAW, audit_logger_1.ResourceTypes.APPLICATION, applicationId, 0, { error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('MembershipService.withdrawApplication:', error);
@@ -434,11 +434,11 @@ class MembershipService {
                 update: { fields: dto.fields },
                 select: { fields: true },
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_FORM_UPSERT, audit_logger_1.ResourceTypes.GROUP_FORM, groupId, 1, { fieldCount: dto.fields.length });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_FORM_UPSERT, audit_logger_1.ResourceTypes.GROUP_FORM, groupId, 1, { fieldCount: dto.fields.length });
             return { fields: form.fields };
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_FORM_UPSERT, audit_logger_1.ResourceTypes.GROUP_FORM, groupId, 0, { error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_FORM_UPSERT, audit_logger_1.ResourceTypes.GROUP_FORM, groupId, 0, { error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('MembershipService.upsertGroupForm:', error);
@@ -509,10 +509,10 @@ class MembershipService {
                 memberIds: [targetUserId],
                 data: { role: dto.role, status: dto.status, updatedBy: actor.userId },
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_MEMBER_UPDATE, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 1, { targetUserId, role: dto.role, status: dto.status });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_MEMBER_UPDATE, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 1, { targetUserId, role: dto.role, status: dto.status });
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_MEMBER_UPDATE, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 0, { targetUserId, error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_MEMBER_UPDATE, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 0, { targetUserId, error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('MembershipService.updateMember:', error);
@@ -564,10 +564,10 @@ class MembershipService {
                 memberIds: [targetUserId],
                 data: { action: 'removed', removedBy: actor.userId },
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_MEMBER_REMOVE, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 1, { targetUserId });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_MEMBER_REMOVE, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 1, { targetUserId });
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_MEMBER_REMOVE, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 0, { targetUserId, error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_MEMBER_REMOVE, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 0, { targetUserId, error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('MembershipService.removeMember:', error);
@@ -613,7 +613,7 @@ class MembershipService {
             });
             // Cache for fast lookups
             await connection_2.redis.setex(inviteKey(token), INVITE_CACHE_TTL, groupId);
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_INVITE_GENERATE, audit_logger_1.ResourceTypes.INVITE_LINK, inviteLink.id, 1, { groupId, maxUses: dto.max_uses, expiresAt });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_INVITE_GENERATE, audit_logger_1.ResourceTypes.INVITE_LINK, inviteLink.id, 1, { groupId, maxUses: dto.max_uses, expiresAt });
             return {
                 id: inviteLink.id,
                 token: inviteLink.token,
@@ -630,7 +630,7 @@ class MembershipService {
             };
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_INVITE_GENERATE, audit_logger_1.ResourceTypes.INVITE_LINK, null, 0, { groupId, error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_INVITE_GENERATE, audit_logger_1.ResourceTypes.INVITE_LINK, null, 0, { groupId, error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('MembershipService.generateInviteLink:', error);
@@ -695,10 +695,10 @@ class MembershipService {
             });
             // Remove from Redis cache
             await connection_2.redis.del(inviteKey(link.token));
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_INVITE_REVOKE, audit_logger_1.ResourceTypes.INVITE_LINK, inviteLinkId, 1, { groupId: link.groupId });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_INVITE_REVOKE, audit_logger_1.ResourceTypes.INVITE_LINK, inviteLinkId, 1, { groupId: link.groupId });
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_INVITE_REVOKE, audit_logger_1.ResourceTypes.INVITE_LINK, inviteLinkId, 0, { error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_INVITE_REVOKE, audit_logger_1.ResourceTypes.INVITE_LINK, inviteLinkId, 0, { error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('MembershipService.revokeInviteLink:', error);
@@ -768,10 +768,10 @@ class MembershipService {
             });
             // Refresh Redis cache TTL
             await connection_2.redis.setex(inviteKey(token), INVITE_CACHE_TTL, groupId);
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_INVITE_ACCEPT, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 1, { token: token.slice(0, 8) + '...', groupName: inviteLink.group.name });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_INVITE_ACCEPT, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 1, { token: token.slice(0, 8) + '...', groupName: inviteLink.group.name });
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_INVITE_ACCEPT, audit_logger_1.ResourceTypes.MEMBERSHIP, null, 0, { error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_INVITE_ACCEPT, audit_logger_1.ResourceTypes.MEMBERSHIP, null, 0, { error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('MembershipService.acceptInvite:', error);

@@ -70,7 +70,7 @@ class NotificationService {
                 data: { isRead: true },
                 select: notification_types_1.notificationSelect,
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.NOTIFICATION_READ, audit_logger_1.ResourceTypes.NOTIFICATION, notificationId, 1);
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.NOTIFICATION_READ, audit_logger_1.ResourceTypes.NOTIFICATION, notificationId, 1);
             return updated;
         }
         catch (error) {
@@ -87,7 +87,7 @@ class NotificationService {
                 where: { userId: actor.userId, isRead: false },
                 data: { isRead: true },
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.NOTIFICATION_READ_ALL, audit_logger_1.ResourceTypes.NOTIFICATION, null, 1, { count: result.count });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.NOTIFICATION_READ_ALL, audit_logger_1.ResourceTypes.NOTIFICATION, null, 1, { count: result.count });
             return { count: result.count };
         }
         catch (error) {
@@ -111,7 +111,7 @@ class NotificationService {
                 throw new error_middleware_1.ApiError(response_constants_1.Messages.FORBIDDEN, http_status_codes_1.StatusCodes.FORBIDDEN);
             }
             await connection_1.prisma.notification.delete({ where: { id: notificationId } });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.NOTIFICATION_DELETE, audit_logger_1.ResourceTypes.NOTIFICATION, notificationId, 1);
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.NOTIFICATION_DELETE, audit_logger_1.ResourceTypes.NOTIFICATION, notificationId, 1);
         }
         catch (error) {
             if (error instanceof error_middleware_1.ApiError)
@@ -164,7 +164,7 @@ class NotificationService {
                     });
                 }
             }
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.NOTIFICATION_PREF_UPDATE, audit_logger_1.ResourceTypes.NOTIFICATION, null, 1);
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.NOTIFICATION_PREF_UPDATE, audit_logger_1.ResourceTypes.NOTIFICATION, null, 1);
             return this.getPreferences(actor);
         }
         catch (error) {

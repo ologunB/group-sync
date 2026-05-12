@@ -48,11 +48,11 @@ class AdminService {
                 data: { status: dto.status },
                 select: admin_types_1.adminUserSelect,
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_USER_UPDATE, audit_logger_1.ResourceTypes.USER, userId, 1, { status: dto.status });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_USER_UPDATE, audit_logger_1.ResourceTypes.USER, userId, 1, { status: dto.status });
             return updated;
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_USER_UPDATE, audit_logger_1.ResourceTypes.USER, userId, 0, { error });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_USER_UPDATE, audit_logger_1.ResourceTypes.USER, userId, 0, { error });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('AdminService.updateUserStatus error:', error);
@@ -101,14 +101,14 @@ class AdminService {
                 },
                 select: admin_types_1.adminUserSelect,
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_USER_VERIFY_ID, audit_logger_1.ResourceTypes.USER, userId, 1, {
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_USER_VERIFY_ID, audit_logger_1.ResourceTypes.USER, userId, 1, {
                 decision: dto.decision,
                 rejection_reason: dto.rejection_reason,
             });
             return updated;
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_USER_VERIFY_ID, audit_logger_1.ResourceTypes.USER, userId, 0, { error });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_USER_VERIFY_ID, audit_logger_1.ResourceTypes.USER, userId, 0, { error });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('AdminService.reviewIdVerification error:', error);
@@ -156,11 +156,11 @@ class AdminService {
                 },
                 select: admin_types_1.adminGroupSelect,
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_GROUP_UPDATE, audit_logger_1.ResourceTypes.GROUP, groupId, 1, dto);
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_GROUP_UPDATE, audit_logger_1.ResourceTypes.GROUP, groupId, 1, dto);
             return updated;
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_GROUP_UPDATE, audit_logger_1.ResourceTypes.GROUP, groupId, 0, { error });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_GROUP_UPDATE, audit_logger_1.ResourceTypes.GROUP, groupId, 0, { error });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('AdminService.updateGroup error:', error);
@@ -203,7 +203,7 @@ class AdminService {
                 },
                 select: admin_types_1.adminReportSelect,
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_REPORT_RESOLVE, audit_logger_1.ResourceTypes.REPORT, reportId, 1, { action: dto.action });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_REPORT_RESOLVE, audit_logger_1.ResourceTypes.REPORT, reportId, 1, { action: dto.action });
             return updated;
         }
         catch (error) {
@@ -354,7 +354,7 @@ class AdminService {
                 data: { role: dto.role },
                 select: admin_types_1.adminUserSelect,
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_USER_UPDATE, audit_logger_1.ResourceTypes.USER, userId, 1, {
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_USER_UPDATE, audit_logger_1.ResourceTypes.USER, userId, 1, {
                 action: 'role_change',
                 new_role: dto.role,
             });

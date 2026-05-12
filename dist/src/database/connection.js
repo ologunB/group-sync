@@ -20,7 +20,7 @@ class Database {
         this.pool = new pg_1.Pool({
             connectionString: app_config_1.config.database.url,
             ssl: { rejectUnauthorized: false },
-            max: 10,
+            max: 3,
             idleTimeoutMillis: 30_000,
             connectionTimeoutMillis: 5_000,
         });

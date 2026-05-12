@@ -22,7 +22,7 @@ class UserService {
             if (!user) {
                 throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('User'), http_status_codes_1.StatusCodes.NOT_FOUND);
             }
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_UPDATE_PROFILE, // reuse closest action — read has no dedicated constant yet
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_UPDATE_PROFILE, // reuse closest action — read has no dedicated constant yet
             audit_logger_1.ResourceTypes.USER, actor.userId, 1, { action: 'read_self_profile' });
             return user;
         }
@@ -111,11 +111,11 @@ class UserService {
                     select: user_types_1.selfProfileSelect,
                 });
             }
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_UPDATE_PROFILE, audit_logger_1.ResourceTypes.USER, actor.userId, 1, { updatedFields: Object.keys({ ...updateData, ...(hasLocation ? { location: true } : {}) }) });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_UPDATE_PROFILE, audit_logger_1.ResourceTypes.USER, actor.userId, 1, { updatedFields: Object.keys({ ...updateData, ...(hasLocation ? { location: true } : {}) }) });
             return updatedUser;
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_UPDATE_PROFILE, audit_logger_1.ResourceTypes.USER, actor.userId, 0, { error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_UPDATE_PROFILE, audit_logger_1.ResourceTypes.USER, actor.userId, 0, { error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('UserService.updateMe:', error);
@@ -156,10 +156,10 @@ class UserService {
                     data: { revokedAt: new Date() },
                 });
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_DELETE_ACCOUNT, audit_logger_1.ResourceTypes.USER, actor.userId, 1, {});
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_DELETE_ACCOUNT, audit_logger_1.ResourceTypes.USER, actor.userId, 1, {});
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_DELETE_ACCOUNT, audit_logger_1.ResourceTypes.USER, actor.userId, 0, { error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_DELETE_ACCOUNT, audit_logger_1.ResourceTypes.USER, actor.userId, 0, { error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('UserService.deleteMe:', error);
@@ -298,11 +298,11 @@ class UserService {
                 data: { interests: normalized },
                 select: { interests: true },
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_UPDATE_PROFILE, audit_logger_1.ResourceTypes.USER, actor.userId, 1, { updatedFields: ['interests'], count: normalized.length });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_UPDATE_PROFILE, audit_logger_1.ResourceTypes.USER, actor.userId, 1, { updatedFields: ['interests'], count: normalized.length });
             return { interests: updated.interests };
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_UPDATE_PROFILE, audit_logger_1.ResourceTypes.USER, actor.userId, 0, { error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_UPDATE_PROFILE, audit_logger_1.ResourceTypes.USER, actor.userId, 0, { error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('UserService.updateInterests:', error);
@@ -395,10 +395,10 @@ class UserService {
                 },
                 update: {}, // already exists — no-op
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_BLOCK, audit_logger_1.ResourceTypes.USER, targetUserId, 1, {});
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_BLOCK, audit_logger_1.ResourceTypes.USER, targetUserId, 1, {});
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_BLOCK, audit_logger_1.ResourceTypes.USER, targetUserId, 0, { error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_BLOCK, audit_logger_1.ResourceTypes.USER, targetUserId, 0, { error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('UserService.blockUser:', error);
@@ -420,10 +420,10 @@ class UserService {
                     blockedId: targetUserId,
                 },
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_UNBLOCK, audit_logger_1.ResourceTypes.USER, targetUserId, 1, {});
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_UNBLOCK, audit_logger_1.ResourceTypes.USER, targetUserId, 1, {});
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_UNBLOCK, audit_logger_1.ResourceTypes.USER, targetUserId, 0, { error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.USER_UNBLOCK, audit_logger_1.ResourceTypes.USER, targetUserId, 0, { error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('UserService.unblockUser:', error);

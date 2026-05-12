@@ -120,7 +120,7 @@ class AuthService {
             if (!passwordValid) {
                 const failedCount = await session_service_1.SessionService.incrementFailedLogin(rawUser.id);
                 if (failedCount >= 5) {
-                    await audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_LOGIN, audit_logger_1.ResourceTypes.USER, rawUser.id, 0, { email, reason: 'account_locked_after_failures' }, ipAddress);
+                    audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_LOGIN, audit_logger_1.ResourceTypes.USER, rawUser.id, 0, { email, reason: 'account_locked_after_failures' }, ipAddress);
                     throw new error_middleware_1.ApiError(response_constants_1.Messages.ACCOUNT_LOCKED, http_status_codes_1.StatusCodes.TOO_MANY_REQUESTS);
                 }
                 throw new error_middleware_1.ApiError(response_constants_1.Messages.INVALID_CREDENTIALS, http_status_codes_1.StatusCodes.UNAUTHORIZED);
@@ -247,11 +247,11 @@ class AuthService {
                     data: { userId, ipAddress, expiresAt: refreshExpiresAt },
                 });
             });
-            await audit_logger_1.AuditLogger.log(tokenPayload, audit_logger_1.LogActions.AUTH_SOCIAL_LOGIN, audit_logger_1.ResourceTypes.USER, userId, 1, { provider: dto.provider, isNewUser }, ipAddress);
+            audit_logger_1.AuditLogger.log(tokenPayload, audit_logger_1.LogActions.AUTH_SOCIAL_LOGIN, audit_logger_1.ResourceTypes.USER, userId, 1, { provider: dto.provider, isNewUser }, ipAddress);
             return { user, tokens, isNewUser };
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_SOCIAL_LOGIN, audit_logger_1.ResourceTypes.USER, null, 0, { provider: dto.provider, error: error.message }, ipAddress);
+            audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_SOCIAL_LOGIN, audit_logger_1.ResourceTypes.USER, null, 0, { provider: dto.provider, error: error.message }, ipAddress);
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('AuthService.socialLogin:', error);
@@ -282,10 +282,10 @@ class AuthService {
                 data: { revokedAt: new Date() },
             });
             await session_service_1.SessionService.clearPresence(actor.userId);
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.AUTH_LOGOUT, audit_logger_1.ResourceTypes.SESSION, actor.userId, 1, {}, ipAddress);
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.AUTH_LOGOUT, audit_logger_1.ResourceTypes.SESSION, actor.userId, 1, {}, ipAddress);
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.AUTH_LOGOUT, audit_logger_1.ResourceTypes.SESSION, actor.userId, 0, { error: error.message }, ipAddress);
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.AUTH_LOGOUT, audit_logger_1.ResourceTypes.SESSION, actor.userId, 0, { error: error.message }, ipAddress);
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('AuthService.logout:', error);
@@ -327,7 +327,7 @@ class AuthService {
                     },
                 });
             });
-            await audit_logger_1.AuditLogger.log(tokenPayload, audit_logger_1.LogActions.AUTH_REFRESH_TOKEN, audit_logger_1.ResourceTypes.REFRESH_TOKEN, existing.userId, 1, {}, ipAddress);
+            audit_logger_1.AuditLogger.log(tokenPayload, audit_logger_1.LogActions.AUTH_REFRESH_TOKEN, audit_logger_1.ResourceTypes.REFRESH_TOKEN, existing.userId, 1, {}, ipAddress);
             return tokens;
         }
         catch (error) {
@@ -355,7 +355,7 @@ class AuthService {
                     template: 'forgot_password',
                     data: { displayName: user.displayName, otp, clientUrl: app_config_1.config.server.clientUrl },
                 });
-                await audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_FORGOT_PASSWORD, audit_logger_1.ResourceTypes.USER, user.id, 1, { email }, ipAddress);
+                audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_FORGOT_PASSWORD, audit_logger_1.ResourceTypes.USER, user.id, 1, { email }, ipAddress);
             }
             // If user not found, we still return success (no-op) — no audit failure log
         }
@@ -374,10 +374,10 @@ class AuthService {
                 throw new error_middleware_1.ApiError(response_constants_1.Messages.INVALID_VERIFICATION_CODE, http_status_codes_1.StatusCodes.BAD_REQUEST);
             }
             // OTP is valid — do NOT delete it here, so resetPassword can still consume it
-            await audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_FORGOT_PASSWORD, audit_logger_1.ResourceTypes.USER, null, 1, { email, step: 'otp_verified' }, ipAddress);
+            audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_FORGOT_PASSWORD, audit_logger_1.ResourceTypes.USER, null, 1, { email, step: 'otp_verified' }, ipAddress);
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_FORGOT_PASSWORD, audit_logger_1.ResourceTypes.USER, null, 0, { email, step: 'otp_verify_failed', error: error.message }, ipAddress);
+            audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_FORGOT_PASSWORD, audit_logger_1.ResourceTypes.USER, null, 0, { email, step: 'otp_verify_failed', error: error.message }, ipAddress);
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('AuthService.verifyForgotOtp:', error);
@@ -410,10 +410,10 @@ class AuthService {
             });
             await session_service_1.SessionService.deleteForgotPasswordOTP(email);
             await session_service_1.SessionService.clearFailedLogins(user.id);
-            await audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_RESET_PASSWORD, audit_logger_1.ResourceTypes.USER, user.id, 1, { email }, ipAddress);
+            audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_RESET_PASSWORD, audit_logger_1.ResourceTypes.USER, user.id, 1, { email }, ipAddress);
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_RESET_PASSWORD, audit_logger_1.ResourceTypes.USER, null, 0, { email, error: error.message }, ipAddress);
+            audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_RESET_PASSWORD, audit_logger_1.ResourceTypes.USER, null, 0, { email, error: error.message }, ipAddress);
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('AuthService.resetPassword:', error);
@@ -442,10 +442,10 @@ class AuthService {
                 where: { id: user.id },
                 data: { passwordHash: newPasswordHash },
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.AUTH_CHANGE_PASSWORD, audit_logger_1.ResourceTypes.USER, user.id, 1, {}, ipAddress);
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.AUTH_CHANGE_PASSWORD, audit_logger_1.ResourceTypes.USER, user.id, 1, {}, ipAddress);
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.AUTH_CHANGE_PASSWORD, audit_logger_1.ResourceTypes.USER, actor.userId, 0, { error: error.message }, ipAddress);
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.AUTH_CHANGE_PASSWORD, audit_logger_1.ResourceTypes.USER, actor.userId, 0, { error: error.message }, ipAddress);
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('AuthService.changePassword:', error);
@@ -491,11 +491,11 @@ class AuthService {
                 template: 'welcome',
                 data: { displayName: user.displayName, clientUrl: app_config_1.config.server.clientUrl },
             });
-            await audit_logger_1.AuditLogger.log(tokenPayload, audit_logger_1.LogActions.AUTH_VERIFY_EMAIL, audit_logger_1.ResourceTypes.USER, user.id, 1, { email }, ipAddress);
+            audit_logger_1.AuditLogger.log(tokenPayload, audit_logger_1.LogActions.AUTH_VERIFY_EMAIL, audit_logger_1.ResourceTypes.USER, user.id, 1, { email }, ipAddress);
             return { user, tokens };
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_VERIFY_EMAIL, audit_logger_1.ResourceTypes.USER, null, 0, { email, error: error.message }, ipAddress);
+            audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_VERIFY_EMAIL, audit_logger_1.ResourceTypes.USER, null, 0, { email, error: error.message }, ipAddress);
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('AuthService.verifyEmail:', error);
@@ -525,7 +525,7 @@ class AuthService {
                 template: 'verify_email',
                 data: { displayName: user.displayName, otp, clientUrl: app_config_1.config.server.clientUrl },
             });
-            await audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_RESEND_VERIFICATION, audit_logger_1.ResourceTypes.USER, user.id, 1, { email }, ipAddress);
+            audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_RESEND_VERIFICATION, audit_logger_1.ResourceTypes.USER, user.id, 1, { email }, ipAddress);
         }
         catch (error) {
             if (error instanceof error_middleware_1.ApiError)
@@ -566,11 +566,11 @@ class AuthService {
                 documentType: dto.document_type,
                 documentUrl: dto.document_url, // Raw URL sent to KYC provider in the worker
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.AUTH_SUBMIT_ID_VERIFICATION, audit_logger_1.ResourceTypes.USER, user.id, 1, { documentType: dto.document_type }, ipAddress);
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.AUTH_SUBMIT_ID_VERIFICATION, audit_logger_1.ResourceTypes.USER, user.id, 1, { documentType: dto.document_type }, ipAddress);
             return { idVerificationStatus: 'pending' };
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.AUTH_SUBMIT_ID_VERIFICATION, audit_logger_1.ResourceTypes.USER, actor.userId, 0, { error: error.message }, ipAddress);
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.AUTH_SUBMIT_ID_VERIFICATION, audit_logger_1.ResourceTypes.USER, actor.userId, 0, { error: error.message }, ipAddress);
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('AuthService.submitIdVerification:', error);
@@ -641,10 +641,10 @@ class AuthService {
                     },
                 });
             }
-            await audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_KYC_WEBHOOK, audit_logger_1.ResourceTypes.USER, user.id, 1, { eventId: dto.event_id, status: dto.status }, ipAddress);
+            audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_KYC_WEBHOOK, audit_logger_1.ResourceTypes.USER, user.id, 1, { eventId: dto.event_id, status: dto.status }, ipAddress);
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_KYC_WEBHOOK, audit_logger_1.ResourceTypes.USER, dto.user_id ?? null, 0, { eventId: dto.event_id, error: error.message }, ipAddress);
+            audit_logger_1.AuditLogger.log(null, audit_logger_1.LogActions.AUTH_KYC_WEBHOOK, audit_logger_1.ResourceTypes.USER, dto.user_id ?? null, 0, { eventId: dto.event_id, error: error.message }, ipAddress);
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('AuthService.handleKycWebhook:', error);

@@ -56,7 +56,7 @@ exports.config = {
     },
     email: {
         resendApiKey: optional_env('RESEND_API_KEY', ''),
-        from: optional_env('EMAIL_FROM', 'GroupSync <onboarding@resend.dev>'),
+        from: optional_env('EMAIL_FROM', 'GroupSync <noreply@groupsync.me>'),
     },
     kyc: {
         apiKey: optional_env('KYC_PROVIDER_API_KEY', ''),

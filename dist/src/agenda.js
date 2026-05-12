@@ -118,6 +118,7 @@ class AgendaManager {
     }
     // ─── Internal: enqueue ────────────────────────────────────────────────────────
     static async enqueue(name, data) {
+        console.log(`Enqueuing job: ${name}`, data);
         if (!AgendaManager.queue) {
             throw new Error('AgendaManager not started. Call AgendaManager.start() first.');
         }

@@ -67,11 +67,11 @@ class GroupService {
           WHERE id = ${group.id}::uuid
         `;
             }
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_CREATE, audit_logger_1.ResourceTypes.GROUP, group.id, 1, { name: group.name, slug: group.slug, membershipType: group.membershipType });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_CREATE, audit_logger_1.ResourceTypes.GROUP, group.id, 1, { name: group.name, slug: group.slug, membershipType: group.membershipType });
             return group;
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_CREATE, audit_logger_1.ResourceTypes.GROUP, null, 0, { name: dto.name, error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_CREATE, audit_logger_1.ResourceTypes.GROUP, null, 0, { name: dto.name, error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('GroupService.createGroup:', error);
@@ -365,11 +365,11 @@ class GroupService {
                 });
                 updatedGroup.slug = newSlug;
             }
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_UPDATE, audit_logger_1.ResourceTypes.GROUP, groupId, 1, { updatedFields: Object.keys(updateData) });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_UPDATE, audit_logger_1.ResourceTypes.GROUP, groupId, 1, { updatedFields: Object.keys(updateData) });
             return updatedGroup;
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_UPDATE, audit_logger_1.ResourceTypes.GROUP, groupId, 0, { error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_UPDATE, audit_logger_1.ResourceTypes.GROUP, groupId, 0, { error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('GroupService.updateGroup:', error);
@@ -409,10 +409,10 @@ class GroupService {
                 type: 'group_deleted',
                 memberIds: activeMembers.map((m) => m.userId),
             });
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_DELETE, audit_logger_1.ResourceTypes.GROUP, groupId, 1, { groupName: group.name, notifiedCount: activeMembers.length });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_DELETE, audit_logger_1.ResourceTypes.GROUP, groupId, 1, { groupName: group.name, notifiedCount: activeMembers.length });
         }
         catch (error) {
-            await audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_DELETE, audit_logger_1.ResourceTypes.GROUP, groupId, 0, { error: error.message });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_DELETE, audit_logger_1.ResourceTypes.GROUP, groupId, 0, { error: error.message });
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('GroupService.deleteGroup:', error);
