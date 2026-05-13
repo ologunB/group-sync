@@ -70,7 +70,10 @@ export class GroupService {
                     },
                 });
 
-                return newGroup;
+                return tx.group.findUniqueOrThrow({
+                    where: { id: newGroup.id },
+                    select: groupPublicSelect,
+                });
             });
 
             // Set PostGIS location if provided

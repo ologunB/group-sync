@@ -931,6 +931,7 @@ async function runFeaturesSuite(): Promise<void> {
         openGroupSlug = group.slug as string;
         assert(openGroupId.length > 0,   'openGroupId empty');
         assert(openGroupSlug.length > 0, 'openGroupSlug empty');
+        assert(group.memberCount === 1, `creator should count as first member, got ${group.memberCount}`);
     });
 
     await test('POST /groups creates application group (201)', async () => {
@@ -1307,6 +1308,14 @@ async function runFeaturesSuite(): Promise<void> {
         assertStatus(status, 201);
     });
 
+    await test('GET /groups/:slug memberCount increments after join (200)', async () => {
+        const { status, data } = await get(`/groups/${openGroupSlug}`);
+        assertStatus(status, 200);
+        const result = data.data as Record<string, unknown>;
+        const group = result.group as Record<string, unknown>;
+        assert(group.memberCount === 2, `expected memberCount=2 after join, got ${group.memberCount}`);
+    });
+
     await test('POST /groups/:id/join again returns 409 (already member)', async () => {
         const { status } = await post(`/groups/${openGroupId}/join`, {}, memberToken);
         assertStatus(status, 409);
@@ -1354,6 +1363,14 @@ async function runFeaturesSuite(): Promise<void> {
     await test('DELETE /groups/:id/leave leaves group (200)', async () => {
         const { status } = await del(`/groups/${openGroupId}/leave`, memberToken);
         assertStatus(status, 200);
+    });
+
+    await test('GET /groups/:slug memberCount decrements after leave (200)', async () => {
+        const { status, data } = await get(`/groups/${openGroupSlug}`);
+        assertStatus(status, 200);
+        const result = data.data as Record<string, unknown>;
+        const group = result.group as Record<string, unknown>;
+        assert(group.memberCount === 1, `expected memberCount=1 after leave, got ${group.memberCount}`);
     });
 
     await test('DELETE /groups/:id/leave when not a member returns 403', async () => {
@@ -1808,6 +1825,14 @@ async function runFeaturesSuite(): Promise<void> {
         assertStatus(status, 200);
     });
 
+    await test('GET /groups/:slug memberCount decrements after suspension (200)', async () => {
+        const { status, data } = await get(`/groups/${openGroupSlug}`);
+        assertStatus(status, 200);
+        const result = data.data as Record<string, unknown>;
+        const group = result.group as Record<string, unknown>;
+        assert(group.memberCount === 1, `expected memberCount=1 after suspension, got ${group.memberCount}`);
+    });
+
     await test('PATCH /groups/:id/members/:userId restores member to active (200)', async () => {
         const { status } = await patch(
             `/groups/${openGroupId}/members/${memberId}`,
@@ -1815,6 +1840,14 @@ async function runFeaturesSuite(): Promise<void> {
             creatorToken,
         );
         assertStatus(status, 200);
+    });
+
+    await test('GET /groups/:slug memberCount increments after restore (200)', async () => {
+        const { status, data } = await get(`/groups/${openGroupSlug}`);
+        assertStatus(status, 200);
+        const result = data.data as Record<string, unknown>;
+        const group = result.group as Record<string, unknown>;
+        assert(group.memberCount === 2, `expected memberCount=2 after restore, got ${group.memberCount}`);
     });
 
     await test('DELETE /groups/:id/members/:userId removes member (200)', async () => {

@@ -56,7 +56,10 @@ class GroupService {
                         status: 'active',
                     },
                 });
-                return newGroup;
+                return tx.group.findUniqueOrThrow({
+                    where: { id: newGroup.id },
+                    select: group_types_1.groupPublicSelect,
+                });
             });
             // Set PostGIS location if provided
             if (dto.lat !== undefined && dto.lng !== undefined) {
