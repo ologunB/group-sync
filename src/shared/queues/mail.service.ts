@@ -73,19 +73,23 @@ export class EmailService {
 
     private static renderTemplate(name: string, data: Record<string, unknown>): string {
         let html = EmailService.loadTemplate(name);
+        const templateData: Record<string, unknown> = {
+            ...data,
+            currentYear: new Date().getFullYear(),
+        };
 
         // {{data.nested.key}}
         html = html.replace(/\{\{data\.([^}]+)}}/g, (_m, keyPath: string) => {
             const value = keyPath.trim().split('.').reduce((obj: unknown, key: string) => {
                 if (obj !== null && typeof obj === 'object') return (obj as Record<string, unknown>)[key];
                 return undefined;
-            }, data);
+            }, templateData);
             return value != null ? String(value) : '';
         });
 
         // {{key}}
         html = html.replace(/\{\{([^}]+)}}/g, (_m, key: string) => {
-            const value = data[key.trim()];
+            const value = templateData[key.trim()];
             return value != null ? String(value) : '';
         });
 

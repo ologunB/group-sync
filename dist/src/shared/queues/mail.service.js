@@ -60,18 +60,22 @@ class EmailService {
     }
     static renderTemplate(name, data) {
         let html = EmailService.loadTemplate(name);
+        const templateData = {
+            ...data,
+            currentYear: new Date().getFullYear(),
+        };
         // {{data.nested.key}}
         html = html.replace(/\{\{data\.([^}]+)}}/g, (_m, keyPath) => {
             const value = keyPath.trim().split('.').reduce((obj, key) => {
                 if (obj !== null && typeof obj === 'object')
                     return obj[key];
                 return undefined;
-            }, data);
+            }, templateData);
             return value != null ? String(value) : '';
         });
         // {{key}}
         html = html.replace(/\{\{([^}]+)}}/g, (_m, key) => {
-            const value = data[key.trim()];
+            const value = templateData[key.trim()];
             return value != null ? String(value) : '';
         });
         return html;

@@ -1442,7 +1442,7 @@ async function runFeaturesSuite() {
         formData.append(fieldName, new Blob([buffer], { type: mimeType }), 'test.' + mimeType.split('/')[1]);
         const headers = {};
         if (token)
-            headers.Authorization = `Bearer ${token}`;
+            headers['Authorization'] = `Bearer ${token}`;
         let lastErr;
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
