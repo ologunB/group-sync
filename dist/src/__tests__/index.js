@@ -1434,6 +1434,30 @@ async function runFeaturesSuite() {
         }
         throw lastErr;
     }
+    async function uploadFileWithFields(path, fieldName, buffer, mimeType, fields, token) {
+        const formData = new FormData();
+        for (const [key, value] of Object.entries(fields)) {
+            formData.append(key, value);
+        }
+        formData.append(fieldName, new Blob([buffer], { type: mimeType }), 'test.' + mimeType.split('/')[1]);
+        const headers = {};
+        if (token)
+            headers.Authorization = `Bearer ${token}`;
+        let lastErr;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const res = await fetch(`${BASE}${path}`, { method: 'POST', headers, body: formData });
+                const data = (await res.json());
+                return { status: res.status, data };
+            }
+            catch (err) {
+                lastErr = err;
+                if (attempt < 2)
+                    await new Promise((r) => setTimeout(r, 600));
+            }
+        }
+        throw lastErr;
+    }
     // ── Profile photo ────────────────────────────────────────────────────────
     await test('POST /users/me/photo without auth returns 401', async () => {
         const { status } = await request('POST', '/users/me/photo');
@@ -1774,6 +1798,13 @@ async function runFeaturesSuite() {
         messageId = msg.id;
         assert(msg.content === 'Hello group!', `content mismatch: ${msg.content}`);
     });
+    await test('POST /groups/:id/messages with media upload sends image message (201)', async () => {
+        const { status, data } = await uploadFileWithFields(`/groups/${openGroupId}/messages`, 'media', TINY_PNG, 'image/png', { content: 'Image hello' }, memberToken);
+        assertStatus(status, 201);
+        const msg = data.data;
+        assert(msg.messageType === 'image', `messageType mismatch: ${msg.messageType}`);
+        assert(typeof msg.mediaUrl === 'string' && msg.mediaUrl.startsWith('https://'), 'expected mediaUrl HTTPS string');
+    });
     await test('POST /groups/:id/messages with reply_to_id sends threaded reply (201)', async () => {
         const { status, data } = await post(`/groups/${openGroupId}/messages`, { content: 'Reply!', reply_to_id: messageId }, creatorToken);
         assertStatus(status, 201);
@@ -1877,6 +1908,12 @@ async function runFeaturesSuite() {
         assertHas(dm, 'id');
         dmId = dm.id;
         assert(dm.content === 'Hey member!', `content mismatch: ${dm.content}`);
+    });
+    await test('POST /dm/:userId with media upload sends DM media (201)', async () => {
+        const { status, data } = await uploadFileWithFields(`/dm/${memberId}`, 'media', TINY_PNG, 'image/png', { content: 'DM image hello' }, creatorToken);
+        assertStatus(status, 201);
+        const dm = data.data;
+        assert(typeof dm.mediaUrl === 'string' && dm.mediaUrl.startsWith('https://'), 'expected mediaUrl HTTPS string');
     });
     await test('POST /dm/:userId to user in no shared group returns 403', async () => {
         // Register a completely new user with no group membership

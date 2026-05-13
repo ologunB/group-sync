@@ -9,6 +9,11 @@ export interface SendMessageDTO {
     reply_to_id?: string;
 }
 
+export interface UploadedMessageMedia {
+    buffer: Buffer;
+    mimeType: string;
+}
+
 export interface ListMessagesQuery {
     cursor?: string;
     limit?: number;

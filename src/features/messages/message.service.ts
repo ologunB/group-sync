@@ -1,4 +1,5 @@
 import { StatusCodes } from 'http-status-codes';
+import { randomUUID } from 'crypto';
 import { prisma } from '../../database/connection';
 import { ApiError } from '../../shared/middleware/error.middleware';
 import { Messages } from '../../shared/utils/response.constants';
@@ -7,10 +8,12 @@ import { AuditLogger, LogActions, ResourceTypes } from '../../shared/utils/audit
 import { TokenPayload } from '../../shared/types/common.types';
 import { SocketService } from '../../shared/socket/socket.service';
 import { SocketEvents } from '../../shared/socket/socket.events';
+import { StorageService } from '../../shared/storage/storage.service';
 import {
     SendMessageDTO,
     ListMessagesQuery,
     MessagePublic,
+    UploadedMessageMedia,
     messageSelect,
 } from './message.types';
 
@@ -101,6 +104,7 @@ export class MessageService {
         groupId: string,
         dto: SendMessageDTO,
         actor: TokenPayload,
+        media?: UploadedMessageMedia,
     ): Promise<MessagePublic> {
         try {
             const membership = await requireActiveMember(groupId, actor.userId);
@@ -115,8 +119,22 @@ export class MessageService {
             if (group.isChatLocked && !['super_admin', 'admin'].includes(membership.role)) {
                 throw new ApiError('Chat is locked. Only admins can send messages.', StatusCodes.FORBIDDEN);
             }
-            if (!dto.content?.trim() && dto.message_type === 'text') {
-                throw new ApiError('Message content is required.', StatusCodes.UNPROCESSABLE_ENTITY);
+
+            let mediaUrl = dto.media_url ?? null;
+            let messageType = dto.message_type ?? 'text';
+
+            if (media) {
+                const result = await StorageService.upload(media.buffer, media.mimeType, {
+                    folder:   `groupsync/messages/${groupId}`,
+                    publicId: `${actor.userId}-${Date.now()}-${randomUUID()}`,
+                    transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+                });
+                mediaUrl = result.url;
+                messageType = 'image';
+            }
+
+            if (!dto.content?.trim() && !mediaUrl) {
+                throw new ApiError('Message content or media is required.', StatusCodes.UNPROCESSABLE_ENTITY);
             }
 
             const message = await prisma.message.create({
@@ -124,8 +142,8 @@ export class MessageService {
                     groupId,
                     senderId: actor.userId,
                     content: dto.content?.trim() ?? null,
-                    messageType: dto.message_type ?? 'text',
-                    mediaUrl: dto.media_url ?? null,
+                    messageType,
+                    mediaUrl,
                     replyToId: dto.reply_to_id ?? null,
                 },
                 select: messageSelect,

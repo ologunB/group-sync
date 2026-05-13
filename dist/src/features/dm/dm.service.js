@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.dmService = exports.DmService = void 0;
 const http_status_codes_1 = require("http-status-codes");
+const crypto_1 = require("crypto");
 const connection_1 = require("../../database/connection");
 const error_middleware_1 = require("../../shared/middleware/error.middleware");
 const response_constants_1 = require("../../shared/utils/response.constants");
@@ -9,6 +10,7 @@ const asLogger_1 = require("../../shared/utils/asLogger");
 const audit_logger_1 = require("../../shared/utils/audit.logger");
 const socket_service_1 = require("../../shared/socket/socket.service");
 const socket_events_1 = require("../../shared/socket/socket.events");
+const storage_service_1 = require("../../shared/storage/storage.service");
 const notification_service_1 = require("../notifications/notification.service");
 const dm_types_1 = require("./dm.types");
 class DmService {
@@ -187,14 +189,11 @@ class DmService {
         }
     }
     // ── Send DM ───────────────────────────────────────────────────────────────
-    async sendDm(otherUserId, dto, actor) {
+    async sendDm(otherUserId, dto, actor, media) {
         try {
             const userId = actor.userId;
             if (userId === otherUserId) {
                 throw new error_middleware_1.ApiError('Cannot send a DM to yourself.', http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY);
-            }
-            if (!dto.content?.trim() && !dto.media_url) {
-                throw new error_middleware_1.ApiError('Content or media_url is required.', http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY);
             }
             // Receiver must exist
             const receiver = await connection_1.prisma.user.findUnique({
@@ -229,12 +228,24 @@ class DmService {
             if (blocked) {
                 throw new error_middleware_1.ApiError('Cannot send DM to this user.', http_status_codes_1.StatusCodes.FORBIDDEN);
             }
+            let mediaUrl = dto.media_url ?? null;
+            if (media) {
+                const result = await storage_service_1.StorageService.upload(media.buffer, media.mimeType, {
+                    folder: `groupsync/dms/${userId}`,
+                    publicId: `${otherUserId}-${Date.now()}-${(0, crypto_1.randomUUID)()}`,
+                    transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+                });
+                mediaUrl = result.url;
+            }
+            if (!dto.content?.trim() && !mediaUrl) {
+                throw new error_middleware_1.ApiError('Content or media is required.', http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY);
+            }
             const dm = await connection_1.prisma.directMessage.create({
                 data: {
                     senderId: userId,
                     receiverId: otherUserId,
                     content: dto.content?.trim() ?? null,
-                    mediaUrl: dto.media_url ?? null,
+                    mediaUrl,
                 },
                 select: dm_types_1.dmSelect,
             });

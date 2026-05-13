@@ -212,16 +212,16 @@ export class AgendaManager {
             case 'expire-invite-links': {
                 // Cron: mark expired invite links — query handled here via prisma import
                 // We import prisma lazily to avoid circular deps in the module graph
-                // const { prisma } = await import('./database/connection');
-                // const now = new Date();
-                // const result = await prisma.inviteLink.updateMany({
-                //     where: {
-                //         expiresAt: { lt: now },
-                //         revokedAt: null,
-                //     },
-                //     data: { revokedAt: now },
-                // });
-                // asLogger.info(`expire-invite-links: expired ${result.count} links`);
+                const { prisma } = await import('./database/connection');
+                const now = new Date();
+                const result = await prisma.inviteLink.updateMany({
+                    where: {
+                        expiresAt: { lt: now },
+                        revokedAt: null,
+                    },
+                    data: { revokedAt: now },
+                });
+                asLogger.info(`expire-invite-links: expired ${result.count} links`);
                 break;
             }
 

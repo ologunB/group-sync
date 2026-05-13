@@ -25,7 +25,8 @@ export class MessageController {
 
     sendMessage = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const message = await messageService.sendMessage(req.params.id, req.body as SendMessageDTO, req.user!);
+            const media = req.file ? { buffer: req.file.buffer, mimeType: req.file.mimetype } : undefined;
+            const message = await messageService.sendMessage(req.params.id, req.body as SendMessageDTO, req.user!, media);
             ResponseHelper.success(res, message, 'Message sent.', StatusCodes.CREATED);
         } catch (error) {
             next(error);

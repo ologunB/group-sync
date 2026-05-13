@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate, authenticateVerified } from '../../shared/middleware/auth.middleware';
+import { uploadImage } from '../../shared/middleware/upload.middleware';
 import { validateRequest } from '../../shared/utils/validators';
 import { messageController } from './message.controller';
 import {
@@ -26,6 +27,7 @@ router.get('/groups/:id/messages',
 
 router.post('/groups/:id/messages',
     authenticateVerified,
+    uploadImage('media'),
     validateRequest(sendMessageValidator),
     messageController.sendMessage,
 );

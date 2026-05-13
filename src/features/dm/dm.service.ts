@@ -1,4 +1,5 @@
 import { StatusCodes } from 'http-status-codes';
+import { randomUUID } from 'crypto';
 import { prisma } from '../../database/connection';
 import { ApiError } from '../../shared/middleware/error.middleware';
 import { Messages } from '../../shared/utils/response.constants';
@@ -7,8 +8,9 @@ import { AuditLogger, LogActions, ResourceTypes } from '../../shared/utils/audit
 import { TokenPayload } from '../../shared/types/common.types';
 import { SocketService } from '../../shared/socket/socket.service';
 import { SocketEvents } from '../../shared/socket/socket.events';
+import { StorageService } from '../../shared/storage/storage.service';
 import { NotificationService } from '../notifications/notification.service';
-import { SendDmDTO, ListThreadQuery, DmPublic, ConversationItem, dmSelect } from './dm.types';
+import { SendDmDTO, ListThreadQuery, DmPublic, ConversationItem, UploadedDmMedia, dmSelect } from './dm.types';
 
 export class DmService {
     // ── Unified conversation list ─────────────────────────────────────────────
@@ -209,15 +211,12 @@ export class DmService {
 
     // ── Send DM ───────────────────────────────────────────────────────────────
 
-    async sendDm(otherUserId: string, dto: SendDmDTO, actor: TokenPayload): Promise<DmPublic> {
+    async sendDm(otherUserId: string, dto: SendDmDTO, actor: TokenPayload, media?: UploadedDmMedia): Promise<DmPublic> {
         try {
             const userId = actor.userId;
 
             if (userId === otherUserId) {
                 throw new ApiError('Cannot send a DM to yourself.', StatusCodes.UNPROCESSABLE_ENTITY);
-            }
-            if (!dto.content?.trim() && !dto.media_url) {
-                throw new ApiError('Content or media_url is required.', StatusCodes.UNPROCESSABLE_ENTITY);
             }
 
             // Receiver must exist
@@ -259,12 +258,27 @@ export class DmService {
                 throw new ApiError('Cannot send DM to this user.', StatusCodes.FORBIDDEN);
             }
 
+            let mediaUrl = dto.media_url ?? null;
+
+            if (media) {
+                const result = await StorageService.upload(media.buffer, media.mimeType, {
+                    folder:   `groupsync/dms/${userId}`,
+                    publicId: `${otherUserId}-${Date.now()}-${randomUUID()}`,
+                    transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+                });
+                mediaUrl = result.url;
+            }
+
+            if (!dto.content?.trim() && !mediaUrl) {
+                throw new ApiError('Content or media is required.', StatusCodes.UNPROCESSABLE_ENTITY);
+            }
+
             const dm = await prisma.directMessage.create({
                 data: {
                     senderId: userId,
                     receiverId: otherUserId,
                     content: dto.content?.trim() ?? null,
-                    mediaUrl: dto.media_url ?? null,
+                    mediaUrl,
                 },
                 select: dmSelect,
             });

@@ -24,7 +24,8 @@ class MessageController {
     };
     sendMessage = async (req, res, next) => {
         try {
-            const message = await message_service_1.messageService.sendMessage(req.params.id, req.body, req.user);
+            const media = req.file ? { buffer: req.file.buffer, mimeType: req.file.mimetype } : undefined;
+            const message = await message_service_1.messageService.sendMessage(req.params.id, req.body, req.user, media);
             response_helper_1.ResponseHelper.success(res, message, 'Message sent.', http_status_codes_1.StatusCodes.CREATED);
         }
         catch (error) {

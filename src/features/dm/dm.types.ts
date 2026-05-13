@@ -7,6 +7,11 @@ export interface SendDmDTO {
     media_url?: string;
 }
 
+export interface UploadedDmMedia {
+    buffer: Buffer;
+    mimeType: string;
+}
+
 export interface ListThreadQuery {
     cursor?: string;
     limit?: number;

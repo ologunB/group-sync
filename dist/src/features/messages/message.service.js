@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.messageService = exports.MessageService = void 0;
 const http_status_codes_1 = require("http-status-codes");
+const crypto_1 = require("crypto");
 const connection_1 = require("../../database/connection");
 const error_middleware_1 = require("../../shared/middleware/error.middleware");
 const response_constants_1 = require("../../shared/utils/response.constants");
@@ -9,6 +10,7 @@ const asLogger_1 = require("../../shared/utils/asLogger");
 const audit_logger_1 = require("../../shared/utils/audit.logger");
 const socket_service_1 = require("../../shared/socket/socket.service");
 const socket_events_1 = require("../../shared/socket/socket.events");
+const storage_service_1 = require("../../shared/storage/storage.service");
 const message_types_1 = require("./message.types");
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 async function requireActiveMember(groupId, userId) {
@@ -79,7 +81,7 @@ class MessageService {
         }
     }
     // ── Send message (REST fallback) ──────────────────────────────────────────
-    async sendMessage(groupId, dto, actor) {
+    async sendMessage(groupId, dto, actor, media) {
         try {
             const membership = await requireActiveMember(groupId, actor.userId);
             const group = await connection_1.prisma.group.findUnique({
@@ -92,16 +94,27 @@ class MessageService {
             if (group.isChatLocked && !['super_admin', 'admin'].includes(membership.role)) {
                 throw new error_middleware_1.ApiError('Chat is locked. Only admins can send messages.', http_status_codes_1.StatusCodes.FORBIDDEN);
             }
-            if (!dto.content?.trim() && dto.message_type === 'text') {
-                throw new error_middleware_1.ApiError('Message content is required.', http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY);
+            let mediaUrl = dto.media_url ?? null;
+            let messageType = dto.message_type ?? 'text';
+            if (media) {
+                const result = await storage_service_1.StorageService.upload(media.buffer, media.mimeType, {
+                    folder: `groupsync/messages/${groupId}`,
+                    publicId: `${actor.userId}-${Date.now()}-${(0, crypto_1.randomUUID)()}`,
+                    transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+                });
+                mediaUrl = result.url;
+                messageType = 'image';
+            }
+            if (!dto.content?.trim() && !mediaUrl) {
+                throw new error_middleware_1.ApiError('Message content or media is required.', http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY);
             }
             const message = await connection_1.prisma.message.create({
                 data: {
                     groupId,
                     senderId: actor.userId,
                     content: dto.content?.trim() ?? null,
-                    messageType: dto.message_type ?? 'text',
-                    mediaUrl: dto.media_url ?? null,
+                    messageType,
+                    mediaUrl,
                     replyToId: dto.reply_to_id ?? null,
                 },
                 select: message_types_1.messageSelect,

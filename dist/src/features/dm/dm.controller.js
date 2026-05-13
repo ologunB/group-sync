@@ -32,7 +32,8 @@ class DmController {
     };
     sendDm = async (req, res, next) => {
         try {
-            const dm = await dm_service_1.dmService.sendDm(req.params.userId, req.body, req.user);
+            const media = req.file ? { buffer: req.file.buffer, mimeType: req.file.mimetype } : undefined;
+            const dm = await dm_service_1.dmService.sendDm(req.params.userId, req.body, req.user, media);
             response_helper_1.ResponseHelper.success(res, dm, 'DM sent.', http_status_codes_1.StatusCodes.CREATED);
         }
         catch (error) {
