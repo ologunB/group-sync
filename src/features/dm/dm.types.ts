@@ -17,6 +17,10 @@ export interface ListThreadQuery {
     limit?: number;
 }
 
+export interface ListConversationsQuery {
+    type?: 'dm' | 'group';
+}
+
 // ─── Prisma selects ───────────────────────────────────────────────────────────
 
 export const dmSelect = {

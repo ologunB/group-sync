@@ -10,42 +10,46 @@ import { SocketService } from '../../shared/socket/socket.service';
 import { SocketEvents } from '../../shared/socket/socket.events';
 import { StorageService } from '../../shared/storage/storage.service';
 import { NotificationService } from '../notifications/notification.service';
-import { SendDmDTO, ListThreadQuery, DmPublic, ConversationItem, UploadedDmMedia, dmSelect } from './dm.types';
+import { SendDmDTO, ListThreadQuery, ListConversationsQuery, DmPublic, ConversationItem, UploadedDmMedia, dmSelect } from './dm.types';
 
 export class DmService {
     // ── Unified conversation list ─────────────────────────────────────────────
 
-    async listConversations(actor: TokenPayload): Promise<ConversationItem[]> {
+    async listConversations(actor: TokenPayload, query: ListConversationsQuery = {}): Promise<ConversationItem[]> {
         try {
             const userId = actor.userId;
+            const includeGroups = !query.type || query.type === 'group';
+            const includeDms = !query.type || query.type === 'dm';
 
             // ── Group conversations ───────────────────────────────────────────
-            const memberships = await prisma.membership.findMany({
-                where: { userId, status: 'active' },
-                select: {
-                    group: {
-                        select: {
-                            id: true,
-                            name: true,
-                            logoUrl: true,
-                            isChatLocked: true,
-                            messages: {
-                                where: { isDeleted: false },
-                                orderBy: { createdAt: 'desc' },
-                                take: 1,
-                                select: {
-                                    id: true, content: true, isDeleted: true, createdAt: true,
-                                    sender: { select: { displayName: true } },
+            const memberships = includeGroups
+                ? await prisma.membership.findMany({
+                    where: { userId, status: 'active' },
+                    select: {
+                        group: {
+                            select: {
+                                id: true,
+                                name: true,
+                                logoUrl: true,
+                                isChatLocked: true,
+                                messages: {
+                                    where: { isDeleted: false },
+                                    orderBy: { createdAt: 'desc' },
+                                    take: 1,
+                                    select: {
+                                        id: true, content: true, isDeleted: true, createdAt: true,
+                                        sender: { select: { displayName: true } },
+                                    },
                                 },
-                            },
-                            chatReadReceipts: {
-                                where: { userId },
-                                select: { lastReadAt: true },
+                                chatReadReceipts: {
+                                    where: { userId },
+                                    select: { lastReadAt: true },
+                                },
                             },
                         },
                     },
-                },
-            });
+                })
+                : [];
 
             // Count unread per group in one batch query
             const groupIds = memberships.map((m) => m.group.id);
@@ -89,7 +93,7 @@ export class DmService {
 
             // ── DM conversations ──────────────────────────────────────────────
             // Get the latest message per unique conversation partner
-            const dmRows = await prisma.$queryRaw<{
+            const dmRows = includeDms ? await prisma.$queryRaw<{
                 other_user_id: string;
                 other_display_name: string;
                 other_photo: string | null;
@@ -134,7 +138,7 @@ export class DmService {
                         ELSE latest.sender_id
                     END
                 ORDER BY latest.created_at DESC
-            `;
+            ` : [];
 
             const dmConversations: ConversationItem[] = dmRows.map((row) => ({
                 type: 'dm',

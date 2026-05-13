@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listThreadValidator = exports.sendDmValidator = void 0;
+exports.listConversationsValidator = exports.listThreadValidator = exports.sendDmValidator = void 0;
 const express_validator_1 = require("express-validator");
 exports.sendDmValidator = [
     (0, express_validator_1.body)('content')
@@ -18,5 +18,10 @@ exports.listThreadValidator = [
     (0, express_validator_1.query)('limit')
         .optional()
         .isInt({ min: 1, max: 100 }).withMessage('limit must be between 1 and 100'),
+];
+exports.listConversationsValidator = [
+    (0, express_validator_1.query)('type')
+        .optional()
+        .isIn(['dm', 'group']).withMessage("type must be either 'dm' or 'group'"),
 ];
 //# sourceMappingURL=dm.validator.js.map

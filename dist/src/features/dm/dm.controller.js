@@ -7,7 +7,10 @@ const dm_service_1 = require("./dm.service");
 class DmController {
     listConversations = async (req, res, next) => {
         try {
-            const data = await dm_service_1.dmService.listConversations(req.user);
+            const query = {
+                type: req.query.type,
+            };
+            const data = await dm_service_1.dmService.listConversations(req.user, query);
             response_helper_1.ResponseHelper.success(res, data, 'Conversations retrieved.');
         }
         catch (error) {

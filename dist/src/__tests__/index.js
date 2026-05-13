@@ -1892,6 +1892,18 @@ async function runFeaturesSuite() {
         assertStatus(status, 200);
         assert(Array.isArray(data.data), 'expected array');
     });
+    await test('GET /conversations with invalid type returns 422', async () => {
+        const { status } = await get('/conversations?type=private', creatorToken);
+        assertStatus(status, 422);
+    });
+    await test('GET /conversations?type=group returns only groups (200)', async () => {
+        const { status, data } = await get('/conversations?type=group', creatorToken);
+        assertStatus(status, 200);
+        const items = data.data;
+        assert(Array.isArray(items), 'expected array');
+        assert(items.length >= 1, 'expected at least one group conversation');
+        assert(items.every((i) => i.type === 'group'), 'expected only group conversations');
+    });
     await test('POST /dm/:userId without auth returns 401', async () => {
         const { status } = await post(`/dm/${memberId}`, { content: 'Hey' });
         assertStatus(status, 401);
@@ -1939,6 +1951,14 @@ async function runFeaturesSuite() {
         const items = data.data;
         const hasDm = items.some((i) => i.type === 'dm' && i.id === memberId);
         assert(hasDm, 'DM conversation not found in unified list');
+    });
+    await test('GET /conversations?type=dm returns only DMs (200)', async () => {
+        const { status, data } = await get('/conversations?type=dm', creatorToken);
+        assertStatus(status, 200);
+        const items = data.data;
+        assert(items.length >= 1, 'expected at least one DM conversation');
+        assert(items.every((i) => i.type === 'dm'), 'expected only DM conversations');
+        assert(items.some((i) => i.id === memberId), 'expected member DM conversation');
     });
     await test('DELETE /dm/:dmId soft-deletes DM (200)', async () => {
         const { status } = await del(`/dm/${dmId}`, creatorToken);

@@ -3,12 +3,15 @@ import { StatusCodes } from 'http-status-codes';
 import { AuthenticatedRequest } from '../../shared/middleware/auth.middleware';
 import { ResponseHelper } from '../../shared/utils/response.helper';
 import { dmService } from './dm.service';
-import { SendDmDTO, ListThreadQuery } from './dm.types';
+import { SendDmDTO, ListThreadQuery, ListConversationsQuery } from './dm.types';
 
 export class DmController {
     listConversations = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const data = await dmService.listConversations(req.user!);
+            const query: ListConversationsQuery = {
+                type: req.query.type as ListConversationsQuery['type'] | undefined,
+            };
+            const data = await dmService.listConversations(req.user!, query);
             ResponseHelper.success(res, data, 'Conversations retrieved.');
         } catch (error) {
             next(error);

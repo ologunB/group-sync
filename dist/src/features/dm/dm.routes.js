@@ -8,7 +8,7 @@ const dm_controller_1 = require("./dm.controller");
 const dm_validator_1 = require("./dm.validator");
 const router = (0, express_1.Router)();
 // Unified conversation inbox (groups + DMs)
-router.get('/conversations', auth_middleware_1.authenticate, dm_controller_1.dmController.listConversations);
+router.get('/conversations', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(dm_validator_1.listConversationsValidator), dm_controller_1.dmController.listConversations);
 // DM thread with a specific user
 router.get('/dm/:userId', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(dm_validator_1.listThreadValidator), dm_controller_1.dmController.getThread);
 // Send DM

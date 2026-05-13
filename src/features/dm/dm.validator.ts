@@ -18,3 +18,9 @@ export const listThreadValidator = [
         .optional()
         .isInt({ min: 1, max: 100 }).withMessage('limit must be between 1 and 100'),
 ];
+
+export const listConversationsValidator = [
+    query('type')
+        .optional()
+        .isIn(['dm', 'group']).withMessage("type must be either 'dm' or 'group'"),
+];

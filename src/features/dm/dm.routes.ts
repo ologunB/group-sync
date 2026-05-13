@@ -3,12 +3,12 @@ import { authenticate, authenticateVerified } from '../../shared/middleware/auth
 import { uploadImage } from '../../shared/middleware/upload.middleware';
 import { validateRequest } from '../../shared/utils/validators';
 import { dmController } from './dm.controller';
-import { sendDmValidator, listThreadValidator } from './dm.validator';
+import { sendDmValidator, listThreadValidator, listConversationsValidator } from './dm.validator';
 
 const router = Router();
 
 // Unified conversation inbox (groups + DMs)
-router.get('/conversations', authenticate, dmController.listConversations);
+router.get('/conversations', authenticate, validateRequest(listConversationsValidator), dmController.listConversations);
 
 // DM thread with a specific user
 router.get('/dm/:userId', authenticate, validateRequest(listThreadValidator), dmController.getThread);

@@ -15,36 +15,40 @@ const notification_service_1 = require("../notifications/notification.service");
 const dm_types_1 = require("./dm.types");
 class DmService {
     // ── Unified conversation list ─────────────────────────────────────────────
-    async listConversations(actor) {
+    async listConversations(actor, query = {}) {
         try {
             const userId = actor.userId;
+            const includeGroups = !query.type || query.type === 'group';
+            const includeDms = !query.type || query.type === 'dm';
             // ── Group conversations ───────────────────────────────────────────
-            const memberships = await connection_1.prisma.membership.findMany({
-                where: { userId, status: 'active' },
-                select: {
-                    group: {
-                        select: {
-                            id: true,
-                            name: true,
-                            logoUrl: true,
-                            isChatLocked: true,
-                            messages: {
-                                where: { isDeleted: false },
-                                orderBy: { createdAt: 'desc' },
-                                take: 1,
-                                select: {
-                                    id: true, content: true, isDeleted: true, createdAt: true,
-                                    sender: { select: { displayName: true } },
+            const memberships = includeGroups
+                ? await connection_1.prisma.membership.findMany({
+                    where: { userId, status: 'active' },
+                    select: {
+                        group: {
+                            select: {
+                                id: true,
+                                name: true,
+                                logoUrl: true,
+                                isChatLocked: true,
+                                messages: {
+                                    where: { isDeleted: false },
+                                    orderBy: { createdAt: 'desc' },
+                                    take: 1,
+                                    select: {
+                                        id: true, content: true, isDeleted: true, createdAt: true,
+                                        sender: { select: { displayName: true } },
+                                    },
                                 },
-                            },
-                            chatReadReceipts: {
-                                where: { userId },
-                                select: { lastReadAt: true },
+                                chatReadReceipts: {
+                                    where: { userId },
+                                    select: { lastReadAt: true },
+                                },
                             },
                         },
                     },
-                },
-            });
+                })
+                : [];
             // Count unread per group in one batch query
             const groupIds = memberships.map((m) => m.group.id);
             const unreadCounts = groupIds.length > 0
@@ -84,7 +88,7 @@ class DmService {
             });
             // ── DM conversations ──────────────────────────────────────────────
             // Get the latest message per unique conversation partner
-            const dmRows = await connection_1.prisma.$queryRaw `
+            const dmRows = includeDms ? await connection_1.prisma.$queryRaw `
                 SELECT
                     other_user.id              AS other_user_id,
                     other_user.display_name    AS other_display_name,
@@ -121,7 +125,7 @@ class DmService {
                         ELSE latest.sender_id
                     END
                 ORDER BY latest.created_at DESC
-            `;
+            ` : [];
             const dmConversations = dmRows.map((row) => ({
                 type: 'dm',
                 id: row.other_user_id,
