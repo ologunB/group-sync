@@ -1,5 +1,4 @@
 import { Response, NextFunction } from 'express';
-import { StatusCodes } from 'http-status-codes';
 import { AuthenticatedRequest } from '../../shared/middleware/auth.middleware';
 import { ResponseHelper } from '../../shared/utils/response.helper';
 import { notificationService } from './notification.service';

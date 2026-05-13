@@ -5,7 +5,7 @@ import { ApiError } from '../../shared/middleware/error.middleware';
 import { Messages } from '../../shared/utils/response.constants';
 import { asLogger } from '../../shared/utils/asLogger';
 import { AuditLogger, LogActions, ResourceTypes } from '../../shared/utils/audit.logger';
-import { TokenPayload, PaginationMeta } from '../../shared/types/common.types';
+import { TokenPayload } from '../../shared/types/common.types';
 import { StorageService } from '../../shared/storage/storage.service';
 import { AgendaManager } from '../../agenda';
 import { generateUniqueGroupSlug } from '../../shared/utils/slug';
@@ -57,7 +57,7 @@ export class GroupService {
                         isDiscoverable,
                         createdBy: actor.userId,
                     },
-                    select: groupPublicSelect,
+                    select: { id: true },
                 });
 
                 // Creator auto-joins as super_admin
@@ -567,7 +567,7 @@ export class GroupService {
     // ── getGroupStats ───────────────────────────────────────────────────────────
     // Admin only (enforced via route middleware).
 
-    async getGroupStats(groupId: string, actor: TokenPayload): Promise<GroupStats> {
+    async getGroupStats(groupId: string, _actor: TokenPayload): Promise<GroupStats> {
         try {
             const group = await prisma.group.findUnique({
                 where: { id: groupId },
@@ -584,11 +584,8 @@ export class GroupService {
                 await Promise.all([
                     prisma.application.count({ where: { groupId, status: 'pending' } }),
                     prisma.application.count({ where: { groupId } }),
-                    // Events model available after event.prisma is added
-                    // prisma.event.count({ where: { groupId, startsAt: { gte: new Date() }, status: 'scheduled' } }),
-                    Promise.resolve(0), // placeholder until events module is built
-                    // prisma.message.count({ where: { groupId, createdAt: { gte: sevenDaysAgo }, isDeleted: false } }),
-                    Promise.resolve(0), // placeholder until messages module is built
+                    prisma.event.count({ where: { groupId, startsAt: { gte: new Date() }, status: 'scheduled' } }),
+                    prisma.message.count({ where: { groupId, createdAt: { gte: sevenDaysAgo }, isDeleted: false } }),
                 ]);
 
             return {

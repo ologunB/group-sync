@@ -40,10 +40,6 @@ class DmService {
                                         sender: { select: { displayName: true } },
                                     },
                                 },
-                                chatReadReceipts: {
-                                    where: { userId },
-                                    select: { lastReadAt: true },
-                                },
                             },
                         },
                     },

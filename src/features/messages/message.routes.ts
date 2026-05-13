@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { body } from 'express-validator';
 import { authenticate, authenticateVerified } from '../../shared/middleware/auth.middleware';
 import { uploadImage } from '../../shared/middleware/upload.middleware';
 import { validateRequest } from '../../shared/utils/validators';
@@ -10,6 +11,11 @@ import {
 } from './message.validator';
 
 const router = Router();
+const reactionValidator = [
+    body('emoji')
+        .exists().withMessage('emoji is required')
+        .isString().isLength({ min: 1, max: 10 }).withMessage('Invalid emoji'),
+];
 
 // ── Group-scoped routes (/groups/:id/...) ─────────────────────────────────────
 
@@ -53,21 +59,13 @@ router.patch('/messages/:id/pin',
 
 router.post('/messages/:id/react',
     authenticate,
-    validateRequest([
-        require('express-validator').body('emoji')
-            .exists().withMessage('emoji is required')
-            .isString().isLength({ min: 1, max: 10 }).withMessage('Invalid emoji'),
-    ]),
+    validateRequest(reactionValidator),
     messageController.addReaction,
 );
 
 router.delete('/messages/:id/react',
     authenticate,
-    validateRequest([
-        require('express-validator').body('emoji')
-            .exists().withMessage('emoji is required')
-            .isString().isLength({ min: 1, max: 10 }).withMessage('Invalid emoji'),
-    ]),
+    validateRequest(reactionValidator),
     messageController.removeReaction,
 );
 

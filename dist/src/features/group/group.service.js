@@ -45,7 +45,7 @@ class GroupService {
                         isDiscoverable,
                         createdBy: actor.userId,
                     },
-                    select: group_types_1.groupPublicSelect,
+                    select: { id: true },
                 });
                 // Creator auto-joins as super_admin
                 await tx.membership.create({
@@ -492,7 +492,7 @@ class GroupService {
     }
     // ── getGroupStats ───────────────────────────────────────────────────────────
     // Admin only (enforced via route middleware).
-    async getGroupStats(groupId, actor) {
+    async getGroupStats(groupId, _actor) {
         try {
             const group = await connection_1.prisma.group.findUnique({
                 where: { id: groupId },
@@ -505,11 +505,8 @@ class GroupService {
             const [pendingApplications, totalApplications, upcomingEvents, messagesLast7Days] = await Promise.all([
                 connection_1.prisma.application.count({ where: { groupId, status: 'pending' } }),
                 connection_1.prisma.application.count({ where: { groupId } }),
-                // Events model available after event.prisma is added
-                // prisma.event.count({ where: { groupId, startsAt: { gte: new Date() }, status: 'scheduled' } }),
-                Promise.resolve(0), // placeholder until events module is built
-                // prisma.message.count({ where: { groupId, createdAt: { gte: sevenDaysAgo }, isDeleted: false } }),
-                Promise.resolve(0), // placeholder until messages module is built
+                connection_1.prisma.event.count({ where: { groupId, startsAt: { gte: new Date() }, status: 'scheduled' } }),
+                connection_1.prisma.message.count({ where: { groupId, createdAt: { gte: sevenDaysAgo }, isDeleted: false } }),
             ]);
             return {
                 memberCount: group.memberCount,
