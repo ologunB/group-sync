@@ -65,6 +65,8 @@ export const LogActions = {
     MESSAGE_PIN:              'message.pin',
     // DMs
     DM_SEND:                  'dm.send',
+    DM_REACTION_ADD:          'dm.reaction_add',
+    DM_REACTION_REMOVE:       'dm.reaction_remove',
     // Chat admin
     CHAT_LOCK:                'chat.lock',
     CHAT_UNLOCK:              'chat.unlock',

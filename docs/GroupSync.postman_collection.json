@@ -2119,7 +2119,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"description\": \"Updated description for our tech community.\",\n  \"rules\": \"Be respectful. No spam. No self-promotion without permission.\",\n  \"city\": \"Lagos\",\n  \"membership_type\": \"application\"\n}",
+              "raw": "{\n  \"name\": \"Lagos Tech Community\",\n  \"description\": \"Updated description for our tech community.\",\n  \"category\": \"Technology\",\n  \"subcategory\": \"Software Engineering\",\n  \"city\": \"Lagos\",\n  \"state\": \"Lagos\",\n  \"country\": \"NG\",\n  \"lat\": 6.5244,\n  \"lng\": 3.3792,\n  \"membership_type\": \"application\",\n  \"membership_fee\": null,\n  \"membership_fee_currency\": \"NGN\",\n  \"membership_fee_frequency\": null,\n  \"how_to_join_content\": \"Apply via the form.\",\n  \"rules\": \"Be respectful. No spam. No self-promotion without permission.\",\n  \"founding_date\": null,\n  \"cover_image_url\": null,\n  \"logo_url\": null\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2136,7 +2136,7 @@
                 "{{groupId}}"
               ]
             },
-            "description": "Update group settings. Auth required. Role: admin or super_admin.\n\nAll fields optional. Changing membership_type to invite_only auto-sets is_discoverable=false.\nChanging away from invite_only restores is_discoverable=true.\nSlug regenerated if name changes.",
+            "description": "Update group settings. Auth required. Role: admin or super_admin. All fields optional.\n\nField notes:\n- Changing `membership_type` to `invite_only` auto-sets `is_discoverable=false`\n- Changing away from `invite_only` restores `is_discoverable=true`\n- Slug regenerated if `name` changes (collision suffix appended if needed)\n- `membership_fee_frequency`: `one_time` | `monthly` | `yearly`\n- `lat` + `lng`: both required together if provided",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -3870,7 +3870,7 @@
                 "events"
               ]
             },
-            "description": "Create an event in a group. Requires admin or super_admin role.",
+            "description": "Create an event in a group. Requires admin or super_admin role.\n\nBody fields:\n- `title` (string, required): max 200 chars\n- `description` (string, optional)\n- `location_name` (string, optional): venue name\n- `lat` / `lng` (number, optional): venue coordinates stored as PostGIS Point\n- `starts_at` (ISO 8601, required): must be in the future\n- `ends_at` (ISO 8601, optional): must be after starts_at\n- `rsvp_limit` (int, optional): max attendees with status `going`; null = unlimited\n\nSide effect: queues `notify-group-members` BullMQ job to fan-out `event_created` notifications.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -3883,7 +3883,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Lagos Tech Meetup\",\n  \"description\": \"Monthly engineering meetup\",\n  \"starts_at\": \"2027-06-15T18:00:00.000Z\",\n  \"rsvp_limit\": 100\n}",
+              "raw": "{\n  \"title\": \"Lagos Tech Meetup\",\n  \"description\": \"Monthly engineering meetup\",\n  \"location_name\": \"Tech Hub Lagos\",\n  \"lat\": 6.5244,\n  \"lng\": 3.3792,\n  \"starts_at\": \"2027-06-15T18:00:00.000Z\",\n  \"ends_at\": \"2027-06-15T21:00:00.000Z\",\n  \"rsvp_limit\": 100\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3911,14 +3911,9 @@
           "name": "List Group Events",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/groups/{{groupId}}/events",
+              "raw": "{{baseUrl}}/groups/{{groupId}}/events?page=1&limit=20",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -3926,9 +3921,27 @@
                 "groups",
                 "{{groupId}}",
                 "events"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Items per page (default 20, max 50)"
+                },
+                {
+                  "key": "status",
+                  "value": "scheduled",
+                  "description": "Filter by status: scheduled | cancelled | completed",
+                  "disabled": true
+                }
               ]
             },
-            "description": "List all non-cancelled events in a group. Paginated.",
+            "description": "List events in a group. Non-members get a preview (scheduled events only). Members see all statuses.\n\nQuery params:\n- `page`, `limit`: offset pagination\n- `status`: `scheduled` | `cancelled` | `completed` — filters by event status",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -3996,7 +4009,7 @@
                 "{{eventId}}"
               ]
             },
-            "description": "Update event details. Requires admin role.",
+            "description": "Update event details. Requires admin or super_admin role. All fields optional.\n\nBody fields (all optional):\n- `title` (string): max 200 chars\n- `description` (string)\n- `location_name` (string)\n- `lat` / `lng` (number): venue coordinates\n- `starts_at` (ISO 8601): must be in the future\n- `ends_at` (ISO 8601): must be after starts_at\n- `rsvp_limit` (int | null): null removes the limit\n- `status` (string): `scheduled` | `cancelled` | `completed`",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4009,7 +4022,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Updated Meetup Title\",\n  \"rsvp_limit\": 150\n}",
+              "raw": "{\n  \"title\": \"Updated Meetup Title\",\n  \"description\": \"Updated description\",\n  \"location_name\": \"New Venue\",\n  \"lat\": 6.5244,\n  \"lng\": 3.3792,\n  \"starts_at\": \"2027-07-01T18:00:00.000Z\",\n  \"ends_at\": \"2027-07-01T21:00:00.000Z\",\n  \"rsvp_limit\": 150\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4220,12 +4233,7 @@
           "name": "List Notifications",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/notifications",
               "host": [
@@ -4233,9 +4241,29 @@
               ],
               "path": [
                 "notifications"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Items per page (1-50, default 20)",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "description": "Notification UUID — fetch items older than this cursor",
+                  "disabled": true
+                },
+                {
+                  "key": "unread_only",
+                  "value": "true",
+                  "description": "Filter to unread notifications only (true | false)",
+                  "disabled": true
+                }
               ]
             },
-            "description": "List notifications (cursor-based). Query: cursor?, limit (1-50), unread_only?. Returns unread_count.",
+            "description": "List notifications (cursor-based). Returns `unread_count` alongside results.\n\nQuery params:\n- `cursor` (UUID): pagination anchor — return items with `created_at` older than this notification\n- `limit` (int, 1-50, default 20)\n- `unread_only` (boolean): only return unread notifications",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4523,23 +4551,42 @@
           "name": "List Users",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/admin/users",
+              "raw": "{{baseUrl}}/admin/users?page=1&limit=20",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "admin",
                 "users"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Items per page (default 20, max 50)"
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "description": "Filter by status: active | suspended | banned",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search by display_name, username, or email",
+                  "disabled": true
+                }
               ]
             },
-            "description": "List all users. Query: page, limit, status (active|suspended|banned), search.",
+            "description": "List all platform users with optional filters. Requires platform.admin permission.\n\nQuery params:\n- `page`, `limit`: offset pagination\n- `status`: `active` | `suspended` | `banned`\n- `search`: free-text search on display_name, username, email",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4728,23 +4775,42 @@
           "name": "List Groups",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/admin/groups",
+              "raw": "{{baseUrl}}/admin/groups?page=1&limit=20",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "admin",
                 "groups"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Items per page (default 20, max 50)"
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "description": "Filter by status: active | suspended | deleted",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search by group name or description",
+                  "disabled": true
+                }
               ]
             },
-            "description": "List all groups. Query: page, limit, status, search.",
+            "description": "List all groups (admin view). Requires platform.admin permission.\n\nQuery params:\n- `page`, `limit`: offset pagination\n- `status`: `active` | `suspended` | `deleted`\n- `search`: free-text search on name/description",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4806,23 +4872,42 @@
           "name": "List Reports",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/admin/reports",
+              "raw": "{{baseUrl}}/admin/reports?page=1&limit=20",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "admin",
                 "reports"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Items per page (default 20, max 50)"
+                },
+                {
+                  "key": "status",
+                  "value": "open",
+                  "description": "Filter by status: open | reviewing | resolved | dismissed",
+                  "disabled": true
+                },
+                {
+                  "key": "target_type",
+                  "value": "user",
+                  "description": "Filter by target type: user | group | message",
+                  "disabled": true
+                }
               ]
             },
-            "description": "List all reports. Query: page, limit, status (open|reviewing|resolved|dismissed).",
+            "description": "List all reports. Requires platform.admin permission.\n\nQuery params:\n- `page`, `limit`: offset pagination\n- `status`: `open` | `reviewing` | `resolved` | `dismissed`\n- `target_type`: `user` | `group` | `message`",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4884,23 +4969,66 @@
           "name": "Get Audit Logs",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/admin/audit-logs",
+              "raw": "{{baseUrl}}/admin/audit-logs?page=1&limit=20",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "admin",
                 "audit-logs"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Items per page (default 20, max 100)"
+                },
+                {
+                  "key": "user_id",
+                  "value": "{{targetUserId}}",
+                  "description": "Filter logs for a specific user UUID",
+                  "disabled": true
+                },
+                {
+                  "key": "action",
+                  "value": "auth.login",
+                  "description": "Filter by action string (e.g. auth.login, group.create, dm.send)",
+                  "disabled": true
+                },
+                {
+                  "key": "entity_type",
+                  "value": "group",
+                  "description": "Filter by entity type: user | group | message | dm | event | application | report | invite_link | notification",
+                  "disabled": true
+                },
+                {
+                  "key": "date_from",
+                  "value": "2026-01-01T00:00:00Z",
+                  "description": "ISO 8601 start date (inclusive)",
+                  "disabled": true
+                },
+                {
+                  "key": "date_to",
+                  "value": "2026-12-31T23:59:59Z",
+                  "description": "ISO 8601 end date (inclusive)",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "1",
+                  "description": "Filter by success status: 1 = success, 0 = failure",
+                  "disabled": true
+                }
               ]
             },
-            "description": "Query audit logs. Query: page, limit, user_id, action, entity_type, date_from, date_to.",
+            "description": "Query audit log entries. Requires platform.admin permission.\n\nQuery params:\n- `page`, `limit`: offset pagination (max 100)\n- `user_id` (UUID): filter to a specific user\n- `action` (string): filter by action key, e.g. `auth.login`, `group.create`, `dm.send`\n- `entity_type` (string): `user` | `group` | `message` | `dm` | `event` | `application` | `report` | `invite_link` | `notification`\n- `date_from` / `date_to` (ISO 8601): date range filter\n- `status` (0|1): 1=success, 0=failure",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -5093,7 +5221,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"receiver_id\": \"{{targetUserId}}\",\n  \"content\": \"Hey! Socket DM test.\"\n}",
+              "raw": "{\n  \"receiver_id\": \"{{targetUserId}}\",\n  \"content\": \"Hey! Socket DM test.\",\n  \"reply_to_id\": null,\n  \"media_url\": null\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -5115,7 +5243,7 @@
                 }
               ]
             },
-            "description": "**Event name to emit:** `dm_send`\n\nSend a direct message via socket. Same business rules as `POST /dm/:userId` \u2014 shared-group check and block check both enforced.\n\n**Payload:**\n```json\n{\n  \"receiver_id\": \"<uuid>\",\n  \"content\": \"Hello!\"\n}\n```\n\n**Emits:**\n- `dm_received` \u2192 to receiver's personal room `user:{receiverId}`\n- `dm_received` \u2192 echoed back to sender (for multi-device)\n\n**Error:** `error` event \u2014 no shared group, blocked user, empty content."
+            "description": "**Event name to emit:** `dm_send`\n\nSend a direct message via socket. Same business rules as `POST /dm/:userId` \u2014 shared-group check and block check both enforced.\n\n**Payload:**\n```json\n{\n  \"receiver_id\": \"<uuid>\",\n  \"content\": \"Hello!\",\n  \"reply_to_id\": \"<uuid | null>\",\n  \"media_url\": \"<url | null>\"\n}\n```\n\n**Emits:**\n- `dm_received` \u2192 to receiver's personal room `user:{receiverId}`\n- `dm_received` \u2192 echoed back to sender (for multi-device)\n\n**Server \u2192 Client events for DM reactions:**\n- `dm_reaction_added` \u2192 `{ dm_id, emoji, user_id }` emitted to both participant rooms\n- `dm_reaction_removed` \u2192 `{ dm_id, emoji, user_id }` emitted to both participant rooms\n\n**Error:** `error` event \u2014 no shared group, blocked user, empty content."
           },
           "response": []
         }
@@ -5142,16 +5270,24 @@
               "query": [
                 {
                   "key": "limit",
-                  "value": "50"
+                  "value": "50",
+                  "description": "Number of messages to return (1-100, default 50)"
                 },
                 {
                   "key": "cursor",
                   "value": "",
+                  "description": "Message UUID — load messages before/after this cursor",
+                  "disabled": true
+                },
+                {
+                  "key": "direction",
+                  "value": "before",
+                  "description": "Pagination direction: before | after (default: before)",
                   "disabled": true
                 }
               ]
             },
-            "description": "Cursor-paginated message list for a group. Also marks messages as read (upserts ChatReadReceipt). Query: limit (max 100), cursor (message ID).",
+            "description": "Cursor-paginated message list for a group. Also marks messages as read (upserts ChatReadReceipt).\n\nQuery params:\n- `limit`: 1-100 (default 50)\n- `cursor`: message UUID — anchor point for pagination\n- `direction`: `before` (older, default) | `after` (newer)\n\nEach message includes sender, reactions array, and replyTo snippet.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -5177,7 +5313,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"content\": \"Hello everyone!\",\n  \"reply_to_id\": null\n}"
+              "raw": "{\n  \"content\": \"Hello everyone!\",\n  \"message_type\": \"text\",\n  \"reply_to_id\": null,\n  \"media_url\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{baseUrl}}/groups/{{groupId}}/messages",
@@ -5190,7 +5331,7 @@
                 "messages"
               ]
             },
-            "description": "Send a message to a group. Requires verified account. Rejected if group chat is locked and caller is not admin/super_admin.",
+            "description": "Send a message to a group (REST fallback). Requires verified account. Rejected if group chat is locked and caller is not admin/super_admin.\n\nBody fields:\n- `content` (string, optional if media provided): message text, max 4000 chars\n- `message_type` (string, optional): `text` | `image` | `file` | `poll` | `voice_note` — defaults to `text`; auto-set to `image` when media file uploaded\n- `media_url` (string, optional): pre-uploaded media URL\n- `reply_to_id` (UUID, optional): ID of the message being replied to — must belong to this group\n\n**To send media**, use `multipart/form-data` with field name `media` (JPEG/PNG/WebP, max 5 MB).",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -5213,6 +5354,60 @@
               }
             }
           ],
+          "response": []
+        },
+        {
+          "name": "Send Group Message with Media",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "media",
+                  "type": "file",
+                  "src": "",
+                  "description": "Image file — JPEG, PNG, or WebP, max 5 MB"
+                },
+                {
+                  "key": "content",
+                  "value": "Check this out!",
+                  "type": "text",
+                  "description": "Optional caption"
+                },
+                {
+                  "key": "reply_to_id",
+                  "value": "",
+                  "type": "text",
+                  "description": "Optional UUID of the message being replied to",
+                  "disabled": true
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/groups/{{groupId}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "{{groupId}}",
+                "messages"
+              ]
+            },
+            "description": "Send a group message with a media attachment using multipart/form-data.\n\nForm fields:\n- `media` (file, required): JPEG/PNG/WebP, max 5 MB — uploaded to Cloudinary, `message_type` auto-set to `image`\n- `content` (text, optional): caption text\n- `reply_to_id` (text, optional): UUID of the message being replied to\n\nRequires verified account. Chat-lock check enforced.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
           "response": []
         },
         {
@@ -5439,9 +5634,17 @@
               ],
               "path": [
                 "conversations"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "dm",
+                  "description": "Filter by type: dm | group. Omit to return both.",
+                  "disabled": true
+                }
               ]
             },
-            "description": "Returns a merged, time-sorted list of all group conversations and personal DM threads the authenticated user participates in. Each item has type ('group' | 'dm'), last_message, and unread_count.",
+            "description": "Returns a merged, time-sorted list of all group conversations and personal DM threads the authenticated user participates in. Each item has type ('group' | 'dm'), last_message, and unread_count.\n\nQuery params:\n- `type`: `dm` | `group` — filter to one type only",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -5507,7 +5710,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"content\": \"Hey, how are you?\"\n}"
+              "raw": "{\n  \"content\": \"Hey, how are you?\",\n  \"message_type\": \"text\",\n  \"reply_to_id\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{baseUrl}}/dm/{{targetUserId}}",
@@ -5519,7 +5727,71 @@
                 "{{targetUserId}}"
               ]
             },
-            "description": "Send a DM to a user. Requires verified account. Both users must share an active group. Block check (either direction) prevents sending.",
+            "description": "Send a DM to a user. Requires verified account. Both users must share an active group. Block check (either direction) prevents sending.\n\nBody fields:\n- `content` (string, optional if media provided): message text, max 4000 chars\n- `message_type` (string, optional): `text` | `image` | `file` | `voice_note` — defaults to `text`; auto-set to `image` when media file uploaded\n- `media_url` (string, optional): pre-uploaded media URL\n- `reply_to_id` (UUID, optional): ID of the DM being replied to — must belong to this conversation\n\n**To send media**, use `multipart/form-data` with field name `media` (JPEG/PNG/WebP, max 5 MB). The image is uploaded to Cloudinary and `media_url` is set automatically.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) { const d = pm.response.json().data; pm.collectionVariables.set('dmId', d.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Send DM with Media",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "media",
+                  "type": "file",
+                  "src": "",
+                  "description": "Image file — JPEG, PNG, or WebP, max 5 MB"
+                },
+                {
+                  "key": "content",
+                  "value": "Check this out!",
+                  "type": "text",
+                  "description": "Optional caption"
+                },
+                {
+                  "key": "reply_to_id",
+                  "value": "",
+                  "type": "text",
+                  "description": "Optional UUID of the DM being replied to",
+                  "disabled": true
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dm/{{targetUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dm",
+                "{{targetUserId}}"
+              ]
+            },
+            "description": "Send a DM with a media attachment using multipart/form-data.\n\nForm fields:\n- `media` (file, required): JPEG/PNG/WebP, max 5 MB — uploaded to Cloudinary, `message_type` auto-set to `image`\n- `content` (text, optional): caption text\n- `reply_to_id` (text, optional): UUID of the DM being replied to\n\nRequires verified account. Same business rules as JSON send.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -5602,6 +5874,124 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Add DM Reaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emoji\": \"\ud83d\udc4d\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dm/{{dmId}}/react",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dm",
+                "{{dmId}}",
+                "react"
+              ]
+            },
+            "description": "Add an emoji reaction to a DM. Caller must be the sender or receiver of the DM. Unique per (dm, user, emoji) \u2014 returns 409 if already reacted with the same emoji.\n\nBroadcasts `dm_reaction_added` socket event to both participants' personal rooms (`user:{id}`).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Reaction added.\",\n  \"data\": null\n}"
+            },
+            {
+              "name": "409 Conflict \u2014 Already reacted",
+              "status": "Conflict",
+              "code": 409,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"success\": false,\n  \"message\": \"You already reacted with this emoji.\",\n  \"data\": null,\n  \"error\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "Remove DM Reaction",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emoji\": \"\ud83d\udc4d\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dm/{{dmId}}/react",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dm",
+                "{{dmId}}",
+                "react"
+              ]
+            },
+            "description": "Remove your emoji reaction from a DM. Returns 404 if the reaction does not exist.\n\nBroadcasts `dm_reaction_removed` socket event to both participants.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Reaction removed.\",\n  \"data\": null\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Reaction not found.\",\n  \"data\": null,\n  \"error\": null\n}"
+            }
+          ]
         }
       ]
     }

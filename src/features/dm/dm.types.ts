@@ -4,7 +4,9 @@ import { Prisma } from '@prisma/client';
 
 export interface SendDmDTO {
     content?: string;
+    message_type?: string;
     media_url?: string;
+    reply_to_id?: string;
 }
 
 export interface UploadedDmMedia {
@@ -28,11 +30,26 @@ export const dmSelect = {
     senderId: true,
     receiverId: true,
     content: true,
+    messageType: true,
     mediaUrl: true,
+    mediaMimeType: true,
+    replyToId: true,
     isRead: true,
     createdAt: true,
     sender:   { select: { id: true, displayName: true, profilePhotoUrl: true } },
     receiver: { select: { id: true, displayName: true, profilePhotoUrl: true } },
+    replyTo: {
+        select: {
+            id: true,
+            content: true,
+            messageType: true,
+            mediaUrl: true,
+            sender: { select: { id: true, displayName: true } },
+        },
+    },
+    reactions: {
+        select: { id: true, emoji: true, userId: true, createdAt: true },
+    },
 } satisfies Prisma.DirectMessageSelect;
 
 export type DmPublic = Prisma.DirectMessageGetPayload<{ select: typeof dmSelect }>;

@@ -21,8 +21,10 @@ export const SocketEvents = {
     DM_SEND: 'dm_send',
 
     // ── DM — server → client ──────────────────────────────────────────────────
-    DM_RECEIVED: 'dm_received',
-    DM_READ:     'dm_read',
+    DM_RECEIVED:         'dm_received',
+    DM_READ:             'dm_read',
+    DM_REACTION_ADDED:   'dm_reaction_added',
+    DM_REACTION_REMOVED: 'dm_reaction_removed',
 
     // ── Errors ────────────────────────────────────────────────────────────────
     ERROR: 'chat_error',

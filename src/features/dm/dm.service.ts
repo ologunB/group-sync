@@ -258,7 +258,23 @@ export class DmService {
                 throw new ApiError('Cannot send DM to this user.', StatusCodes.FORBIDDEN);
             }
 
+            // Validate reply_to_id belongs to this thread
+            if (dto.reply_to_id) {
+                const parent = await prisma.directMessage.findUnique({
+                    where: { id: dto.reply_to_id },
+                    select: { senderId: true, receiverId: true },
+                });
+                const isInThread = parent && (
+                    (parent.senderId === userId && parent.receiverId === otherUserId) ||
+                    (parent.senderId === otherUserId && parent.receiverId === userId)
+                );
+                if (!isInThread) {
+                    throw new ApiError('reply_to_id does not belong to this conversation.', StatusCodes.UNPROCESSABLE_ENTITY);
+                }
+            }
+
             let mediaUrl = dto.media_url ?? null;
+            let messageType = dto.message_type ?? 'text';
 
             if (media) {
                 const result = await StorageService.upload(media.buffer, media.mimeType, {
@@ -267,6 +283,7 @@ export class DmService {
                     transformation: [{ quality: 'auto', fetch_format: 'auto' }],
                 });
                 mediaUrl = result.url;
+                messageType = 'image';
             }
 
             if (!dto.content?.trim() && !mediaUrl) {
@@ -278,7 +295,10 @@ export class DmService {
                     senderId: userId,
                     receiverId: otherUserId,
                     content: dto.content?.trim() ?? null,
+                    messageType,
                     mediaUrl,
+                    mediaMimeType: media?.mimeType ?? null,
+                    replyToId: dto.reply_to_id ?? null,
                 },
                 select: dmSelect,
             });
@@ -330,6 +350,82 @@ export class DmService {
         } catch (error) {
             if (error instanceof ApiError) throw error;
             asLogger.error('DmService.markRead error:', error);
+            throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ── Add reaction ──────────────────────────────────────────────────────────
+
+    async addReaction(dmId: string, emoji: string, actor: TokenPayload): Promise<void> {
+        try {
+            const dm = await prisma.directMessage.findUnique({
+                where: { id: dmId },
+                select: { id: true, senderId: true, receiverId: true },
+            });
+            if (!dm) throw new ApiError(Messages.RESOURCE_NOT_FOUND('Message'), StatusCodes.NOT_FOUND);
+
+            if (dm.senderId !== actor.userId && dm.receiverId !== actor.userId) {
+                throw new ApiError(Messages.FORBIDDEN, StatusCodes.FORBIDDEN);
+            }
+
+            const existing = await prisma.dmReaction.findUnique({
+                where: { dmId_userId_emoji: { dmId, userId: actor.userId, emoji } },
+                select: { id: true },
+            });
+            if (existing) {
+                throw new ApiError('You already reacted with this emoji.', StatusCodes.CONFLICT);
+            }
+
+            await prisma.dmReaction.create({ data: { dmId, userId: actor.userId, emoji } });
+
+            const otherUserId = dm.senderId === actor.userId ? dm.receiverId : dm.senderId;
+            SocketService.emitToRoom(`user:${otherUserId}`, SocketEvents.DM_REACTION_ADDED, {
+                dm_id: dmId,
+                emoji,
+                user_id: actor.userId,
+            });
+            SocketService.emitToRoom(`user:${actor.userId}`, SocketEvents.DM_REACTION_ADDED, {
+                dm_id: dmId,
+                emoji,
+                user_id: actor.userId,
+            });
+        } catch (error) {
+            if (error instanceof ApiError) throw error;
+            asLogger.error('DmService.addReaction error:', error);
+            throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ── Remove reaction ───────────────────────────────────────────────────────
+
+    async removeReaction(dmId: string, emoji: string, actor: TokenPayload): Promise<void> {
+        try {
+            const reaction = await prisma.dmReaction.findUnique({
+                where: { dmId_userId_emoji: { dmId, userId: actor.userId, emoji } },
+                select: { id: true, dm: { select: { senderId: true, receiverId: true } } },
+            });
+            if (!reaction) throw new ApiError(Messages.RESOURCE_NOT_FOUND('Reaction'), StatusCodes.NOT_FOUND);
+
+            await prisma.dmReaction.delete({
+                where: { dmId_userId_emoji: { dmId, userId: actor.userId, emoji } },
+            });
+
+            const otherUserId = reaction.dm.senderId === actor.userId
+                ? reaction.dm.receiverId
+                : reaction.dm.senderId;
+            SocketService.emitToRoom(`user:${otherUserId}`, SocketEvents.DM_REACTION_REMOVED, {
+                dm_id: dmId,
+                emoji,
+                user_id: actor.userId,
+            });
+            SocketService.emitToRoom(`user:${actor.userId}`, SocketEvents.DM_REACTION_REMOVED, {
+                dm_id: dmId,
+                emoji,
+                user_id: actor.userId,
+            });
+        } catch (error) {
+            if (error instanceof ApiError) throw error;
+            asLogger.error('DmService.removeReaction error:', error);
             throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }

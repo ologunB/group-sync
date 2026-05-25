@@ -5,6 +5,7 @@ import { ResponseHelper } from '../../shared/utils/response.helper';
 import { dmService } from './dm.service';
 import { SendDmDTO, ListThreadQuery, ListConversationsQuery } from './dm.types';
 
+
 export class DmController {
     listConversations = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
@@ -57,6 +58,24 @@ export class DmController {
         try {
             await dmService.deleteDm(req.params.dmId, req.user!);
             ResponseHelper.success(res, null, 'Message deleted.');
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    addReaction = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            await dmService.addReaction(req.params.dmId, req.body.emoji, req.user!);
+            ResponseHelper.success(res, null, 'Reaction added.', StatusCodes.CREATED);
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    removeReaction = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            await dmService.removeReaction(req.params.dmId, req.body.emoji, req.user!);
+            ResponseHelper.success(res, null, 'Reaction removed.');
         } catch (error) {
             next(error);
         }

@@ -2730,6 +2730,92 @@ async function runFeaturesSuite(): Promise<void> {
         assertStatus(status, 200);
     });
 
+    // ── DM reply_to ───────────────────────────────────────────────────────────
+
+    let replyDmId = '';
+
+    await test('POST /dm/:userId with reply_to_id sends threaded reply (201)', async () => {
+        // Send a fresh DM first so we have a parent in-thread message
+        const parent = await post(`/dm/${memberId}`, { content: 'Parent message' }, creatorToken);
+        assertStatus(parent.status, 201);
+        const parentDm = parent.data.data as Record<string, unknown>;
+        const parentId = parentDm.id as string;
+
+        const { status, data } = await post(`/dm/${memberId}`, {
+            content: 'Reply to parent',
+            reply_to_id: parentId,
+        }, creatorToken);
+        assertStatus(status, 201);
+        const dm = data.data as Record<string, unknown>;
+        assertHas(dm, 'replyToId');
+        assert(dm.replyToId === parentId, `replyToId mismatch: ${dm.replyToId}`);
+        assertHas(dm, 'replyTo');
+        replyDmId = dm.id as string;
+    });
+
+    await test('POST /dm/:userId with out-of-thread reply_to_id returns 422', async () => {
+        // Use a completely different (non-existent) UUID as reply_to_id
+        const { status } = await post(`/dm/${memberId}`, {
+            content: 'Invalid reply',
+            reply_to_id: '00000000-0000-0000-0000-000000000000',
+        }, creatorToken);
+        assertStatus(status, 422);
+    });
+
+    // ── DM reactions ──────────────────────────────────────────────────────────
+
+    await test('POST /dm/:dmId/react without auth returns 401', async () => {
+        const { status } = await post(`/dm/${replyDmId}/react`, { emoji: '👍' });
+        assertStatus(status, 401);
+    });
+
+    await test('POST /dm/:dmId/react adds reaction (201)', async () => {
+        const { status } = await post(`/dm/${replyDmId}/react`, { emoji: '👍' }, memberToken);
+        assertStatus(status, 201);
+    });
+
+    await test('POST /dm/:dmId/react duplicate reaction returns 409', async () => {
+        const { status } = await post(`/dm/${replyDmId}/react`, { emoji: '👍' }, memberToken);
+        assertStatus(status, 409);
+    });
+
+    await test('POST /dm/:dmId/react missing emoji returns 422', async () => {
+        const { status } = await post(`/dm/${replyDmId}/react`, {}, memberToken);
+        assertStatus(status, 422);
+    });
+
+    await test('POST /dm/:dmId/react by non-participant returns 403', async () => {
+        // Register a fresh user who shares no DM thread with creator
+        const { token: outsiderToken } = await registerAndLogin(`dmreact${ts}@test.io`, 'Outsider1!', 'DmReactOut');
+        const { status } = await post(`/dm/${replyDmId}/react`, { emoji: '❤️' }, outsiderToken);
+        assertStatus(status, 403);
+    });
+
+    await test('DELETE /dm/:dmId/react removes reaction (200)', async () => {
+        const { status } = await del(`/dm/${replyDmId}/react`, memberToken, { emoji: '👍' });
+        assertStatus(status, 200);
+    });
+
+    await test('DELETE /dm/:dmId/react non-existent reaction returns 404', async () => {
+        const { status } = await del(`/dm/${replyDmId}/react`, memberToken, { emoji: '👍' });
+        assertStatus(status, 404);
+    });
+
+    await test('GET /dm/:userId thread includes replyTo and reactions fields', async () => {
+        // Re-add a reaction so we can inspect the shape
+        await post(`/dm/${replyDmId}/react`, { emoji: '🔥' }, creatorToken);
+        const { status, data } = await get(`/dm/${memberId}`, creatorToken);
+        assertStatus(status, 200);
+        const messages = data.data as any[];
+        const reply = messages.find((m: any) => m.id === replyDmId);
+        assert(reply !== undefined, 'reply DM not found in thread');
+        assertHas(reply, 'replyToId');
+        assertHas(reply, 'replyTo');
+        assertHas(reply, 'reactions');
+        assert(Array.isArray(reply.reactions), 'reactions should be an array');
+        assert(reply.reactions.length >= 1, 'expected at least one reaction');
+    });
+
     // ── 15. Socket.io ────────────────────────────────────────────────────────
 
     section('15. Socket.io');

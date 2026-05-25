@@ -3,7 +3,7 @@ import { authenticate, authenticateVerified } from '../../shared/middleware/auth
 import { uploadImage } from '../../shared/middleware/upload.middleware';
 import { validateRequest } from '../../shared/utils/validators';
 import { dmController } from './dm.controller';
-import { sendDmValidator, listThreadValidator, listConversationsValidator } from './dm.validator';
+import { sendDmValidator, listThreadValidator, listConversationsValidator, dmReactionValidator } from './dm.validator';
 
 const router = Router();
 
@@ -21,5 +21,9 @@ router.patch('/dm/:userId/read', authenticate, dmController.markRead);
 
 // Delete a single DM (soft, per-side)
 router.delete('/dm/:dmId', authenticate, dmController.deleteDm);
+
+// Reactions on a DM
+router.post('/dm/:dmId/react', authenticate, validateRequest(dmReactionValidator), dmController.addReaction);
+router.delete('/dm/:dmId/react', authenticate, validateRequest(dmReactionValidator), dmController.removeReaction);
 
 export default router;

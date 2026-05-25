@@ -50,18 +50,41 @@ model DirectMessage {
   senderId            String   @map("sender_id") @db.Uuid
   receiverId          String   @map("receiver_id") @db.Uuid
   content             String?
+  messageType         String   @default("text") @map("message_type") @db.VarChar(20)
   mediaUrl            String?  @map("media_url")
+  mediaMimeType       String?  @map("media_mime_type") @db.VarChar(100)
+  replyToId           String?  @map("reply_to_id") @db.Uuid
   isRead              Boolean  @default(false) @map("is_read")
   isDeletedBySender   Boolean  @default(false) @map("is_deleted_by_sender")
   isDeletedByReceiver Boolean  @default(false) @map("is_deleted_by_receiver")
   createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  sender   User @relation("DMSender", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver User @relation("DMReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender    User            @relation("DMSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver  User            @relation("DMReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  replyTo   DirectMessage?  @relation("DMReplies", fields: [replyToId], references: [id])
+  replies   DirectMessage[] @relation("DMReplies")
+  reactions DmReaction[]
 
   @@index([createdAt(sort: Desc)], map: "idx_dm_created")
   @@index([receiverId, isRead], map: "idx_dm_receiver_unread")
   @@map("direct_messages")
+}
+
+// ─── DmReaction ───────────────────────────────────────────────────────────────
+
+model DmReaction {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dmId      String   @map("dm_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  emoji     String   @db.VarChar(10)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  dm   DirectMessage @relation(fields: [dmId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([dmId, userId, emoji])
+  @@index([dmId], map: "idx_dm_reactions_dm")
+  @@map("dm_reactions")
 }
 
 // ─── ChatReadReceipt ──────────────────────────────────────────────────────────
