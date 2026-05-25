@@ -5305,20 +5305,45 @@
           "name": "Send Group Message",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"content\": \"Hello everyone!\",\n  \"message_type\": \"text\",\n  \"reply_to_id\": null,\n  \"media_url\": null\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "content",
+                  "value": "Hello everyone!",
+                  "type": "text",
+                  "description": "Message text (max 4000 chars). Required if no media file or media_url provided."
+                },
+                {
+                  "key": "media",
+                  "type": "file",
+                  "src": "",
+                  "description": "Media file — JPEG, PNG, or WebP, max 5 MB. Uploaded to Cloudinary; message_type auto-set to 'image'. Omit to send text-only.",
+                  "disabled": true
+                },
+                {
+                  "key": "media_url",
+                  "value": "",
+                  "type": "text",
+                  "description": "Pre-hosted media URL (alternative to file upload). Use this OR the media file field, not both.",
+                  "disabled": true
+                },
+                {
+                  "key": "message_type",
+                  "value": "text",
+                  "type": "text",
+                  "description": "text | image | file | poll | voice_note. Defaults to 'text'; auto-overridden to 'image' when a media file is attached.",
+                  "disabled": true
+                },
+                {
+                  "key": "reply_to_id",
+                  "value": "",
+                  "type": "text",
+                  "description": "UUID of the group message being replied to — must belong to this group.",
+                  "disabled": true
                 }
-              }
+              ]
             },
             "url": {
               "raw": "{{baseUrl}}/groups/{{groupId}}/messages",
@@ -5331,7 +5356,7 @@
                 "messages"
               ]
             },
-            "description": "Send a message to a group (REST fallback). Requires verified account. Rejected if group chat is locked and caller is not admin/super_admin.\n\nBody fields:\n- `content` (string, optional if media provided): message text, max 4000 chars\n- `message_type` (string, optional): `text` | `image` | `file` | `poll` | `voice_note` — defaults to `text`; auto-set to `image` when media file uploaded\n- `media_url` (string, optional): pre-uploaded media URL\n- `reply_to_id` (UUID, optional): ID of the message being replied to — must belong to this group\n\n**To send media**, use `multipart/form-data` with field name `media` (JPEG/PNG/WebP, max 5 MB).",
+            "description": "Send a message to a group. Requires a verified account. Rejected if group chat is locked and caller is not admin/super_admin.\n\n**Form fields:**\n- `content` (text, optional if media provided): message text, max 4000 chars\n- `media` (file, optional): JPEG/PNG/WebP, max 5 MB — uploaded to Cloudinary, `message_type` auto-set to `image`\n- `media_url` (text, optional): pre-hosted media URL — use instead of `media` file when the asset is already uploaded\n- `message_type` (text, optional): `text` | `image` | `file` | `poll` | `voice_note` — defaults to `text`\n- `reply_to_id` (text, optional): UUID of the message being replied to — must belong to this group\n\nAt least one of `content`, `media`, or `media_url` is required.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -5354,60 +5379,6 @@
               }
             }
           ],
-          "response": []
-        },
-        {
-          "name": "Send Group Message with Media",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "formdata",
-              "formdata": [
-                {
-                  "key": "media",
-                  "type": "file",
-                  "src": "",
-                  "description": "Image file — JPEG, PNG, or WebP, max 5 MB"
-                },
-                {
-                  "key": "content",
-                  "value": "Check this out!",
-                  "type": "text",
-                  "description": "Optional caption"
-                },
-                {
-                  "key": "reply_to_id",
-                  "value": "",
-                  "type": "text",
-                  "description": "Optional UUID of the message being replied to",
-                  "disabled": true
-                }
-              ]
-            },
-            "url": {
-              "raw": "{{baseUrl}}/groups/{{groupId}}/messages",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "groups",
-                "{{groupId}}",
-                "messages"
-              ]
-            },
-            "description": "Send a group message with a media attachment using multipart/form-data.\n\nForm fields:\n- `media` (file, required): JPEG/PNG/WebP, max 5 MB — uploaded to Cloudinary, `message_type` auto-set to `image`\n- `content` (text, optional): caption text\n- `reply_to_id` (text, optional): UUID of the message being replied to\n\nRequires verified account. Chat-lock check enforced.",
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            }
-          },
           "response": []
         },
         {
@@ -5702,81 +5673,42 @@
           "name": "Send DM",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"content\": \"Hey, how are you?\",\n  \"message_type\": \"text\",\n  \"reply_to_id\": null\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/dm/{{targetUserId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "dm",
-                "{{targetUserId}}"
-              ]
-            },
-            "description": "Send a DM to a user. Requires verified account. Both users must share an active group. Block check (either direction) prevents sending.\n\nBody fields:\n- `content` (string, optional if media provided): message text, max 4000 chars\n- `message_type` (string, optional): `text` | `image` | `file` | `voice_note` — defaults to `text`; auto-set to `image` when media file uploaded\n- `media_url` (string, optional): pre-uploaded media URL\n- `reply_to_id` (UUID, optional): ID of the DM being replied to — must belong to this conversation\n\n**To send media**, use `multipart/form-data` with field name `media` (JPEG/PNG/WebP, max 5 MB). The image is uploaded to Cloudinary and `media_url` is set automatically.",
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 201) { const d = pm.response.json().data; pm.collectionVariables.set('dmId', d.id); }"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "response": []
-        },
-        {
-          "name": "Send DM with Media",
-          "request": {
-            "method": "POST",
             "header": [],
             "body": {
               "mode": "formdata",
               "formdata": [
                 {
+                  "key": "content",
+                  "value": "Hey, how are you?",
+                  "type": "text",
+                  "description": "Message text (max 4000 chars). Required if no media file or media_url provided."
+                },
+                {
                   "key": "media",
                   "type": "file",
                   "src": "",
-                  "description": "Image file — JPEG, PNG, or WebP, max 5 MB"
+                  "description": "Media file — JPEG, PNG, or WebP, max 5 MB. Uploaded to Cloudinary; message_type auto-set to 'image'. Omit to send text-only.",
+                  "disabled": true
                 },
                 {
-                  "key": "content",
-                  "value": "Check this out!",
+                  "key": "media_url",
+                  "value": "",
                   "type": "text",
-                  "description": "Optional caption"
+                  "description": "Pre-hosted media URL (alternative to file upload). Use this OR the media file field, not both.",
+                  "disabled": true
+                },
+                {
+                  "key": "message_type",
+                  "value": "text",
+                  "type": "text",
+                  "description": "text | image | file | voice_note. Defaults to 'text'; auto-overridden to 'image' when a media file is attached.",
+                  "disabled": true
                 },
                 {
                   "key": "reply_to_id",
                   "value": "",
                   "type": "text",
-                  "description": "Optional UUID of the DM being replied to",
+                  "description": "UUID of the DM being replied to — must belong to this two-user conversation.",
                   "disabled": true
                 }
               ]
@@ -5791,7 +5723,7 @@
                 "{{targetUserId}}"
               ]
             },
-            "description": "Send a DM with a media attachment using multipart/form-data.\n\nForm fields:\n- `media` (file, required): JPEG/PNG/WebP, max 5 MB — uploaded to Cloudinary, `message_type` auto-set to `image`\n- `content` (text, optional): caption text\n- `reply_to_id` (text, optional): UUID of the DM being replied to\n\nRequires verified account. Same business rules as JSON send.",
+            "description": "Send a direct message to a user. Requires a verified account. Both users must share an active group membership. Block check (either direction) prevents sending.\n\n**Form fields:**\n- `content` (text, optional if media provided): message text, max 4000 chars\n- `media` (file, optional): JPEG/PNG/WebP, max 5 MB — uploaded to Cloudinary, `message_type` auto-set to `image`\n- `media_url` (text, optional): pre-hosted media URL — use instead of `media` file when the asset is already uploaded\n- `message_type` (text, optional): `text` | `image` | `file` | `voice_note` — defaults to `text`\n- `reply_to_id` (text, optional): UUID of the DM being replied to — must belong to this conversation\n\nAt least one of `content`, `media`, or `media_url` is required.",
             "auth": {
               "type": "bearer",
               "bearer": [
