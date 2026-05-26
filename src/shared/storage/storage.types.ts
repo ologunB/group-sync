@@ -3,6 +3,7 @@ export interface UploadOptions {
     publicId?: string;
     maxBytes?: number;
     transformation?: Record<string, unknown>[];
+    resourceType?: 'image' | 'audio';
 }
 
 export interface UploadResult {

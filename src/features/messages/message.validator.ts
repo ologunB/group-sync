@@ -7,7 +7,7 @@ export const sendMessageValidator = [
         .isLength({ max: 4000 }).withMessage('Content must be at most 4000 characters'),
     body('message_type')
         .optional()
-        .isIn(['text', 'image', 'file', 'poll', 'voice_note'])
+        .isIn(['text', 'image', 'audio', 'poll'])
         .withMessage('Invalid message type'),
     body('media_url')
         .optional({ nullable: true })
@@ -33,4 +33,10 @@ export const toggleChatLockValidator = [
     body('locked')
         .exists().withMessage('locked is required')
         .isBoolean().withMessage('locked must be a boolean'),
+];
+
+export const votePollValidator = [
+    body('option_id')
+        .exists().withMessage('option_id is required')
+        .isUUID().withMessage('option_id must be a UUID'),
 ];

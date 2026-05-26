@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
 import { authenticate, authenticateVerified } from '../../shared/middleware/auth.middleware';
-import { uploadImage } from '../../shared/middleware/upload.middleware';
+import { uploadMedia } from '../../shared/middleware/upload.middleware';
 import { validateRequest } from '../../shared/utils/validators';
 import { messageController } from './message.controller';
 import {
     sendMessageValidator,
     listMessagesValidator,
     toggleChatLockValidator,
+    votePollValidator,
 } from './message.validator';
 
 const router = Router();
@@ -33,7 +34,7 @@ router.get('/groups/:id/messages',
 
 router.post('/groups/:id/messages',
     authenticateVerified,
-    uploadImage('media'),
+    uploadMedia('media'),
     validateRequest(sendMessageValidator),
     messageController.sendMessage,
 );
@@ -67,6 +68,18 @@ router.delete('/messages/:id/react',
     authenticate,
     validateRequest(reactionValidator),
     messageController.removeReaction,
+);
+
+router.post('/messages/:id/poll/vote',
+    authenticate,
+    validateRequest(votePollValidator),
+    messageController.votePoll,
+);
+
+router.delete('/messages/:id/poll/vote',
+    authenticate,
+    validateRequest(votePollValidator),
+    messageController.unvotePoll,
 );
 
 export default router;

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate, authenticateVerified } from '../../shared/middleware/auth.middleware';
-import { uploadImage } from '../../shared/middleware/upload.middleware';
+import { uploadMedia } from '../../shared/middleware/upload.middleware';
 import { validateRequest } from '../../shared/utils/validators';
 import { dmController } from './dm.controller';
 import { sendDmValidator, listThreadValidator, listConversationsValidator, dmReactionValidator } from './dm.validator';
@@ -14,7 +14,7 @@ router.get('/conversations', authenticate, validateRequest(listConversationsVali
 router.get('/dm/:userId', authenticate, validateRequest(listThreadValidator), dmController.getThread);
 
 // Send DM
-router.post('/dm/:userId', authenticateVerified, uploadImage('media'), validateRequest(sendDmValidator), dmController.sendDm);
+router.post('/dm/:userId', authenticateVerified, uploadMedia('media'), validateRequest(sendDmValidator), dmController.sendDm);
 
 // Mark thread as read
 router.patch('/dm/:userId/read', authenticate, dmController.markRead);

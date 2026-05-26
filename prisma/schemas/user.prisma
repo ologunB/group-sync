@@ -47,6 +47,7 @@ model User {
   messagesSent         Message[]                 @relation("MessageSender")
   messageReactions     MessageReaction[]
   dmReactions          DmReaction[]
+  pollVotes            PollVote[]
   directMessagesSent   DirectMessage[]           @relation("DMSender")
   directMessagesRecv   DirectMessage[]           @relation("DMReceiver")
   chatReadReceipts     ChatReadReceipt[]

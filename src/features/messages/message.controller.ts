@@ -3,7 +3,7 @@ import { StatusCodes } from 'http-status-codes';
 import { AuthenticatedRequest } from '../../shared/middleware/auth.middleware';
 import { ResponseHelper } from '../../shared/utils/response.helper';
 import { messageService } from './message.service';
-import { SendMessageDTO, ListMessagesQuery, ToggleChatLockDTO } from './message.types';
+import { SendMessageDTO, VotePollDTO, ListMessagesQuery, ToggleChatLockDTO } from './message.types';
 
 export class MessageController {
     listMessages = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
@@ -73,6 +73,24 @@ export class MessageController {
         try {
             const messages = await messageService.listPinned(req.params.id, req.user!);
             ResponseHelper.success(res, messages, 'Pinned messages retrieved.');
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    votePoll = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const result = await messageService.votePoll(req.params.id, req.body as VotePollDTO, req.user!);
+            ResponseHelper.success(res, result, 'Vote recorded.', StatusCodes.CREATED);
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    unvotePoll = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const result = await messageService.unvotePoll(req.params.id, req.body as VotePollDTO, req.user!);
+            ResponseHelper.success(res, result, 'Vote removed.');
         } catch (error) {
             next(error);
         }

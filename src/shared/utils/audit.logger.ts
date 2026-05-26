@@ -63,6 +63,8 @@ export const LogActions = {
     MESSAGE_SEND:             'message.send',
     MESSAGE_DELETE:           'message.delete',
     MESSAGE_PIN:              'message.pin',
+    POLL_VOTE:                'poll.vote',
+    POLL_UNVOTE:              'poll.unvote',
     // DMs
     DM_SEND:                  'dm.send',
     DM_REACTION_ADD:          'dm.reaction_add',

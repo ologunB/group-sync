@@ -7,7 +7,7 @@ export const sendDmValidator = [
         .isLength({ max: 4000 }).withMessage('Content must be at most 4000 characters'),
     body('message_type')
         .optional()
-        .isIn(['text', 'image', 'file', 'voice_note'])
+        .isIn(['text', 'image', 'audio'])
         .withMessage('Invalid message type'),
     body('media_url')
         .optional({ nullable: true })

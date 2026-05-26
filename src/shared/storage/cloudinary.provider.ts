@@ -12,16 +12,19 @@ export class CloudinaryProvider implements StorageProvider {
     }
 
     upload(buffer: Buffer, _mimeType: string, options: UploadOptions = {}): Promise<UploadResult> {
+        const isAudio = options.resourceType === 'audio';
         return new Promise((resolve, reject) => {
             const stream = cloudinary.uploader.upload_stream(
                 {
                     folder:          options.folder,
                     public_id:       options.publicId,
-                    resource_type:   'image',
-                    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-                    transformation:  options.transformation ?? [
+                    resource_type:   isAudio ? 'video' : 'image', // Cloudinary uses 'video' for audio
+                    allowed_formats: isAudio
+                        ? ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'opus', 'flac']
+                        : ['jpg', 'jpeg', 'png', 'webp'],
+                    transformation:  isAudio ? undefined : (options.transformation ?? [
                         { quality: 'auto', fetch_format: 'auto' },
-                    ],
+                    ]),
                     overwrite: true,
                 },
                 (error, result) => {

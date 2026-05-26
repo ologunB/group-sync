@@ -19,11 +19,58 @@ model Message {
   replyTo   Message?          @relation("MessageReplies", fields: [replyToId], references: [id])
   replies   Message[]         @relation("MessageReplies")
   reactions MessageReaction[]
+  poll      Poll?
 
   @@index([groupId, createdAt(sort: Desc)], map: "idx_messages_group_created")
   @@index([senderId], map: "idx_messages_sender")
   @@index([groupId, isPinned], map: "idx_messages_pinned")
   @@map("messages")
+}
+
+// ─── Poll ─────────────────────────────────────────────────────────────────────
+
+model Poll {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  messageId  String    @unique @map("message_id") @db.Uuid
+  question   String    @db.VarChar(500)
+  isMultiple Boolean   @default(false) @map("is_multiple")
+  endsAt     DateTime? @map("ends_at") @db.Timestamptz
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  message Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  options PollOption[]
+  votes   PollVote[]
+
+  @@map("polls")
+}
+
+model PollOption {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pollId   String @map("poll_id") @db.Uuid
+  text     String @db.VarChar(200)
+  position Int    @default(0)
+
+  poll  Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes PollVote[]
+
+  @@index([pollId], map: "idx_poll_options_poll")
+  @@map("poll_options")
+}
+
+model PollVote {
+  id       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  optionId String   @map("option_id") @db.Uuid
+  pollId   String   @map("poll_id") @db.Uuid
+  userId   String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  option PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  poll   Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([optionId, userId])
+  @@index([pollId, userId], map: "idx_poll_votes_poll_user")
+  @@map("poll_votes")
 }
 
 // ─── MessageReaction ─────────────────────────────────────────────────────────

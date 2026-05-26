@@ -97,6 +97,16 @@
       "type": "string"
     },
     {
+      "key": "pollMessageId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "pollOptionId",
+      "value": "",
+      "type": "string"
+    },
+    {
       "key": "socketUrl",
       "value": "http://localhost:3000",
       "type": "string",
@@ -5333,7 +5343,7 @@
                   "key": "message_type",
                   "value": "text",
                   "type": "text",
-                  "description": "text | image | file | poll | voice_note. Defaults to 'text'; auto-overridden to 'image' when a media file is attached.",
+                  "description": "text | image | audio | poll. Defaults to 'text'; auto-overridden when a media file is attached.",
                   "disabled": true
                 },
                 {
@@ -5356,7 +5366,7 @@
                 "messages"
               ]
             },
-            "description": "Send a message to a group. Requires a verified account. Rejected if group chat is locked and caller is not admin/super_admin.\n\n**Form fields:**\n- `content` (text, optional if media provided): message text, max 4000 chars\n- `media` (file, optional): JPEG/PNG/WebP, max 5 MB — uploaded to Cloudinary, `message_type` auto-set to `image`\n- `media_url` (text, optional): pre-hosted media URL — use instead of `media` file when the asset is already uploaded\n- `message_type` (text, optional): `text` | `image` | `file` | `poll` | `voice_note` — defaults to `text`\n- `reply_to_id` (text, optional): UUID of the message being replied to — must belong to this group\n\nAt least one of `content`, `media`, or `media_url` is required.",
+            "description": "Send a message to a group. Requires a verified account. Rejected if group chat is locked and caller is not admin/super_admin.\n\n**Form fields:**\n- `content` (text, optional if media provided): message text, max 4000 chars\n- `media` (file, optional): JPEG/PNG/WebP ≤5 MB or MP3/OGG/WAV/M4A/AAC ≤20 MB — uploaded to Cloudinary\n- `media_url` (text, optional): pre-hosted media URL — use instead of `media` file\n- `message_type` (text, optional): `text` | `image` | `audio` | `poll` — defaults to `text`\n- `reply_to_id` (text, optional): UUID of the message being replied to\n\nFor polls omit `content`/`media` and send a JSON body instead — see **Create Poll Message**.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -5379,6 +5389,151 @@
               }
             }
           ],
+          "response": []
+        },
+        {
+          "name": "Create Poll Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message_type\": \"poll\",\n  \"poll\": {\n    \"question\": \"What time should we meet?\",\n    \"is_multiple\": false,\n    \"ends_at\": null,\n    \"options\": [\n      { \"text\": \"10:00 AM\", \"position\": 0 },\n      { \"text\": \"2:00 PM\",  \"position\": 1 },\n      { \"text\": \"6:00 PM\",  \"position\": 2 }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/groups/{{groupId}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "{{groupId}}",
+                "messages"
+              ]
+            },
+            "description": "Send a poll to a group chat. The caller must be a verified, active member.\n\n**Body (JSON):**\n- `message_type` (required): must be `\"poll\"`\n- `poll.question` (required): max 500 chars\n- `poll.is_multiple` (optional, default `false`): allow members to vote on multiple options\n- `poll.ends_at` (optional): ISO-8601 datetime when voting closes\n- `poll.options` (required): array of 2–10 objects with `text` (max 200 chars) and optional `position` (sort order)\n\nReturns the full message object with the embedded `poll` including all options.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) { const d = pm.response.json().data; pm.collectionVariables.set('pollMessageId', d.id); pm.collectionVariables.set('pollOptionId', d.poll.options[0].id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Vote on Poll",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"option_id\": \"{{pollOptionId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/messages/{{pollMessageId}}/poll/vote",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "messages",
+                "{{pollMessageId}}",
+                "poll",
+                "vote"
+              ]
+            },
+            "description": "Cast a vote on a poll option. The caller must be an active member of the group that owns the message.\n\n**Body:**\n- `option_id` (required, UUID): ID of the `PollOption` to vote on\n\n**Rules:**\n- If the poll is single-choice (`is_multiple: false`), voting on a second option returns 409\n- Voting on the same option twice returns 409\n- Voting after `ends_at` returns 422\n\nEmits a `poll_vote_updated` socket event to the group room.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Vote from Poll",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"option_id\": \"{{pollOptionId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/messages/{{pollMessageId}}/poll/vote",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "messages",
+                "{{pollMessageId}}",
+                "poll",
+                "vote"
+              ]
+            },
+            "description": "Remove a previously cast vote from a poll option.\n\n**Body:**\n- `option_id` (required, UUID): ID of the `PollOption` to un-vote\n\nReturns 404 if the caller has not voted on this option. Emits a `poll_vote_updated` socket event to the group room.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
           "response": []
         },
         {

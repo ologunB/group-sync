@@ -26,6 +26,9 @@ export const SocketEvents = {
     DM_REACTION_ADDED:   'dm_reaction_added',
     DM_REACTION_REMOVED: 'dm_reaction_removed',
 
+    // ── Polls — server → client ───────────────────────────────────────────────
+    POLL_VOTE_UPDATED: 'poll_vote_updated',
+
     // ── Errors ────────────────────────────────────────────────────────────────
     ERROR: 'chat_error',
 } as const;

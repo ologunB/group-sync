@@ -3,40 +3,56 @@ import { Request, Response, NextFunction } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { ApiError } from './error.middleware';
 
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-const MAX_FILE_SIZE      = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const ALLOWED_AUDIO_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/ogg', 'audio/wav', 'audio/x-wav',
+                              'audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac', 'audio/opus',
+                              'audio/flac', 'audio/webm'];
 
-function imageFilter(_req: Request, file: Express.Multer.File, cb: FileFilterCallback): void {
-    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+const IMAGE_MAX = 5  * 1024 * 1024; // 5 MB
+const AUDIO_MAX = 20 * 1024 * 1024; // 20 MB
+
+function makeFilter(cb: FileFilterCallback, file: Express.Multer.File, allowed: string[], label: string): void {
+    if (allowed.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error('Only JPEG, PNG, and WebP images are allowed'));
+        cb(new Error(`Only ${label} files are allowed`));
     }
 }
 
-const multerInstance = multer({
+// Image-only uploader (existing behaviour, unchanged)
+const imageMulter = multer({
     storage:    multer.memoryStorage(),
-    limits:     { fileSize: MAX_FILE_SIZE },
-    fileFilter: imageFilter,
+    limits:     { fileSize: IMAGE_MAX },
+    fileFilter: (_req, file, cb) => makeFilter(cb, file, ALLOWED_IMAGE_TYPES, 'JPEG, PNG, and WebP image'),
 });
 
-// Wraps multer.single() so that:
-//   - LIMIT_FILE_SIZE   → 413 Payload Too Large
-//   - fileFilter errors → 422 Unprocessable Entity
-//   - Other multer errors → 422
-export const uploadImage = (fieldName: string) =>
-    (req: Request, res: Response, next: NextFunction): void => {
-        multerInstance.single(fieldName)(req, res, (err) => {
-            if (!err) return next();
+// Image + audio uploader (for group messages and DMs)
+const mediaMulter = multer({
+    storage: multer.memoryStorage(),
+    limits:  { fileSize: AUDIO_MAX },
+    fileFilter: (_req, file, cb) => {
+        if ([...ALLOWED_IMAGE_TYPES, ...ALLOWED_AUDIO_TYPES].includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only image (JPEG/PNG/WebP) or audio (MP3/OGG/WAV/M4A/AAC/OPUS) files are allowed'));
+        }
+    },
+});
 
+function wrapMulter(instance: multer.Multer, fieldName: string, maxMb: number) {
+    return (req: Request, res: Response, next: NextFunction): void => {
+        instance.single(fieldName)(req, res, (err) => {
+            if (!err) return next();
             if (err instanceof multer.MulterError) {
                 if (err.code === 'LIMIT_FILE_SIZE') {
-                    return next(new ApiError(`File too large. Maximum allowed size is ${MAX_FILE_SIZE / (1024 * 1024)} MB.`, StatusCodes.REQUEST_TOO_LONG));
+                    return next(new ApiError(`File too large. Maximum allowed size is ${maxMb} MB.`, StatusCodes.REQUEST_TOO_LONG));
                 }
                 return next(new ApiError(err.message, StatusCodes.UNPROCESSABLE_ENTITY));
             }
-
-            // fileFilter rejection (plain Error)
             return next(new ApiError(err.message, StatusCodes.UNPROCESSABLE_ENTITY));
         });
     };
+}
+
+export const uploadImage = (fieldName: string) => wrapMulter(imageMulter, fieldName, IMAGE_MAX / (1024 * 1024));
+export const uploadMedia  = (fieldName: string) => wrapMulter(mediaMulter, fieldName, AUDIO_MAX / (1024 * 1024));

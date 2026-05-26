@@ -2527,6 +2527,36 @@ async function runFeaturesSuite(): Promise<void> {
         assert(typeof msg.mediaUrl === 'string' && (msg.mediaUrl as string).startsWith('https://'), 'expected mediaUrl HTTPS string');
     });
 
+    await test('POST /groups/:id/messages with message_type text sends text message (201)', async () => {
+        const { status, data } = await post(`/groups/${openGroupId}/messages`, {
+            content: 'Plain text message',
+            message_type: 'text',
+        }, memberToken);
+        assertStatus(status, 201);
+        const msg = data.data as Record<string, unknown>;
+        assert(msg.messageType === 'text', `expected messageType=text, got ${msg.messageType}`);
+        assert(msg.content === 'Plain text message', 'content mismatch');
+    });
+
+    await test('POST /groups/:id/messages with media_url sends image by URL (201)', async () => {
+        const { status, data } = await post(`/groups/${openGroupId}/messages`, {
+            message_type: 'image',
+            media_url: 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
+        }, memberToken);
+        assertStatus(status, 201);
+        const msg = data.data as Record<string, unknown>;
+        assert(msg.messageType === 'image', `expected messageType=image, got ${msg.messageType}`);
+        assert(typeof msg.mediaUrl === 'string', 'expected mediaUrl string');
+    });
+
+    await test('POST /groups/:id/messages with invalid message_type returns 422', async () => {
+        const { status } = await post(`/groups/${openGroupId}/messages`, {
+            content: 'hi',
+            message_type: 'voice_note',
+        }, memberToken);
+        assertStatus(status, 422);
+    });
+
     await test('POST /groups/:id/messages with reply_to_id sends threaded reply (201)', async () => {
         const { status, data } = await post(
             `/groups/${openGroupId}/messages`,
@@ -2619,6 +2649,110 @@ async function runFeaturesSuite(): Promise<void> {
 
     await test('DELETE /messages/:id already deleted returns 404', async () => {
         const { status } = await del(`/messages/${messageId}`, memberToken);
+        assertStatus(status, 404);
+    });
+
+    // ── Polls ─────────────────────────────────────────────────────────────────
+
+    let pollMessageId = '';
+    let pollOptionId  = '';
+
+    await test('POST /groups/:id/messages with message_type poll creates poll (201)', async () => {
+        const { status, data } = await post(`/groups/${openGroupId}/messages`, {
+            message_type: 'poll',
+            poll: {
+                question:    'What is your favourite colour?',
+                options:     ['Red', 'Green', 'Blue'],
+                is_multiple: false,
+            },
+        }, creatorToken);
+        assertStatus(status, 201);
+        const msg = data.data as Record<string, unknown>;
+        assert(msg.messageType === 'poll', `expected messageType=poll, got ${msg.messageType}`);
+        assertHas(msg, 'poll');
+        const poll = msg.poll as Record<string, unknown>;
+        assert(poll.question === 'What is your favourite colour?', 'question mismatch');
+        const options = poll.options as any[];
+        assert(options.length === 3, `expected 3 options, got ${options.length}`);
+        pollMessageId = msg.id as string;
+        pollOptionId  = options[0].id as string;
+    });
+
+    await test('POST /groups/:id/messages with poll but < 2 options returns 422', async () => {
+        const { status } = await post(`/groups/${openGroupId}/messages`, {
+            message_type: 'poll',
+            poll: { question: 'Solo?', options: ['Only one'] },
+        }, creatorToken);
+        assertStatus(status, 422);
+    });
+
+    await test('POST /groups/:id/messages with poll but no question returns 422', async () => {
+        const { status } = await post(`/groups/${openGroupId}/messages`, {
+            message_type: 'poll',
+            poll: { options: ['A', 'B'] },
+        }, creatorToken);
+        assertStatus(status, 422);
+    });
+
+    await test('POST /messages/:id/poll/vote without auth returns 401', async () => {
+        const { status } = await post(`/messages/${pollMessageId}/poll/vote`, { option_id: pollOptionId });
+        assertStatus(status, 401);
+    });
+
+    await test('POST /messages/:id/poll/vote records vote (201)', async () => {
+        const { status, data } = await post(`/messages/${pollMessageId}/poll/vote`, { option_id: pollOptionId }, memberToken);
+        assertStatus(status, 201);
+        const msg = data.data as Record<string, unknown>;
+        const poll = msg.poll as Record<string, unknown>;
+        const options = poll.options as any[];
+        const voted = options.find((o: any) => o.id === pollOptionId);
+        assert(voted._count.votes === 1, `expected 1 vote, got ${voted._count.votes}`);
+        assert(voted.votes.some((v: any) => v.userId === memberId), 'memberToken vote not reflected');
+    });
+
+    await test('POST /messages/:id/poll/vote duplicate returns 409', async () => {
+        const { status } = await post(`/messages/${pollMessageId}/poll/vote`, { option_id: pollOptionId }, memberToken);
+        assertStatus(status, 409);
+    });
+
+    await test('POST /messages/:id/poll/vote on second option (single-choice) returns 409', async () => {
+        // member already voted for pollOptionId; single-choice poll prevents voting on another option
+        const pollData = (await get(`/groups/${openGroupId}/messages`, memberToken)).data.data as any[];
+        const ourPoll  = pollData.find((m: any) => m.id === pollMessageId);
+        const secondOption = (ourPoll.poll.options as any[]).find((o: any) => o.id !== pollOptionId);
+        const { status } = await post(`/messages/${pollMessageId}/poll/vote`, { option_id: secondOption.id }, memberToken);
+        assertStatus(status, 409);
+    });
+
+    await test('DELETE /messages/:id/poll/vote removes vote (200)', async () => {
+        const { status, data } = await del(`/messages/${pollMessageId}/poll/vote`, memberToken, { option_id: pollOptionId });
+        assertStatus(status, 200);
+        const poll = ((data.data as Record<string, unknown>).poll as Record<string, unknown>);
+        const options = poll.options as any[];
+        const unvoted = options.find((o: any) => o.id === pollOptionId);
+        assert(unvoted._count.votes === 0, `expected 0 votes after unvote, got ${unvoted._count.votes}`);
+    });
+
+    await test('DELETE /messages/:id/poll/vote non-existent vote returns 404', async () => {
+        const { status } = await del(`/messages/${pollMessageId}/poll/vote`, memberToken, { option_id: pollOptionId });
+        assertStatus(status, 404);
+    });
+
+    await test('POST /messages/:id/poll/vote with invalid option_id returns 422', async () => {
+        const { status } = await post(`/messages/${pollMessageId}/poll/vote`, { option_id: 'not-a-uuid' }, memberToken);
+        assertStatus(status, 422);
+    });
+
+    await test('POST /messages/:id/poll/vote with option from wrong poll returns 404', async () => {
+        // Create a second poll and try to vote its option on the first poll's message
+        const p2 = await post(`/groups/${openGroupId}/messages`, {
+            message_type: 'poll',
+            poll: { question: 'Other poll', options: ['X', 'Y'] },
+        }, creatorToken);
+        assertStatus(p2.status, 201);
+        const otherOption = ((p2.data.data as any).poll.options as any[])[0].id as string;
+        // Vote that option against the ORIGINAL poll message — should be 404 (option not in this poll)
+        const { status } = await post(`/messages/${pollMessageId}/poll/vote`, { option_id: otherOption }, memberToken);
         assertStatus(status, 404);
     });
 
