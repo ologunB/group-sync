@@ -20,8 +20,10 @@ export class CloudinaryProvider implements StorageProvider {
                     public_id:       options.publicId,
                     resource_type:   isAudio ? 'video' : 'image', // Cloudinary uses 'video' for audio
                     allowed_formats: isAudio ? undefined : ['jpg', 'jpeg', 'png', 'webp'],
-                    // Transcode all audio to mp3 — multer already validates the input format
-                    format:          isAudio ? 'mp3' : undefined,
+                    // Transcode to mp3 synchronously — eager with async:false blocks until
+                    // conversion is done so secure_url already points to the .mp3 file.
+                    eager:           isAudio ? [{ format: 'mp3' }] : undefined,
+                    eager_async:     isAudio ? false : undefined,
                     transformation:  isAudio ? undefined : (options.transformation ?? [
                         { quality: 'auto', fetch_format: 'auto' },
                     ]),
@@ -29,8 +31,10 @@ export class CloudinaryProvider implements StorageProvider {
                 },
                 (error, result) => {
                     if (error || !result) return reject(error ?? new Error('Cloudinary upload failed'));
+                    // For audio uploads, use the eager-transformed mp3 URL
+                    const url = (result.eager?.[0]?.secure_url as string | undefined) ?? result.secure_url;
                     resolve({
-                        url:      result.secure_url,
+                        url,
                         publicId: result.public_id,
                         format:   result.format,
                         bytes:    result.bytes,

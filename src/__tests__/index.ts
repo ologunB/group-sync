@@ -2954,6 +2954,19 @@ async function runFeaturesSuite(): Promise<void> {
 
     section('15. Socket.io');
 
+    // Re-login to get fresh tokens — sections 12-14 may take >15 min when DB is slow,
+    // causing the original JWT (15-min TTL) to expire before socket tests run.
+    await test('refresh tokens before socket tests', async () => {
+        const { data: cd } = await post('/auth/login', { email: CREATOR_EMAIL, password: CREATOR_PASS });
+        const { data: md } = await post('/auth/login', { email: MEMBER_EMAIL,  password: MEMBER_PASS  });
+        const freshCreator = ((cd.data as any)?.tokens as any)?.accessToken as string;
+        const freshMember  = ((md.data as any)?.tokens as any)?.accessToken as string;
+        assert(freshCreator?.length > 0, `Creator re-login failed: ${JSON.stringify(cd)}`);
+        assert(freshMember?.length  > 0, `Member re-login failed: ${JSON.stringify(md)}`);
+        creatorToken = freshCreator;
+        memberToken  = freshMember;
+    });
+
     const SOCKET_URL = 'http://localhost:3000/chat';
 
     function connectSocket(token: string): Promise<ClientSocket> {
@@ -2969,7 +2982,8 @@ async function runFeaturesSuite(): Promise<void> {
         });
     }
 
-    function waitForEvent(s: ClientSocket, event: string, timeoutMs = 3000): Promise<unknown> {
+    function waitForEvent(s: ClientSocket | null, event: string, timeoutMs = 3000): Promise<unknown> {
+        if (!s) return Promise.reject(new Error('Socket is not connected'));
         return new Promise((resolve, reject) => {
             const timer = setTimeout(
                 () => reject(new Error(`Timeout (${timeoutMs}ms) waiting for "${event}"`)),
