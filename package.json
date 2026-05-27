@@ -9,7 +9,7 @@
     "build": "tsc",
     "db:generate": "prisma generate --schema=prisma/schemas",
     "db:push": "prisma db push --schema=prisma/schemas",
-    "db:migrate": "prisma migrate deploy --schema=prisma/schemas",
+    "db:migrate": "prisma migrate deploy",
     "db:dev": "prisma migrate dev --schema=prisma/schemas",
     "db:studio": "prisma studio --schema=prisma/schemas",
     "db:pull": "prisma db pull --schema=prisma/schemas",

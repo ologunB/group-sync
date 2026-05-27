@@ -9,6 +9,9 @@ export default defineConfig({
         path: "prisma/migrations",
     },
     datasource: {
-        url: env("DATABASE_URL"),
+        // Runtime PrismaClient uses the PrismaPg adapter (connection.ts) and ignores this URL.
+        // This URL is only used by Prisma CLI (migrate, studio) — use the session-mode pooler
+        // which supports DDL statements, unlike the transaction-mode pooler (DATABASE_URL).
+        url: env("DIRECT_URL"),
     },
 });

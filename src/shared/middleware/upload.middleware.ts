@@ -6,7 +6,8 @@ import { ApiError } from './error.middleware';
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 const ALLOWED_AUDIO_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/ogg', 'audio/wav', 'audio/x-wav',
                               'audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac', 'audio/opus',
-                              'audio/flac', 'audio/webm'];
+                              'audio/flac', 'audio/webm',
+                              'video/webm']; // Chrome/Edge MediaRecorder reports audio as video/webm
 
 const IMAGE_MAX = 5  * 1024 * 1024; // 5 MB
 const AUDIO_MAX = 20 * 1024 * 1024; // 20 MB

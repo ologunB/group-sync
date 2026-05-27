@@ -13,7 +13,7 @@ import { EncryptionUtil } from '../shared/utils/encryption';
 import { io as ioClient, Socket as ClientSocket } from 'socket.io-client';
 import { SocketEvents } from '../shared/socket/socket.events';
 
-const BASE = Boolean(false) ? 'https://group-sync-ovzh.onrender.com/api/v1' : 'http://localhost:3000/api/v1';
+const BASE = Boolean(true) ? 'https://group-sync-ovzh.onrender.com/api/v1' : 'http://localhost:3000/api/v1';
 const ts = Date.now();
 
 // ─── Shared assertion helpers ─────────────────────────────────────────────────

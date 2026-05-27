@@ -20,7 +20,7 @@ export class CloudinaryProvider implements StorageProvider {
                     public_id:       options.publicId,
                     resource_type:   isAudio ? 'video' : 'image', // Cloudinary uses 'video' for audio
                     allowed_formats: isAudio
-                        ? ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'opus', 'flac']
+                        ? ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'opus', 'flac', 'webm']
                         : ['jpg', 'jpeg', 'png', 'webp'],
                     transformation:  isAudio ? undefined : (options.transformation ?? [
                         { quality: 'auto', fetch_format: 'auto' },

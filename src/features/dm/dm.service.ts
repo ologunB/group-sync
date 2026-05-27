@@ -277,13 +277,15 @@ export class DmService {
             let messageType = dto.message_type ?? 'text';
 
             if (media) {
+                const isAudio = media.mimeType.startsWith('audio/') || media.mimeType === 'video/webm';
                 const result = await StorageService.upload(media.buffer, media.mimeType, {
-                    folder:   `groupsync/dms/${userId}`,
-                    publicId: `${otherUserId}-${Date.now()}-${randomUUID()}`,
-                    transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+                    folder:         `groupsync/dms/${userId}`,
+                    publicId:       `${otherUserId}-${Date.now()}-${randomUUID()}`,
+                    resourceType:   isAudio ? 'audio' : 'image',
+                    transformation: isAudio ? undefined : [{ quality: 'auto', fetch_format: 'auto' }],
                 });
                 mediaUrl = result.url;
-                messageType = 'image';
+                messageType = isAudio ? 'audio' : 'image';
             }
 
             if (!dto.content?.trim() && !mediaUrl) {
