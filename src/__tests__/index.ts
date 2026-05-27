@@ -8,7 +8,6 @@
  *   2. Run tests:         npx tsx src/__tests__/index.ts
  */
 
-import { redis, prisma } from '../database/connection';
 import { EncryptionUtil } from '../shared/utils/encryption';
 import { io as ioClient, Socket as ClientSocket } from 'socket.io-client';
 import { SocketEvents } from '../shared/socket/socket.events';
@@ -94,13 +93,15 @@ async function test(name: string, fn: () => Promise<void>): Promise<void> {
     }
 }
 
-// ─── Redis OTP helper (auth suite) ───────────────────────────────────────────
+// ─── OTP helper — reads from server via test endpoint ────────────────────────
 
 async function getOtp(prefix: 'verify:email' | 'verify:forgot', email: string): Promise<string> {
-    const key = `${prefix}:${email}`;
-    const otp = await redis.get(key);
-    assert(otp !== null, `OTP not found in Redis at key "${key}"`);
-    return otp!;
+    const type = prefix === 'verify:forgot' ? 'forgot_password' : 'verify_email';
+    const { status, data } = await get(`/test/otp?email=${encodeURIComponent(email)}&type=${type}`);
+    assert(status === 200, `OTP fetch failed (${status}): ${JSON.stringify(data)}`);
+    const otp = (data.data as Record<string, unknown>).otp as string;
+    assert(typeof otp === 'string' && otp.length > 0, `OTP not found for ${email}`);
+    return otp;
 }
 
 // ─── Setup helpers (features suite) ──────────────────────────────────────────
@@ -129,10 +130,8 @@ async function registerAndLogin(
 }
 
 async function setVerified(userId: string): Promise<void> {
-    await prisma.user.update({
-        where: { id: userId },
-        data:  { idVerificationStatus: 'verified' },
-    });
+    const { status } = await patch(`/test/verify-user/${userId}`, {});
+    assert(status === 200, `setVerified failed for ${userId}: HTTP ${status}`);
 }
 
 function makeAdminToken(userId: string): string {
@@ -2255,15 +2254,14 @@ async function runFeaturesSuite(): Promise<void> {
     });
 
     await test('seed a notification for creator to test read/delete', async () => {
-        const notif = await prisma.notification.create({
-            data: {
-                userId: creatorId,
-                type: 'system',
-                title: 'Test notification',
-                body: 'This is a test.',
-            },
+        const { status, data } = await post('/test/seed-notification', {
+            userId: creatorId,
+            type: 'system',
+            title: 'Test notification',
+            body: 'This is a test.',
         });
-        notificationId = notif.id;
+        assertStatus(status, 201);
+        notificationId = (data.data as Record<string, unknown>).id as string;
         assert(notificationId.length > 0, 'Expected notification id');
     });
 
@@ -3025,14 +3023,13 @@ async function runFeaturesSuite(): Promise<void> {
     });
 
     await test('join_group as active member receives no error', async () => {
-        // Set up error listener before emitting — if error fires within 1 s, fail
-        const errPromise = waitForEvent(creatorSocket!, SocketEvents.ERROR, 1000).then(
-            (d) => { throw new Error(`Unexpected error: ${JSON.stringify(d)}`); },
-            () => { /* timeout = no error = pass */ },
-        );
+        // Wait for GROUP_JOINED confirmation on both sockets — guarantees socket.join()
+        // completed before subsequent tests rely on room membership.
+        const creatorJoined = waitForEvent(creatorSocket!, SocketEvents.GROUP_JOINED, 5000);
+        const memberJoined  = waitForEvent(memberSocket!,  SocketEvents.GROUP_JOINED, 5000);
         creatorSocket!.emit(SocketEvents.JOIN_GROUP, { group_id: openGroupId });
         memberSocket!.emit(SocketEvents.JOIN_GROUP, { group_id: openGroupId });
-        await errPromise;
+        await Promise.all([creatorJoined, memberJoined]);
     });
 
     await test('join_group for unknown group emits error event', async () => {
@@ -3079,13 +3076,14 @@ async function runFeaturesSuite(): Promise<void> {
     await test('heartbeat sets presence key in Redis', async () => {
         creatorSocket!.emit(SocketEvents.HEARTBEAT, {});
         // Retry up to 3 times in case of transient Redis blip
-        let presence: string | null = null;
+        let present = false;
         for (let i = 0; i < 3; i++) {
             await new Promise((r) => setTimeout(r, 400));
-            presence = await redis.get(`presence:${creatorId}`);
-            if (presence !== null) break;
+            const { data } = await get(`/test/presence/${creatorId}`);
+            present = (data.data as Record<string, unknown>).present as boolean;
+            if (present) break;
         }
-        assert(presence === '1', `Expected presence key = '1', got: ${presence}`);
+        assert(present, `Expected presence key to be set after heartbeat`);
     });
 
     await test('dm_send via socket delivers dm_received to receiver', async () => {
@@ -3119,8 +3117,9 @@ async function runFeaturesSuite(): Promise<void> {
         creatorSocket!.disconnect();
         memberSocket!.disconnect();
         await new Promise((r) => setTimeout(r, 500));
-        const presence = await redis.get(`presence:${creatorId}`);
-        assert(presence === null, `Presence should be null after disconnect, got: ${presence}`);
+        const { data } = await get(`/test/presence/${creatorId}`);
+        const present = (data.data as Record<string, unknown>).present as boolean;
+        assert(!present, `Presence should be cleared after disconnect`);
     });
 
     // ── 16. Group Deletion ─────────────────────────────────────────────────────
@@ -3215,8 +3214,6 @@ run()
         console.error('\nFatal test runner error:', err);
         process.exitCode = 1;
     })
-    .finally(async () => {
-        await redis.quit();
-        await prisma.$disconnect();
+    .finally(() => {
         process.exit(results.some((r) => !r.passed) ? 1 : 0);
     });

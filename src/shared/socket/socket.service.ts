@@ -58,8 +58,10 @@ async function handleConnection(socket: AuthSocket, nsp: Namespace): Promise<voi
                 return;
             }
             socket.join(`group:${group_id}`);
+            socket.emit(SocketEvents.GROUP_JOINED, { group_id });
         } catch (err) {
             asLogger.error('socket join_group error:', err);
+            socket.emit(SocketEvents.ERROR, { message: 'Failed to join group.' });
         }
     });
 

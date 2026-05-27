@@ -7,6 +7,7 @@ export const SocketEvents = {
     HEARTBEAT:      'heartbeat',
 
     // ── Group chat — server → client ───────────────────────────────────────────
+    GROUP_JOINED:    'group_joined',
     NEW_MESSAGE:     'new_message',
     MESSAGE_DELETED: 'message_deleted',
     MESSAGE_PINNED:  'message_pinned',
