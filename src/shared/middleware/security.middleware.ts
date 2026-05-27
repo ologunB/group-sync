@@ -31,7 +31,7 @@ const authLimiter = rateLimit({
         data: null,
         error: null,
     },
-    skip: () => !config.server.isProduction, // Disable in development for convenience
+    skip: () => !config.server.isProduction || config.server.testRoutesEnabled,
 });
 
 // General API: 100 requests / minute per authenticated user / IP
