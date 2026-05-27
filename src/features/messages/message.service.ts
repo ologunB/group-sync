@@ -124,8 +124,9 @@ export class MessageService {
             let mediaUrl = dto.media_url ?? null;
             let messageType = dto.message_type ?? 'text';
 
+            let storedMimeType = media?.mimeType ?? null;
             if (media) {
-                const isAudio = media.mimeType.startsWith('audio/');
+                const isAudio = media.mimeType.startsWith('audio/') || media.mimeType === 'video/webm';
                 const result = await StorageService.upload(media.buffer, media.mimeType, {
                     folder:       `groupsync/messages/${groupId}`,
                     publicId:     `${actor.userId}-${Date.now()}-${randomUUID()}`,
@@ -134,6 +135,7 @@ export class MessageService {
                 });
                 mediaUrl = result.url;
                 messageType = isAudio ? 'audio' : 'image';
+                storedMimeType = isAudio ? 'audio/mpeg' : media.mimeType; // audio transcoded to mp3
             }
 
             if (messageType === 'poll') {
@@ -158,7 +160,7 @@ export class MessageService {
                     content: dto.content?.trim() ?? null,
                     messageType,
                     mediaUrl,
-                    mediaMimeType: media?.mimeType ?? null,
+                    mediaMimeType: storedMimeType,
                     replyToId: dto.reply_to_id ?? null,
                     ...(messageType === 'poll' && dto.poll ? {
                         poll: {

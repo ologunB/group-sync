@@ -275,6 +275,7 @@ export class DmService {
 
             let mediaUrl = dto.media_url ?? null;
             let messageType = dto.message_type ?? 'text';
+            let storedMimeType = media?.mimeType ?? null;
 
             if (media) {
                 const isAudio = media.mimeType.startsWith('audio/') || media.mimeType === 'video/webm';
@@ -286,6 +287,7 @@ export class DmService {
                 });
                 mediaUrl = result.url;
                 messageType = isAudio ? 'audio' : 'image';
+                storedMimeType = isAudio ? 'audio/mpeg' : media.mimeType; // audio transcoded to mp3
             }
 
             if (!dto.content?.trim() && !mediaUrl) {
@@ -299,7 +301,7 @@ export class DmService {
                     content: dto.content?.trim() ?? null,
                     messageType,
                     mediaUrl,
-                    mediaMimeType: media?.mimeType ?? null,
+                    mediaMimeType: storedMimeType,
                     replyToId: dto.reply_to_id ?? null,
                 },
                 select: dmSelect,

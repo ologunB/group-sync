@@ -22,6 +22,8 @@ export class CloudinaryProvider implements StorageProvider {
                     allowed_formats: isAudio
                         ? ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'opus', 'flac', 'webm']
                         : ['jpg', 'jpeg', 'png', 'webp'],
+                    // Transcode all audio to mp3 regardless of input format (webm, ogg, m4a, etc.)
+                    format:          isAudio ? 'mp3' : undefined,
                     transformation:  isAudio ? undefined : (options.transformation ?? [
                         { quality: 'auto', fetch_format: 'auto' },
                     ]),
