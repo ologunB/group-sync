@@ -25,6 +25,7 @@ exports.config = {
         clientUrl: optional_env('CLIENT_URL', 'http://localhost:3000'),
         isProduction: optional_env('NODE_ENV', 'development') === 'production',
         serviceMode: optional_env('SERVICE_MODE', 'both'),
+        testRoutesEnabled: optional_env('TEST_ROUTES_ENABLED', 'false') === 'true',
     },
     database: {
         url: require_env('DATABASE_URL'),

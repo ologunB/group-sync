@@ -61,6 +61,24 @@ class DmController {
             next(error);
         }
     };
+    addReaction = async (req, res, next) => {
+        try {
+            await dm_service_1.dmService.addReaction(req.params.dmId, req.body.emoji, req.user);
+            response_helper_1.ResponseHelper.success(res, null, 'Reaction added.', http_status_codes_1.StatusCodes.CREATED);
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    removeReaction = async (req, res, next) => {
+        try {
+            await dm_service_1.dmService.removeReaction(req.params.dmId, req.body.emoji, req.user);
+            response_helper_1.ResponseHelper.success(res, null, 'Reaction removed.');
+        }
+        catch (error) {
+            next(error);
+        }
+    };
 }
 exports.DmController = DmController;
 exports.dmController = new DmController();

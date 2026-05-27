@@ -3,42 +3,61 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.uploadImage = void 0;
+exports.uploadMedia = exports.uploadImage = void 0;
 const multer_1 = __importDefault(require("multer"));
 const http_status_codes_1 = require("http-status-codes");
 const error_middleware_1 = require("./error.middleware");
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
-function imageFilter(_req, file, cb) {
-    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const ALLOWED_AUDIO_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/ogg', 'audio/wav', 'audio/x-wav',
+    'audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac', 'audio/opus',
+    'audio/flac', 'audio/webm',
+    'video/webm']; // Chrome/Edge MediaRecorder reports audio as video/webm
+const IMAGE_MAX = 5 * 1024 * 1024; // 5 MB
+const AUDIO_MAX = 20 * 1024 * 1024; // 20 MB
+function makeFilter(cb, file, allowed, label) {
+    if (allowed.includes(file.mimetype)) {
         cb(null, true);
     }
     else {
-        cb(new Error('Only JPEG, PNG, and WebP images are allowed'));
+        cb(new Error(`Only ${label} files are allowed`));
     }
 }
-const multerInstance = (0, multer_1.default)({
+// Image-only uploader (existing behaviour, unchanged)
+const imageMulter = (0, multer_1.default)({
     storage: multer_1.default.memoryStorage(),
-    limits: { fileSize: MAX_FILE_SIZE },
-    fileFilter: imageFilter,
+    limits: { fileSize: IMAGE_MAX },
+    fileFilter: (_req, file, cb) => makeFilter(cb, file, ALLOWED_IMAGE_TYPES, 'JPEG, PNG, and WebP image'),
 });
-// Wraps multer.single() so that:
-//   - LIMIT_FILE_SIZE   → 413 Payload Too Large
-//   - fileFilter errors → 422 Unprocessable Entity
-//   - Other multer errors → 422
-const uploadImage = (fieldName) => (req, res, next) => {
-    multerInstance.single(fieldName)(req, res, (err) => {
-        if (!err)
-            return next();
-        if (err instanceof multer_1.default.MulterError) {
-            if (err.code === 'LIMIT_FILE_SIZE') {
-                return next(new error_middleware_1.ApiError(`File too large. Maximum allowed size is ${MAX_FILE_SIZE / (1024 * 1024)} MB.`, http_status_codes_1.StatusCodes.REQUEST_TOO_LONG));
+// Image + audio uploader (for group messages and DMs)
+const mediaMulter = (0, multer_1.default)({
+    storage: multer_1.default.memoryStorage(),
+    limits: { fileSize: AUDIO_MAX },
+    fileFilter: (_req, file, cb) => {
+        if ([...ALLOWED_IMAGE_TYPES, ...ALLOWED_AUDIO_TYPES].includes(file.mimetype)) {
+            cb(null, true);
+        }
+        else {
+            cb(new Error('Only image (JPEG/PNG/WebP) or audio (MP3/OGG/WAV/M4A/AAC/OPUS) files are allowed'));
+        }
+    },
+});
+function wrapMulter(instance, fieldName, maxMb) {
+    return (req, res, next) => {
+        instance.single(fieldName)(req, res, (err) => {
+            if (!err)
+                return next();
+            if (err instanceof multer_1.default.MulterError) {
+                if (err.code === 'LIMIT_FILE_SIZE') {
+                    return next(new error_middleware_1.ApiError(`File too large. Maximum allowed size is ${maxMb} MB.`, http_status_codes_1.StatusCodes.REQUEST_TOO_LONG));
+                }
+                return next(new error_middleware_1.ApiError(err.message, http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY));
             }
             return next(new error_middleware_1.ApiError(err.message, http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY));
-        }
-        // fileFilter rejection (plain Error)
-        return next(new error_middleware_1.ApiError(err.message, http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY));
-    });
-};
+        });
+    };
+}
+const uploadImage = (fieldName) => wrapMulter(imageMulter, fieldName, IMAGE_MAX / (1024 * 1024));
 exports.uploadImage = uploadImage;
+const uploadMedia = (fieldName) => wrapMulter(mediaMulter, fieldName, AUDIO_MAX / (1024 * 1024));
+exports.uploadMedia = uploadMedia;
 //# sourceMappingURL=upload.middleware.js.map

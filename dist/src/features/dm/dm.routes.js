@@ -12,10 +12,13 @@ router.get('/conversations', auth_middleware_1.authenticate, (0, validators_1.va
 // DM thread with a specific user
 router.get('/dm/:userId', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(dm_validator_1.listThreadValidator), dm_controller_1.dmController.getThread);
 // Send DM
-router.post('/dm/:userId', auth_middleware_1.authenticateVerified, (0, upload_middleware_1.uploadImage)('media'), (0, validators_1.validateRequest)(dm_validator_1.sendDmValidator), dm_controller_1.dmController.sendDm);
+router.post('/dm/:userId', auth_middleware_1.authenticateVerified, (0, upload_middleware_1.uploadMedia)('media'), (0, validators_1.validateRequest)(dm_validator_1.sendDmValidator), dm_controller_1.dmController.sendDm);
 // Mark thread as read
 router.patch('/dm/:userId/read', auth_middleware_1.authenticate, dm_controller_1.dmController.markRead);
 // Delete a single DM (soft, per-side)
 router.delete('/dm/:dmId', auth_middleware_1.authenticate, dm_controller_1.dmController.deleteDm);
+// Reactions on a DM
+router.post('/dm/:dmId/react', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(dm_validator_1.dmReactionValidator), dm_controller_1.dmController.addReaction);
+router.delete('/dm/:dmId/react', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(dm_validator_1.dmReactionValidator), dm_controller_1.dmController.removeReaction);
 exports.default = router;
 //# sourceMappingURL=dm.routes.js.map

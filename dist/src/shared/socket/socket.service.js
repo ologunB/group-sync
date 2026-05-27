@@ -48,9 +48,11 @@ async function handleConnection(socket, nsp) {
                 return;
             }
             socket.join(`group:${group_id}`);
+            socket.emit(socket_events_1.SocketEvents.GROUP_JOINED, { group_id });
         }
         catch (err) {
             asLogger_1.asLogger.error('socket join_group error:', err);
+            socket.emit(socket_events_1.SocketEvents.ERROR, { message: 'Failed to join group.' });
         }
     });
     // ── Leave group room ──────────────────────────────────────────────────────

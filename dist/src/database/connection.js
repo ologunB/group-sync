@@ -37,8 +37,7 @@ class Database {
         if (this._connected)
             return;
         try {
-            await this._client.$connect();
-            await this.pool.query('SELECT 1');
+            await this._client.$connect(); // internally validates the connection via the adapter
             this._connected = true;
             asLogger_1.asLogger.info('PostgreSQL connected successfully');
         }
@@ -51,14 +50,18 @@ class Database {
         if (!this._connected)
             return;
         this._connected = false; // set first to block concurrent calls
-        try {
-            await this._client.$disconnect();
-        }
-        catch { /* already disconnected */ }
+        // With PrismaPg adapter, PrismaClient does not own the pool — calling $disconnect()
+        // schedules internal async cleanup that races with pool.end() and triggers a pg@8
+        // DeprecationWarning. End the pool first so no new queries can be issued, then let
+        // $disconnect() clean up its internal state against an already-drained pool.
         try {
             await this.pool.end();
         }
         catch { /* already ended */ }
+        try {
+            await this._client.$disconnect();
+        }
+        catch { /* already disconnected */ }
         asLogger_1.asLogger.info('PostgreSQL disconnected');
     }
     get client() {

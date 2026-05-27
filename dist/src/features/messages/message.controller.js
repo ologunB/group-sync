@@ -77,6 +77,24 @@ class MessageController {
             next(error);
         }
     };
+    votePoll = async (req, res, next) => {
+        try {
+            const result = await message_service_1.messageService.votePoll(req.params.id, req.body, req.user);
+            response_helper_1.ResponseHelper.success(res, result, 'Vote recorded.', http_status_codes_1.StatusCodes.CREATED);
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    unvotePoll = async (req, res, next) => {
+        try {
+            const result = await message_service_1.messageService.unvotePoll(req.params.id, req.body, req.user);
+            response_helper_1.ResponseHelper.success(res, result, 'Vote removed.');
+        }
+        catch (error) {
+            next(error);
+        }
+    };
     toggleChatLock = async (req, res, next) => {
         try {
             const result = await message_service_1.messageService.toggleChatLock(req.params.id, req.body.locked, req.user);

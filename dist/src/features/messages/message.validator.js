@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.toggleChatLockValidator = exports.listMessagesValidator = exports.sendMessageValidator = void 0;
+exports.votePollValidator = exports.toggleChatLockValidator = exports.listMessagesValidator = exports.sendMessageValidator = void 0;
 const express_validator_1 = require("express-validator");
 exports.sendMessageValidator = [
     (0, express_validator_1.body)('content')
@@ -9,7 +9,7 @@ exports.sendMessageValidator = [
         .isLength({ max: 4000 }).withMessage('Content must be at most 4000 characters'),
     (0, express_validator_1.body)('message_type')
         .optional()
-        .isIn(['text', 'image', 'file', 'poll', 'voice_note'])
+        .isIn(['text', 'image', 'audio', 'poll'])
         .withMessage('Invalid message type'),
     (0, express_validator_1.body)('media_url')
         .optional({ nullable: true })
@@ -33,5 +33,10 @@ exports.toggleChatLockValidator = [
     (0, express_validator_1.body)('locked')
         .exists().withMessage('locked is required')
         .isBoolean().withMessage('locked must be a boolean'),
+];
+exports.votePollValidator = [
+    (0, express_validator_1.body)('option_id')
+        .exists().withMessage('option_id is required')
+        .isUUID().withMessage('option_id must be a UUID'),
 ];
 //# sourceMappingURL=message.validator.js.map

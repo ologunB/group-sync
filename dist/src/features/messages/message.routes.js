@@ -17,7 +17,7 @@ const reactionValidator = [
 // Pinned messages before /:messageId routes to avoid param collision
 router.get('/groups/:id/messages/pinned', auth_middleware_1.authenticate, message_controller_1.messageController.listPinned);
 router.get('/groups/:id/messages', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(message_validator_1.listMessagesValidator), message_controller_1.messageController.listMessages);
-router.post('/groups/:id/messages', auth_middleware_1.authenticateVerified, (0, upload_middleware_1.uploadImage)('media'), (0, validators_1.validateRequest)(message_validator_1.sendMessageValidator), message_controller_1.messageController.sendMessage);
+router.post('/groups/:id/messages', auth_middleware_1.authenticateVerified, (0, upload_middleware_1.uploadMedia)('media'), (0, validators_1.validateRequest)(message_validator_1.sendMessageValidator), message_controller_1.messageController.sendMessage);
 // Toggle group chat lock — admin only (enforced inside service)
 router.patch('/groups/:id/chat', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(message_validator_1.toggleChatLockValidator), message_controller_1.messageController.toggleChatLock);
 // ── Message-scoped routes (/messages/:id/...) ─────────────────────────────────
@@ -25,5 +25,7 @@ router.delete('/messages/:id', auth_middleware_1.authenticate, message_controlle
 router.patch('/messages/:id/pin', auth_middleware_1.authenticate, message_controller_1.messageController.togglePin);
 router.post('/messages/:id/react', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(reactionValidator), message_controller_1.messageController.addReaction);
 router.delete('/messages/:id/react', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(reactionValidator), message_controller_1.messageController.removeReaction);
+router.post('/messages/:id/poll/vote', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(message_validator_1.votePollValidator), message_controller_1.messageController.votePoll);
+router.delete('/messages/:id/poll/vote', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(message_validator_1.votePollValidator), message_controller_1.messageController.unvotePoll);
 exports.default = router;
 //# sourceMappingURL=message.routes.js.map

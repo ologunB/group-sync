@@ -9,11 +9,10 @@
  *   2. Run tests:         npx tsx src/__tests__/index.ts
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-const connection_1 = require("../database/connection");
 const encryption_1 = require("../shared/utils/encryption");
 const socket_io_client_1 = require("socket.io-client");
 const socket_events_1 = require("../shared/socket/socket.events");
-const BASE = Boolean(false) ? 'https://group-sync-ovzh.onrender.com/api/v1' : 'http://localhost:3000/api/v1';
+const BASE = Boolean(true) ? 'https://group-sync-ovzh.onrender.com/api/v1' : 'http://localhost:3000/api/v1';
 const ts = Date.now();
 // ─── Shared assertion helpers ─────────────────────────────────────────────────
 function assert(condition, message) {
@@ -73,11 +72,13 @@ async function test(name, fn) {
         console.log(`       → ${msg}`);
     }
 }
-// ─── Redis OTP helper (auth suite) ───────────────────────────────────────────
+// ─── OTP helper — reads from server via test endpoint ────────────────────────
 async function getOtp(prefix, email) {
-    const key = `${prefix}:${email}`;
-    const otp = await connection_1.redis.get(key);
-    assert(otp !== null, `OTP not found in Redis at key "${key}"`);
+    const type = prefix === 'verify:forgot' ? 'forgot_password' : 'verify_email';
+    const { status, data } = await get(`/test/otp?email=${encodeURIComponent(email)}&type=${type}`);
+    assert(status === 200, `OTP fetch failed (${status}): ${JSON.stringify(data)}`);
+    const otp = data.data.otp;
+    assert(typeof otp === 'string' && otp.length > 0, `OTP not found for ${email}`);
     return otp;
 }
 // ─── Setup helpers (features suite) ──────────────────────────────────────────
@@ -99,10 +100,8 @@ async function registerAndLogin(email, password, name) {
     return { token: tokens.accessToken, userId: user.id };
 }
 async function setVerified(userId) {
-    await connection_1.prisma.user.update({
-        where: { id: userId },
-        data: { idVerificationStatus: 'verified' },
-    });
+    const { status } = await patch(`/test/verify-user/${userId}`, {});
+    assert(status === 200, `setVerified failed for ${userId}: HTTP ${status}`);
 }
 function makeAdminToken(userId) {
     return encryption_1.EncryptionUtil.generateJWT({ userId, role: 'platform_admin', sessionId: 'test-admin-session', permissions: ['platform.admin'] }, 900);
@@ -1634,15 +1633,14 @@ async function runFeaturesSuite() {
         assert(typeof d.unread_count === 'number', 'Expected unread_count');
     });
     await test('seed a notification for creator to test read/delete', async () => {
-        const notif = await connection_1.prisma.notification.create({
-            data: {
-                userId: creatorId,
-                type: 'system',
-                title: 'Test notification',
-                body: 'This is a test.',
-            },
+        const { status, data } = await post('/test/seed-notification', {
+            userId: creatorId,
+            type: 'system',
+            title: 'Test notification',
+            body: 'This is a test.',
         });
-        notificationId = notif.id;
+        assertStatus(status, 201);
+        notificationId = data.data.id;
         assert(notificationId.length > 0, 'Expected notification id');
     });
     await test('PATCH /notifications/:id/read marks notification read (200)', async () => {
@@ -1834,6 +1832,33 @@ async function runFeaturesSuite() {
         assert(msg.messageType === 'image', `messageType mismatch: ${msg.messageType}`);
         assert(typeof msg.mediaUrl === 'string' && msg.mediaUrl.startsWith('https://'), 'expected mediaUrl HTTPS string');
     });
+    await test('POST /groups/:id/messages with message_type text sends text message (201)', async () => {
+        const { status, data } = await post(`/groups/${openGroupId}/messages`, {
+            content: 'Plain text message',
+            message_type: 'text',
+        }, memberToken);
+        assertStatus(status, 201);
+        const msg = data.data;
+        assert(msg.messageType === 'text', `expected messageType=text, got ${msg.messageType}`);
+        assert(msg.content === 'Plain text message', 'content mismatch');
+    });
+    await test('POST /groups/:id/messages with media_url sends image by URL (201)', async () => {
+        const { status, data } = await post(`/groups/${openGroupId}/messages`, {
+            message_type: 'image',
+            media_url: 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
+        }, memberToken);
+        assertStatus(status, 201);
+        const msg = data.data;
+        assert(msg.messageType === 'image', `expected messageType=image, got ${msg.messageType}`);
+        assert(typeof msg.mediaUrl === 'string', 'expected mediaUrl string');
+    });
+    await test('POST /groups/:id/messages with invalid message_type returns 422', async () => {
+        const { status } = await post(`/groups/${openGroupId}/messages`, {
+            content: 'hi',
+            message_type: 'voice_note',
+        }, memberToken);
+        assertStatus(status, 422);
+    });
     await test('POST /groups/:id/messages with reply_to_id sends threaded reply (201)', async () => {
         const { status, data } = await post(`/groups/${openGroupId}/messages`, { content: 'Reply!', reply_to_id: messageId }, creatorToken);
         assertStatus(status, 201);
@@ -1907,6 +1932,97 @@ async function runFeaturesSuite() {
     });
     await test('DELETE /messages/:id already deleted returns 404', async () => {
         const { status } = await del(`/messages/${messageId}`, memberToken);
+        assertStatus(status, 404);
+    });
+    // ── Polls ─────────────────────────────────────────────────────────────────
+    let pollMessageId = '';
+    let pollOptionId = '';
+    await test('POST /groups/:id/messages with message_type poll creates poll (201)', async () => {
+        const { status, data } = await post(`/groups/${openGroupId}/messages`, {
+            message_type: 'poll',
+            poll: {
+                question: 'What is your favourite colour?',
+                options: ['Red', 'Green', 'Blue'],
+                is_multiple: false,
+            },
+        }, creatorToken);
+        assertStatus(status, 201);
+        const msg = data.data;
+        assert(msg.messageType === 'poll', `expected messageType=poll, got ${msg.messageType}`);
+        assertHas(msg, 'poll');
+        const poll = msg.poll;
+        assert(poll.question === 'What is your favourite colour?', 'question mismatch');
+        const options = poll.options;
+        assert(options.length === 3, `expected 3 options, got ${options.length}`);
+        pollMessageId = msg.id;
+        pollOptionId = options[0].id;
+    });
+    await test('POST /groups/:id/messages with poll but < 2 options returns 422', async () => {
+        const { status } = await post(`/groups/${openGroupId}/messages`, {
+            message_type: 'poll',
+            poll: { question: 'Solo?', options: ['Only one'] },
+        }, creatorToken);
+        assertStatus(status, 422);
+    });
+    await test('POST /groups/:id/messages with poll but no question returns 422', async () => {
+        const { status } = await post(`/groups/${openGroupId}/messages`, {
+            message_type: 'poll',
+            poll: { options: ['A', 'B'] },
+        }, creatorToken);
+        assertStatus(status, 422);
+    });
+    await test('POST /messages/:id/poll/vote without auth returns 401', async () => {
+        const { status } = await post(`/messages/${pollMessageId}/poll/vote`, { option_id: pollOptionId });
+        assertStatus(status, 401);
+    });
+    await test('POST /messages/:id/poll/vote records vote (201)', async () => {
+        const { status, data } = await post(`/messages/${pollMessageId}/poll/vote`, { option_id: pollOptionId }, memberToken);
+        assertStatus(status, 201);
+        const msg = data.data;
+        const poll = msg.poll;
+        const options = poll.options;
+        const voted = options.find((o) => o.id === pollOptionId);
+        assert(voted._count.votes === 1, `expected 1 vote, got ${voted._count.votes}`);
+        assert(voted.votes.some((v) => v.userId === memberId), 'memberToken vote not reflected');
+    });
+    await test('POST /messages/:id/poll/vote duplicate returns 409', async () => {
+        const { status } = await post(`/messages/${pollMessageId}/poll/vote`, { option_id: pollOptionId }, memberToken);
+        assertStatus(status, 409);
+    });
+    await test('POST /messages/:id/poll/vote on second option (single-choice) returns 409', async () => {
+        // member already voted for pollOptionId; single-choice poll prevents voting on another option
+        const pollData = (await get(`/groups/${openGroupId}/messages`, memberToken)).data.data;
+        const ourPoll = pollData.find((m) => m.id === pollMessageId);
+        const secondOption = ourPoll.poll.options.find((o) => o.id !== pollOptionId);
+        const { status } = await post(`/messages/${pollMessageId}/poll/vote`, { option_id: secondOption.id }, memberToken);
+        assertStatus(status, 409);
+    });
+    await test('DELETE /messages/:id/poll/vote removes vote (200)', async () => {
+        const { status, data } = await del(`/messages/${pollMessageId}/poll/vote`, memberToken, { option_id: pollOptionId });
+        assertStatus(status, 200);
+        const poll = data.data.poll;
+        const options = poll.options;
+        const unvoted = options.find((o) => o.id === pollOptionId);
+        assert(unvoted._count.votes === 0, `expected 0 votes after unvote, got ${unvoted._count.votes}`);
+    });
+    await test('DELETE /messages/:id/poll/vote non-existent vote returns 404', async () => {
+        const { status } = await del(`/messages/${pollMessageId}/poll/vote`, memberToken, { option_id: pollOptionId });
+        assertStatus(status, 404);
+    });
+    await test('POST /messages/:id/poll/vote with invalid option_id returns 422', async () => {
+        const { status } = await post(`/messages/${pollMessageId}/poll/vote`, { option_id: 'not-a-uuid' }, memberToken);
+        assertStatus(status, 422);
+    });
+    await test('POST /messages/:id/poll/vote with option from wrong poll returns 404', async () => {
+        // Create a second poll and try to vote its option on the first poll's message
+        const p2 = await post(`/groups/${openGroupId}/messages`, {
+            message_type: 'poll',
+            poll: { question: 'Other poll', options: ['X', 'Y'] },
+        }, creatorToken);
+        assertStatus(p2.status, 201);
+        const otherOption = p2.data.data.poll.options[0].id;
+        // Vote that option against the ORIGINAL poll message — should be 404 (option not in this poll)
+        const { status } = await post(`/messages/${pollMessageId}/poll/vote`, { option_id: otherOption }, memberToken);
         assertStatus(status, 404);
     });
     // ── 14. Direct Messages ───────────────────────────────────────────────────
@@ -1993,8 +2109,92 @@ async function runFeaturesSuite() {
         const { status } = await del(`/dm/${dmId}`, creatorToken);
         assertStatus(status, 200);
     });
+    // ── DM reply_to ───────────────────────────────────────────────────────────
+    let replyDmId = '';
+    await test('POST /dm/:userId with reply_to_id sends threaded reply (201)', async () => {
+        // Send a fresh DM first so we have a parent in-thread message
+        const parent = await post(`/dm/${memberId}`, { content: 'Parent message' }, creatorToken);
+        assertStatus(parent.status, 201);
+        const parentDm = parent.data.data;
+        const parentId = parentDm.id;
+        const { status, data } = await post(`/dm/${memberId}`, {
+            content: 'Reply to parent',
+            reply_to_id: parentId,
+        }, creatorToken);
+        assertStatus(status, 201);
+        const dm = data.data;
+        assertHas(dm, 'replyToId');
+        assert(dm.replyToId === parentId, `replyToId mismatch: ${dm.replyToId}`);
+        assertHas(dm, 'replyTo');
+        replyDmId = dm.id;
+    });
+    await test('POST /dm/:userId with out-of-thread reply_to_id returns 422', async () => {
+        // Use a completely different (non-existent) UUID as reply_to_id
+        const { status } = await post(`/dm/${memberId}`, {
+            content: 'Invalid reply',
+            reply_to_id: '00000000-0000-0000-0000-000000000000',
+        }, creatorToken);
+        assertStatus(status, 422);
+    });
+    // ── DM reactions ──────────────────────────────────────────────────────────
+    await test('POST /dm/:dmId/react without auth returns 401', async () => {
+        const { status } = await post(`/dm/${replyDmId}/react`, { emoji: '👍' });
+        assertStatus(status, 401);
+    });
+    await test('POST /dm/:dmId/react adds reaction (201)', async () => {
+        const { status } = await post(`/dm/${replyDmId}/react`, { emoji: '👍' }, memberToken);
+        assertStatus(status, 201);
+    });
+    await test('POST /dm/:dmId/react duplicate reaction returns 409', async () => {
+        const { status } = await post(`/dm/${replyDmId}/react`, { emoji: '👍' }, memberToken);
+        assertStatus(status, 409);
+    });
+    await test('POST /dm/:dmId/react missing emoji returns 422', async () => {
+        const { status } = await post(`/dm/${replyDmId}/react`, {}, memberToken);
+        assertStatus(status, 422);
+    });
+    await test('POST /dm/:dmId/react by non-participant returns 403', async () => {
+        // Register a fresh user who shares no DM thread with creator
+        const { token: outsiderToken } = await registerAndLogin(`dmreact${ts}@test.io`, 'Outsider1!', 'DmReactOut');
+        const { status } = await post(`/dm/${replyDmId}/react`, { emoji: '❤️' }, outsiderToken);
+        assertStatus(status, 403);
+    });
+    await test('DELETE /dm/:dmId/react removes reaction (200)', async () => {
+        const { status } = await del(`/dm/${replyDmId}/react`, memberToken, { emoji: '👍' });
+        assertStatus(status, 200);
+    });
+    await test('DELETE /dm/:dmId/react non-existent reaction returns 404', async () => {
+        const { status } = await del(`/dm/${replyDmId}/react`, memberToken, { emoji: '👍' });
+        assertStatus(status, 404);
+    });
+    await test('GET /dm/:userId thread includes replyTo and reactions fields', async () => {
+        // Re-add a reaction so we can inspect the shape
+        await post(`/dm/${replyDmId}/react`, { emoji: '🔥' }, creatorToken);
+        const { status, data } = await get(`/dm/${memberId}`, creatorToken);
+        assertStatus(status, 200);
+        const messages = data.data;
+        const reply = messages.find((m) => m.id === replyDmId);
+        assert(reply !== undefined, 'reply DM not found in thread');
+        assertHas(reply, 'replyToId');
+        assertHas(reply, 'replyTo');
+        assertHas(reply, 'reactions');
+        assert(Array.isArray(reply.reactions), 'reactions should be an array');
+        assert(reply.reactions.length >= 1, 'expected at least one reaction');
+    });
     // ── 15. Socket.io ────────────────────────────────────────────────────────
     section('15. Socket.io');
+    // Re-login to get fresh tokens — sections 12-14 may take >15 min when DB is slow,
+    // causing the original JWT (15-min TTL) to expire before socket tests run.
+    await test('refresh tokens before socket tests', async () => {
+        const { data: cd } = await post('/auth/login', { email: CREATOR_EMAIL, password: CREATOR_PASS });
+        const { data: md } = await post('/auth/login', { email: MEMBER_EMAIL, password: MEMBER_PASS });
+        const freshCreator = cd.data?.tokens?.accessToken;
+        const freshMember = md.data?.tokens?.accessToken;
+        assert(freshCreator?.length > 0, `Creator re-login failed: ${JSON.stringify(cd)}`);
+        assert(freshMember?.length > 0, `Member re-login failed: ${JSON.stringify(md)}`);
+        creatorToken = freshCreator;
+        memberToken = freshMember;
+    });
     const SOCKET_URL = 'http://localhost:3000/chat';
     function connectSocket(token) {
         return new Promise((resolve, reject) => {
@@ -2009,6 +2209,8 @@ async function runFeaturesSuite() {
         });
     }
     function waitForEvent(s, event, timeoutMs = 3000) {
+        if (!s)
+            return Promise.reject(new Error('Socket is not connected'));
         return new Promise((resolve, reject) => {
             const timer = setTimeout(() => reject(new Error(`Timeout (${timeoutMs}ms) waiting for "${event}"`)), timeoutMs);
             s.once(event, (data) => { clearTimeout(timer); resolve(data); });
@@ -2042,11 +2244,13 @@ async function runFeaturesSuite() {
         assert(memberSocket.connected, 'member socket should be connected');
     });
     await test('join_group as active member receives no error', async () => {
-        // Set up error listener before emitting — if error fires within 1 s, fail
-        const errPromise = waitForEvent(creatorSocket, socket_events_1.SocketEvents.ERROR, 1000).then((d) => { throw new Error(`Unexpected error: ${JSON.stringify(d)}`); }, () => { });
+        // Wait for GROUP_JOINED confirmation on both sockets — guarantees socket.join()
+        // completed before subsequent tests rely on room membership.
+        const creatorJoined = waitForEvent(creatorSocket, socket_events_1.SocketEvents.GROUP_JOINED, 5000);
+        const memberJoined = waitForEvent(memberSocket, socket_events_1.SocketEvents.GROUP_JOINED, 5000);
         creatorSocket.emit(socket_events_1.SocketEvents.JOIN_GROUP, { group_id: openGroupId });
         memberSocket.emit(socket_events_1.SocketEvents.JOIN_GROUP, { group_id: openGroupId });
-        await errPromise;
+        await Promise.all([creatorJoined, memberJoined]);
     });
     await test('join_group for unknown group emits error event', async () => {
         const fakeId = '00000000-0000-0000-0000-000000000000';
@@ -2088,14 +2292,15 @@ async function runFeaturesSuite() {
     await test('heartbeat sets presence key in Redis', async () => {
         creatorSocket.emit(socket_events_1.SocketEvents.HEARTBEAT, {});
         // Retry up to 3 times in case of transient Redis blip
-        let presence = null;
+        let present = false;
         for (let i = 0; i < 3; i++) {
             await new Promise((r) => setTimeout(r, 400));
-            presence = await connection_1.redis.get(`presence:${creatorId}`);
-            if (presence !== null)
+            const { data } = await get(`/test/presence/${creatorId}`);
+            present = data.data.present;
+            if (present)
                 break;
         }
-        assert(presence === '1', `Expected presence key = '1', got: ${presence}`);
+        assert(present, `Expected presence key to be set after heartbeat`);
     });
     await test('dm_send via socket delivers dm_received to receiver', async () => {
         const dmPromise = waitForEvent(memberSocket, socket_events_1.SocketEvents.DM_RECEIVED);
@@ -2124,8 +2329,9 @@ async function runFeaturesSuite() {
         creatorSocket.disconnect();
         memberSocket.disconnect();
         await new Promise((r) => setTimeout(r, 500));
-        const presence = await connection_1.redis.get(`presence:${creatorId}`);
-        assert(presence === null, `Presence should be null after disconnect, got: ${presence}`);
+        const { data } = await get(`/test/presence/${creatorId}`);
+        const present = data.data.present;
+        assert(!present, `Presence should be cleared after disconnect`);
     });
     // ── 16. Group Deletion ─────────────────────────────────────────────────────
     section('16. Group Deletion');
@@ -2200,9 +2406,7 @@ run()
     console.error('\nFatal test runner error:', err);
     process.exitCode = 1;
 })
-    .finally(async () => {
-    await connection_1.redis.quit();
-    await connection_1.prisma.$disconnect();
+    .finally(() => {
     process.exit(results.some((r) => !r.passed) ? 1 : 0);
 });
 //# sourceMappingURL=index.js.map

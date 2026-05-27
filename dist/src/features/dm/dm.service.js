@@ -228,14 +228,32 @@ class DmService {
             if (blocked) {
                 throw new error_middleware_1.ApiError('Cannot send DM to this user.', http_status_codes_1.StatusCodes.FORBIDDEN);
             }
+            // Validate reply_to_id belongs to this thread
+            if (dto.reply_to_id) {
+                const parent = await connection_1.prisma.directMessage.findUnique({
+                    where: { id: dto.reply_to_id },
+                    select: { senderId: true, receiverId: true },
+                });
+                const isInThread = parent && ((parent.senderId === userId && parent.receiverId === otherUserId) ||
+                    (parent.senderId === otherUserId && parent.receiverId === userId));
+                if (!isInThread) {
+                    throw new error_middleware_1.ApiError('reply_to_id does not belong to this conversation.', http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY);
+                }
+            }
             let mediaUrl = dto.media_url ?? null;
+            let messageType = dto.message_type ?? 'text';
+            let storedMimeType = media?.mimeType ?? null;
             if (media) {
+                const isAudio = media.mimeType.startsWith('audio/') || media.mimeType === 'video/webm';
                 const result = await storage_service_1.StorageService.upload(media.buffer, media.mimeType, {
                     folder: `groupsync/dms/${userId}`,
                     publicId: `${otherUserId}-${Date.now()}-${(0, crypto_1.randomUUID)()}`,
-                    transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+                    resourceType: isAudio ? 'audio' : 'image',
+                    transformation: isAudio ? undefined : [{ quality: 'auto', fetch_format: 'auto' }],
                 });
                 mediaUrl = result.url;
+                messageType = isAudio ? 'audio' : 'image';
+                storedMimeType = isAudio ? 'audio/mpeg' : media.mimeType; // audio transcoded to mp3
             }
             if (!dto.content?.trim() && !mediaUrl) {
                 throw new error_middleware_1.ApiError('Content or media is required.', http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY);
@@ -245,7 +263,10 @@ class DmService {
                     senderId: userId,
                     receiverId: otherUserId,
                     content: dto.content?.trim() ?? null,
+                    messageType,
                     mediaUrl,
+                    mediaMimeType: storedMimeType,
+                    replyToId: dto.reply_to_id ?? null,
                 },
                 select: dm_types_1.dmSelect,
             });
@@ -293,6 +314,78 @@ class DmService {
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('DmService.markRead error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    // ── Add reaction ──────────────────────────────────────────────────────────
+    async addReaction(dmId, emoji, actor) {
+        try {
+            const dm = await connection_1.prisma.directMessage.findUnique({
+                where: { id: dmId },
+                select: { id: true, senderId: true, receiverId: true },
+            });
+            if (!dm)
+                throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('Message'), http_status_codes_1.StatusCodes.NOT_FOUND);
+            if (dm.senderId !== actor.userId && dm.receiverId !== actor.userId) {
+                throw new error_middleware_1.ApiError(response_constants_1.Messages.FORBIDDEN, http_status_codes_1.StatusCodes.FORBIDDEN);
+            }
+            const existing = await connection_1.prisma.dmReaction.findUnique({
+                where: { dmId_userId_emoji: { dmId, userId: actor.userId, emoji } },
+                select: { id: true },
+            });
+            if (existing) {
+                throw new error_middleware_1.ApiError('You already reacted with this emoji.', http_status_codes_1.StatusCodes.CONFLICT);
+            }
+            await connection_1.prisma.dmReaction.create({ data: { dmId, userId: actor.userId, emoji } });
+            const otherUserId = dm.senderId === actor.userId ? dm.receiverId : dm.senderId;
+            socket_service_1.SocketService.emitToRoom(`user:${otherUserId}`, socket_events_1.SocketEvents.DM_REACTION_ADDED, {
+                dm_id: dmId,
+                emoji,
+                user_id: actor.userId,
+            });
+            socket_service_1.SocketService.emitToRoom(`user:${actor.userId}`, socket_events_1.SocketEvents.DM_REACTION_ADDED, {
+                dm_id: dmId,
+                emoji,
+                user_id: actor.userId,
+            });
+        }
+        catch (error) {
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('DmService.addReaction error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    // ── Remove reaction ───────────────────────────────────────────────────────
+    async removeReaction(dmId, emoji, actor) {
+        try {
+            const reaction = await connection_1.prisma.dmReaction.findUnique({
+                where: { dmId_userId_emoji: { dmId, userId: actor.userId, emoji } },
+                select: { id: true, dm: { select: { senderId: true, receiverId: true } } },
+            });
+            if (!reaction)
+                throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('Reaction'), http_status_codes_1.StatusCodes.NOT_FOUND);
+            await connection_1.prisma.dmReaction.delete({
+                where: { dmId_userId_emoji: { dmId, userId: actor.userId, emoji } },
+            });
+            const otherUserId = reaction.dm.senderId === actor.userId
+                ? reaction.dm.receiverId
+                : reaction.dm.senderId;
+            socket_service_1.SocketService.emitToRoom(`user:${otherUserId}`, socket_events_1.SocketEvents.DM_REACTION_REMOVED, {
+                dm_id: dmId,
+                emoji,
+                user_id: actor.userId,
+            });
+            socket_service_1.SocketService.emitToRoom(`user:${actor.userId}`, socket_events_1.SocketEvents.DM_REACTION_REMOVED, {
+                dm_id: dmId,
+                emoji,
+                user_id: actor.userId,
+            });
+        }
+        catch (error) {
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('DmService.removeReaction error:', error);
             throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }

@@ -9,6 +9,7 @@ exports.SocketEvents = {
     USER_TYPING: 'user_typing',
     HEARTBEAT: 'heartbeat',
     // ── Group chat — server → client ───────────────────────────────────────────
+    GROUP_JOINED: 'group_joined',
     NEW_MESSAGE: 'new_message',
     MESSAGE_DELETED: 'message_deleted',
     MESSAGE_PINNED: 'message_pinned',
@@ -23,6 +24,10 @@ exports.SocketEvents = {
     // ── DM — server → client ──────────────────────────────────────────────────
     DM_RECEIVED: 'dm_received',
     DM_READ: 'dm_read',
+    DM_REACTION_ADDED: 'dm_reaction_added',
+    DM_REACTION_REMOVED: 'dm_reaction_removed',
+    // ── Polls — server → client ───────────────────────────────────────────────
+    POLL_VOTE_UPDATED: 'poll_vote_updated',
     // ── Errors ────────────────────────────────────────────────────────────────
     ERROR: 'chat_error',
 };

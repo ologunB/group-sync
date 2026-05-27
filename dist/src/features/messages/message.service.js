@@ -96,16 +96,32 @@ class MessageService {
             }
             let mediaUrl = dto.media_url ?? null;
             let messageType = dto.message_type ?? 'text';
+            let storedMimeType = media?.mimeType ?? null;
             if (media) {
+                const isAudio = media.mimeType.startsWith('audio/') || media.mimeType === 'video/webm';
                 const result = await storage_service_1.StorageService.upload(media.buffer, media.mimeType, {
                     folder: `groupsync/messages/${groupId}`,
                     publicId: `${actor.userId}-${Date.now()}-${(0, crypto_1.randomUUID)()}`,
-                    transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+                    resourceType: isAudio ? 'audio' : 'image',
+                    transformation: isAudio ? undefined : [{ quality: 'auto', fetch_format: 'auto' }],
                 });
                 mediaUrl = result.url;
-                messageType = 'image';
+                messageType = isAudio ? 'audio' : 'image';
+                storedMimeType = isAudio ? 'audio/mpeg' : media.mimeType; // audio transcoded to mp3
             }
-            if (!dto.content?.trim() && !mediaUrl) {
+            if (messageType === 'poll') {
+                const p = dto.poll;
+                if (!p?.question?.trim()) {
+                    throw new error_middleware_1.ApiError('Poll question is required.', http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY);
+                }
+                if (!Array.isArray(p.options) || p.options.length < 2 || p.options.length > 10) {
+                    throw new error_middleware_1.ApiError('Poll must have between 2 and 10 options.', http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY);
+                }
+                if (p.options.some((o) => !o?.trim())) {
+                    throw new error_middleware_1.ApiError('All poll options must be non-empty strings.', http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY);
+                }
+            }
+            else if (!dto.content?.trim() && !mediaUrl) {
                 throw new error_middleware_1.ApiError('Message content or media is required.', http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY);
             }
             const message = await connection_1.prisma.message.create({
@@ -115,7 +131,23 @@ class MessageService {
                     content: dto.content?.trim() ?? null,
                     messageType,
                     mediaUrl,
+                    mediaMimeType: storedMimeType,
                     replyToId: dto.reply_to_id ?? null,
+                    ...(messageType === 'poll' && dto.poll ? {
+                        poll: {
+                            create: {
+                                question: dto.poll.question.trim(),
+                                isMultiple: dto.poll.is_multiple ?? false,
+                                endsAt: dto.poll.ends_at ? new Date(dto.poll.ends_at) : null,
+                                options: {
+                                    create: dto.poll.options.map((text, i) => ({
+                                        text: text.trim(),
+                                        position: i,
+                                    })),
+                                },
+                            },
+                        },
+                    } : {}),
                 },
                 select: message_types_1.messageSelect,
             });
@@ -266,6 +298,114 @@ class MessageService {
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('MessageService.listPinned error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    // ── Vote on poll ──────────────────────────────────────────────────────────
+    async votePoll(messageId, dto, actor) {
+        try {
+            const message = await connection_1.prisma.message.findUnique({
+                where: { id: messageId },
+                select: { id: true, groupId: true, isDeleted: true, messageType: true,
+                    poll: { select: { id: true, isMultiple: true, endsAt: true } } },
+            });
+            if (!message || message.isDeleted || message.messageType !== 'poll' || !message.poll) {
+                throw new error_middleware_1.ApiError('Poll not found.', http_status_codes_1.StatusCodes.NOT_FOUND);
+            }
+            if (message.poll.endsAt && message.poll.endsAt < new Date()) {
+                throw new error_middleware_1.ApiError('This poll has ended.', http_status_codes_1.StatusCodes.GONE);
+            }
+            await requireActiveMember(message.groupId, actor.userId);
+            const option = await connection_1.prisma.pollOption.findUnique({
+                where: { id: dto.option_id },
+                select: { id: true, pollId: true },
+            });
+            if (!option || option.pollId !== message.poll.id) {
+                throw new error_middleware_1.ApiError('Poll option not found.', http_status_codes_1.StatusCodes.NOT_FOUND);
+            }
+            const existing = await connection_1.prisma.pollVote.findUnique({
+                where: { optionId_userId: { optionId: dto.option_id, userId: actor.userId } },
+                select: { id: true },
+            });
+            if (existing) {
+                throw new error_middleware_1.ApiError('You have already voted for this option.', http_status_codes_1.StatusCodes.CONFLICT);
+            }
+            if (!message.poll.isMultiple) {
+                const priorVote = await connection_1.prisma.pollVote.findFirst({
+                    where: { pollId: message.poll.id, userId: actor.userId },
+                    select: { id: true },
+                });
+                if (priorVote) {
+                    throw new error_middleware_1.ApiError('You have already voted in this poll.', http_status_codes_1.StatusCodes.CONFLICT);
+                }
+            }
+            await connection_1.prisma.pollVote.create({
+                data: { optionId: dto.option_id, pollId: message.poll.id, userId: actor.userId },
+            });
+            const updated = await connection_1.prisma.message.findUniqueOrThrow({
+                where: { id: messageId },
+                select: message_types_1.messageSelect,
+            });
+            socket_service_1.SocketService.emitToRoom(`group:${message.groupId}`, socket_events_1.SocketEvents.POLL_VOTE_UPDATED, {
+                message_id: messageId,
+                poll_id: message.poll.id,
+                option_id: dto.option_id,
+                user_id: actor.userId,
+                action: 'vote',
+            });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.POLL_VOTE, audit_logger_1.ResourceTypes.MESSAGE, messageId, 1, { optionId: dto.option_id });
+            return updated;
+        }
+        catch (error) {
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('MessageService.votePoll error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    // ── Remove vote from poll ─────────────────────────────────────────────────
+    async unvotePoll(messageId, dto, actor) {
+        try {
+            const message = await connection_1.prisma.message.findUnique({
+                where: { id: messageId },
+                select: { id: true, groupId: true, isDeleted: true, messageType: true,
+                    poll: { select: { id: true, endsAt: true } } },
+            });
+            if (!message || message.isDeleted || message.messageType !== 'poll' || !message.poll) {
+                throw new error_middleware_1.ApiError('Poll not found.', http_status_codes_1.StatusCodes.NOT_FOUND);
+            }
+            if (message.poll.endsAt && message.poll.endsAt < new Date()) {
+                throw new error_middleware_1.ApiError('This poll has ended.', http_status_codes_1.StatusCodes.GONE);
+            }
+            await requireActiveMember(message.groupId, actor.userId);
+            const vote = await connection_1.prisma.pollVote.findUnique({
+                where: { optionId_userId: { optionId: dto.option_id, userId: actor.userId } },
+                select: { id: true },
+            });
+            if (!vote) {
+                throw new error_middleware_1.ApiError('Vote not found.', http_status_codes_1.StatusCodes.NOT_FOUND);
+            }
+            await connection_1.prisma.pollVote.delete({
+                where: { optionId_userId: { optionId: dto.option_id, userId: actor.userId } },
+            });
+            const updated = await connection_1.prisma.message.findUniqueOrThrow({
+                where: { id: messageId },
+                select: message_types_1.messageSelect,
+            });
+            socket_service_1.SocketService.emitToRoom(`group:${message.groupId}`, socket_events_1.SocketEvents.POLL_VOTE_UPDATED, {
+                message_id: messageId,
+                poll_id: message.poll.id,
+                option_id: dto.option_id,
+                user_id: actor.userId,
+                action: 'unvote',
+            });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.POLL_UNVOTE, audit_logger_1.ResourceTypes.MESSAGE, messageId, 1, { optionId: dto.option_id });
+            return updated;
+        }
+        catch (error) {
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('MessageService.unvotePoll error:', error);
             throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }

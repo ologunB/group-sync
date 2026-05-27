@@ -2007,7 +2007,7 @@ async function runFeaturesSuite(): Promise<void> {
         token?: string,
     ): Promise<ApiResponse> {
         const formData = new FormData();
-        formData.append(fieldName, new Blob([buffer], { type: mimeType }), 'test.' + mimeType.split('/')[1]);
+        formData.append(fieldName, new Blob([new Uint8Array(buffer)], { type: mimeType }), 'test.' + mimeType.split('/')[1]);
 
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -2038,7 +2038,7 @@ async function runFeaturesSuite(): Promise<void> {
         for (const [key, value] of Object.entries(fields)) {
             formData.append(key, value);
         }
-        formData.append(fieldName, new Blob([buffer], { type: mimeType }), 'test.' + mimeType.split('/')[1]);
+        formData.append(fieldName, new Blob([new Uint8Array(buffer)], { type: mimeType }), 'test.' + mimeType.split('/')[1]);
 
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -2486,6 +2486,18 @@ async function runFeaturesSuite(): Promise<void> {
 
     section('13. Messages (Group Chat)');
 
+    // Re-login before messages section — sections 1-12 can exceed the 15-min JWT TTL
+    await test('refresh tokens before message tests', async () => {
+        const { data: cd } = await post('/auth/login', { email: CREATOR_EMAIL, password: CREATOR_PASS });
+        const { data: md } = await post('/auth/login', { email: MEMBER_EMAIL,  password: MEMBER_PASS  });
+        const freshCreator = ((cd.data as any)?.tokens as any)?.accessToken as string;
+        const freshMember  = ((md.data as any)?.tokens as any)?.accessToken as string;
+        assert(freshCreator?.length > 0, `Creator re-login failed: ${JSON.stringify(cd)}`);
+        assert(freshMember?.length  > 0, `Member re-login failed: ${JSON.stringify(md)}`);
+        creatorToken = freshCreator;
+        memberToken  = freshMember;
+    });
+
     let messageId = '';
     let pinnedMessageId = '';
 
@@ -2758,6 +2770,18 @@ async function runFeaturesSuite(): Promise<void> {
 
     section('14. Direct Messages');
 
+    // Re-login before DM section — sections 1-13 can exceed the 15-min JWT TTL
+    await test('refresh tokens before DM tests', async () => {
+        const { data: cd } = await post('/auth/login', { email: CREATOR_EMAIL, password: CREATOR_PASS });
+        const { data: md } = await post('/auth/login', { email: MEMBER_EMAIL,  password: MEMBER_PASS  });
+        const freshCreator = ((cd.data as any)?.tokens as any)?.accessToken as string;
+        const freshMember  = ((md.data as any)?.tokens as any)?.accessToken as string;
+        assert(freshCreator?.length > 0, `Creator re-login failed: ${JSON.stringify(cd)}`);
+        assert(freshMember?.length  > 0, `Member re-login failed: ${JSON.stringify(md)}`);
+        creatorToken = freshCreator;
+        memberToken  = freshMember;
+    });
+
     let dmId = '';
 
     await test('GET /conversations without auth returns 401', async () => {
@@ -2965,7 +2989,7 @@ async function runFeaturesSuite(): Promise<void> {
         memberToken  = freshMember;
     });
 
-    const SOCKET_URL = 'http://localhost:3000/chat';
+    const SOCKET_URL = BASE.replace('/api/v1', '') + '/chat';
 
     function connectSocket(token: string): Promise<ClientSocket> {
         return new Promise((resolve, reject) => {

@@ -23,5 +23,23 @@ exports.messageSelect = {
     reactions: {
         select: { id: true, emoji: true, userId: true, createdAt: true },
     },
+    poll: {
+        select: {
+            id: true,
+            question: true,
+            isMultiple: true,
+            endsAt: true,
+            options: {
+                select: {
+                    id: true,
+                    text: true,
+                    position: true,
+                    _count: { select: { votes: true } },
+                    votes: { select: { userId: true } },
+                },
+                orderBy: { position: 'asc' },
+            },
+        },
+    },
 };
 //# sourceMappingURL=message.types.js.map
