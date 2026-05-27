@@ -19,10 +19,8 @@ export class CloudinaryProvider implements StorageProvider {
                     folder:          options.folder,
                     public_id:       options.publicId,
                     resource_type:   isAudio ? 'video' : 'image', // Cloudinary uses 'video' for audio
-                    allowed_formats: isAudio
-                        ? ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'opus', 'flac', 'webm']
-                        : ['jpg', 'jpeg', 'png', 'webp'],
-                    // Transcode all audio to mp3 regardless of input format (webm, ogg, m4a, etc.)
+                    allowed_formats: isAudio ? undefined : ['jpg', 'jpeg', 'png', 'webp'],
+                    // Transcode all audio to mp3 — multer already validates the input format
                     format:          isAudio ? 'mp3' : undefined,
                     transformation:  isAudio ? undefined : (options.transformation ?? [
                         { quality: 'auto', fetch_format: 'auto' },
