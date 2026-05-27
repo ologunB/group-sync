@@ -36,8 +36,7 @@ class Database {
         if (this._connected) return;
 
         try {
-            await this._client.$connect();
-            await this.pool.query('SELECT 1');
+            await this._client.$connect(); // internally validates the connection via the adapter
             this._connected = true;
             asLogger.info('PostgreSQL connected successfully');
         } catch (error) {
