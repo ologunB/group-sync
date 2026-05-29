@@ -79,6 +79,10 @@ export class MembershipService {
                 throw new ApiError('You have been banned from this group.', StatusCodes.FORBIDDEN);
             }
 
+            if (existing?.status === 'suspended') {
+                throw new ApiError('Your membership in this group has been suspended.', StatusCodes.FORBIDDEN);
+            }
+
             // Create membership — DB trigger handles member_count increment
             await prisma.membership.create({
                 data: { userId: actor.userId, groupId, role: 'member', status: 'active' },
@@ -175,13 +179,6 @@ export class MembershipService {
                 );
             }
 
-            if (existingApp?.status === 'approved') {
-                throw new ApiError(
-                    'Your previous application was approved. You are already a member.',
-                    StatusCodes.CONFLICT,
-                );
-            }
-
             // Validate required form fields if a form exists
             if (group.groupForm) {
                 const fields = group.groupForm.fields as Array<{
@@ -202,8 +199,8 @@ export class MembershipService {
                 }
             }
 
-            // Delete rejected or withdrawn application if exists (allow re-application)
-            if (existingApp?.status === 'rejected' || existingApp?.status === 'withdrawn') {
+            // Delete old application if it exists and is no longer blocking (allow re-application)
+            if (existingApp && existingApp.status !== 'pending') {
                 await prisma.application.delete({ where: { id: existingApp.id } });
             }
 
