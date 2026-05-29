@@ -7,6 +7,7 @@ import { asLogger } from '../utils/asLogger';
 import { SocketEvents } from './socket.events';
 import { config } from '../config/app.config';
 import { TokenPayload } from '../types/common.types';
+import { messageSelect } from '../../features/messages/message.types';
 
 // Augment Socket with the authenticated user payload
 interface AuthSocket extends Socket {
@@ -127,12 +128,7 @@ async function handleConnection(socket: AuthSocket, nsp: Namespace): Promise<voi
                     messageType: message_type,
                     replyToId: reply_to_id ?? null,
                 },
-                select: {
-                    id: true, groupId: true, senderId: true, content: true,
-                    messageType: true, mediaUrl: true, replyToId: true,
-                    isPinned: true, isDeleted: true, createdAt: true,
-                    sender: { select: { id: true, displayName: true, profilePhotoUrl: true } },
-                },
+                select: messageSelect,
             });
 
             nsp.to(`group:${group_id}`).emit(SocketEvents.NEW_MESSAGE, { message });
@@ -214,6 +210,13 @@ async function handleConnection(socket: AuthSocket, nsp: Namespace): Promise<voi
             asLogger.error('socket dm_send error:', err);
             socket.emit(SocketEvents.ERROR, { message: 'Failed to send DM.' });
         }
+    });
+
+    // ── DM typing indicator ───────────────────────────────────────────────────
+    socket.on(SocketEvents.DM_TYPING, ({ receiver_id }: { receiver_id: string }) => {
+        nsp.to(`user:${receiver_id}`).emit(SocketEvents.DM_TYPING_UPDATE, {
+            sender_id: userId,
+        });
     });
 
     // ── Disconnect ────────────────────────────────────────────────────────────

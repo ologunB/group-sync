@@ -48,7 +48,13 @@ export const dmSelect = {
         },
     },
     reactions: {
-        select: { id: true, emoji: true, userId: true, createdAt: true },
+        select: {
+            id: true,
+            emoji: true,
+            userId: true,
+            createdAt: true,
+            user: { select: { id: true, displayName: true, profilePhotoUrl: true } },
+        },
     },
 } satisfies Prisma.DirectMessageSelect;
 
