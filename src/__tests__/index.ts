@@ -12,7 +12,7 @@ import { EncryptionUtil } from '../shared/utils/encryption';
 import { io as ioClient, Socket as ClientSocket } from 'socket.io-client';
 import { SocketEvents } from '../shared/socket/socket.events';
 
-const BASE = Boolean(true) ? 'https://group-sync-ovzh.onrender.com/api/v1' : 'http://localhost:3000/api/v1';
+const BASE = Boolean(false) ? 'https://group-sync-ovzh.onrender.com/api/v1' : 'http://localhost:3000/api/v1';
 const ts = Date.now();
 
 // ─── Shared assertion helpers ─────────────────────────────────────────────────
@@ -225,7 +225,7 @@ async function runAuthSuite(): Promise<void> {
     await test('register with valid phone number returns 201', async () => {
         const { status } = await post('/auth/register', {
             email: `withphone${ts}@test.io`, password: PASSWORD,
-            display_name: 'Phone User', phone: `+234${String(ts).slice(-10)}`,
+            display_name: 'Phone User', phone: `+2348${String(ts).slice(-9)}`,
         });
         assertStatus(status, 201);
     });
@@ -3144,6 +3144,386 @@ async function runFeaturesSuite(): Promise<void> {
         const { data } = await get(`/test/presence/${creatorId}`);
         const present = (data.data as Record<string, unknown>).present as boolean;
         assert(!present, `Presence should be cleared after disconnect`);
+    });
+
+    // ── 15b. Feed (Group Timeline) ────────────────────────────────────────────
+
+    console.log('\n══════════════════════════════════════════════════════════════');
+    console.log('  Suite — Feed / Group Timeline');
+    console.log('══════════════════════════════════════════════════════════════');
+
+    // Re-login before feed tests — prior sections can push us past the 15-min JWT TTL
+    await test('refresh tokens before feed tests', async () => {
+        const { data: cd } = await post('/auth/login', { email: CREATOR_EMAIL, password: CREATOR_PASS });
+        const { data: md } = await post('/auth/login', { email: MEMBER_EMAIL,  password: MEMBER_PASS  });
+        const { data: od } = await post('/auth/login', { email: OUTSIDER_EMAIL, password: OUTSIDER_PASS });
+        const fc = ((cd.data as any)?.tokens as any)?.accessToken as string;
+        const fm = ((md.data as any)?.tokens as any)?.accessToken as string;
+        const fo = ((od.data as any)?.tokens as any)?.accessToken as string;
+        assert(fc?.length > 0, 'Creator re-login failed');
+        assert(fm?.length > 0, 'Member re-login failed');
+        assert(fo?.length > 0, 'Outsider re-login failed');
+        creatorToken  = fc;
+        memberToken   = fm;
+        outsiderToken = fo;
+    });
+
+    let feedPostId      = '';
+    let publicPostId    = '';
+    let feedCommentId   = '';
+    let feedReplyId     = '';
+
+    section('Feed — Post CRUD');
+
+    await test('POST /test/seed-feed seeds 100 diverse posts', async () => {
+        const { status, data } = await post('/test/seed-feed', { groupId: openGroupId, authorId: creatorId });
+        assertStatus(status, 201);
+        const d = data.data as Record<string, unknown>;
+        assert(typeof d.count === 'number' && d.count > 0, `Expected count > 0, got ${d.count}`);
+    });
+
+    await test('POST /groups/:id/feed without auth returns 401', async () => {
+        const { status } = await post(`/groups/${openGroupId}/feed`, { content: 'Hello world' });
+        assertStatus(status, 401);
+    });
+
+    await test('POST /groups/:id/feed as non-member returns 403', async () => {
+        const { status } = await post(`/groups/${openGroupId}/feed`, { content: 'Hello world' }, outsiderToken);
+        assertStatus(status, 403);
+    });
+
+    await test('POST /groups/:id/feed with no content, link, or media returns 422', async () => {
+        const { status } = await post(`/groups/${openGroupId}/feed`, {}, creatorToken);
+        // Service throws UNPROCESSABLE_ENTITY (422)
+        assert(status >= 400 && status < 500, `Expected 4xx, got ${status}`);
+    });
+
+    await test('POST /groups/:id/feed creates a text post (201)', async () => {
+        const { status, data } = await post(
+            `/groups/${openGroupId}/feed`,
+            { content: 'My first feed post — integration test' },
+            creatorToken,
+        );
+        assertStatus(status, 201);
+        const post_ = data.data as Record<string, unknown>;
+        assertHas(post_, 'id');
+        assertHas(post_, 'content');
+        assertHas(post_, 'author');
+        assertHas(post_, 'reactions');
+        assertHas(post_, '_count');
+        assert(post_.isPublic === false, 'New post should default to private');
+        assert(post_.isPinned === false, 'New post should default to unpinned');
+        feedPostId = post_.id as string;
+    });
+
+    await test('POST /groups/:id/feed creates a link post (201)', async () => {
+        const { status, data } = await post(
+            `/groups/${openGroupId}/feed`,
+            { content: 'Check out this resource', link_url: 'https://example.com' },
+            memberToken,
+        );
+        assertStatus(status, 201);
+        const post_ = data.data as Record<string, unknown>;
+        assert(post_.linkUrl === 'https://example.com', `Expected linkUrl, got ${post_.linkUrl}`);
+    });
+
+    await test('POST /groups/:id/feed with HTTP link_url returns 422', async () => {
+        const { status } = await post(
+            `/groups/${openGroupId}/feed`,
+            { content: 'Bad link', link_url: 'http://example.com' },
+            creatorToken,
+        );
+        assertStatus(status, 422);
+    });
+
+    await test('GET /groups/:id/feed as member returns all posts including private (200)', async () => {
+        const { status, data } = await get(`/groups/${openGroupId}/feed`, creatorToken);
+        assertStatus(status, 200);
+        const d = data.data as Record<string, unknown>;
+        assertHas(d, 'pinned');
+        assertHas(d, 'data');
+        assertHas(d, 'has_more');
+        const posts = d.data as unknown[];
+        assert(posts.length > 0, 'Expected posts in feed');
+    });
+
+    await test('GET /groups/:id/feed without auth returns only public posts (200)', async () => {
+        const { status, data } = await get(`/groups/${openGroupId}/feed`);
+        assertStatus(status, 200);
+        const d  = data.data as Record<string, unknown>;
+        const all = [...(d.pinned as any[]), ...(d.data as any[])];
+        assert(all.every((p: any) => p.isPublic === true), 'Non-member should only see public posts');
+    });
+
+    await test('GET /groups/:id/feed?limit=5 paginates correctly (200)', async () => {
+        const { status, data } = await get(`/groups/${openGroupId}/feed?limit=5`, creatorToken);
+        assertStatus(status, 200);
+        const d = data.data as Record<string, unknown>;
+        const posts = d.data as unknown[];
+        assert(posts.length <= 5, `Expected ≤5 posts, got ${posts.length}`);
+        assert(d.has_more === true, 'Expected has_more=true with 100 seeded posts');
+        assert(typeof d.next_cursor === 'string', 'Expected next_cursor string');
+    });
+
+    await test('GET /groups/:id/feed with cursor returns next page (200)', async () => {
+        const first  = await get(`/groups/${openGroupId}/feed?limit=5`, creatorToken);
+        const cursor = ((first.data.data as any).next_cursor) as string;
+        const { status, data } = await get(`/groups/${openGroupId}/feed?limit=5&cursor=${cursor}`, creatorToken);
+        assertStatus(status, 200);
+        const secondPage = (data.data as any).data as any[];
+        assert(secondPage.length > 0, 'Expected posts on second page');
+    });
+
+    await test('GET /feed/posts/:postId returns the post (200)', async () => {
+        const { status, data } = await get(`/feed/posts/${feedPostId}`, creatorToken);
+        assertStatus(status, 200);
+        const p = data.data as Record<string, unknown>;
+        assert(p.id === feedPostId, 'ID mismatch');
+    });
+
+    await test('GET /feed/posts/:postId without auth on private post returns 403', async () => {
+        const { status } = await get(`/feed/posts/${feedPostId}`);
+        assertStatus(status, 403);
+    });
+
+    await test('PATCH /feed/posts/:postId updates content (200)', async () => {
+        const { status, data } = await patch(
+            `/feed/posts/${feedPostId}`,
+            { content: 'Updated feed post content' },
+            creatorToken,
+        );
+        assertStatus(status, 200);
+        const p = data.data as Record<string, unknown>;
+        assert(p.content === 'Updated feed post content', `Content mismatch: ${p.content}`);
+    });
+
+    await test('PATCH /feed/posts/:postId by non-author returns 403', async () => {
+        const { status } = await patch(
+            `/feed/posts/${feedPostId}`,
+            { content: 'Trying to hijack' },
+            memberToken,
+        );
+        assertStatus(status, 403);
+    });
+
+    section('Feed — Visibility & Pin');
+
+    await test('PATCH /feed/posts/:postId/visibility as non-admin returns 403', async () => {
+        const { status } = await patch(`/feed/posts/${feedPostId}/visibility`, {}, memberToken);
+        assertStatus(status, 403);
+    });
+
+    await test('PATCH /feed/posts/:postId/visibility as admin toggles to public (200)', async () => {
+        const { status, data } = await patch(`/feed/posts/${feedPostId}/visibility`, {}, creatorToken);
+        assertStatus(status, 200);
+        const p = data.data as Record<string, unknown>;
+        assert(p.isPublic === true, `Expected isPublic=true, got ${p.isPublic}`);
+        publicPostId = p.id as string;
+    });
+
+    await test('GET /feed/posts/:postId on now-public post works without auth (200)', async () => {
+        const { status } = await get(`/feed/posts/${publicPostId}`);
+        assertStatus(status, 200);
+    });
+
+    await test('PATCH /feed/posts/:postId/pin as non-admin returns 403', async () => {
+        const { status } = await patch(`/feed/posts/${feedPostId}/pin`, {}, memberToken);
+        assertStatus(status, 403);
+    });
+
+    await test('PATCH /feed/posts/:postId/pin as admin pins post (200)', async () => {
+        const { status, data } = await patch(`/feed/posts/${feedPostId}/pin`, {}, creatorToken);
+        assertStatus(status, 200);
+        const p = data.data as Record<string, unknown>;
+        assert(p.isPinned === true, `Expected isPinned=true, got ${p.isPinned}`);
+    });
+
+    await test('GET /groups/:id/feed pinned array includes pinned post', async () => {
+        const { status, data } = await get(`/groups/${openGroupId}/feed`, creatorToken);
+        assertStatus(status, 200);
+        const pinned = (data.data as any).pinned as any[];
+        assert(pinned.some((p: any) => p.id === feedPostId), 'Pinned post missing from pinned array');
+    });
+
+    await test('PATCH /feed/posts/:postId/pin again unpins (toggle, 200)', async () => {
+        const { status, data } = await patch(`/feed/posts/${feedPostId}/pin`, {}, creatorToken);
+        assertStatus(status, 200);
+        const p = data.data as Record<string, unknown>;
+        assert(p.isPinned === false, `Expected isPinned=false after toggle, got ${p.isPinned}`);
+    });
+
+    section('Feed — Reactions');
+
+    await test('POST /feed/posts/:postId/react without auth returns 401', async () => {
+        const { status } = await post(`/feed/posts/${feedPostId}/react`, { emoji: '👍' });
+        assertStatus(status, 401);
+    });
+
+    await test('POST /feed/posts/:postId/react as non-member returns 403', async () => {
+        const { status } = await post(`/feed/posts/${feedPostId}/react`, { emoji: '👍' }, outsiderToken);
+        assertStatus(status, 403);
+    });
+
+    await test('POST /feed/posts/:postId/react adds reaction (201)', async () => {
+        const { status } = await post(`/feed/posts/${feedPostId}/react`, { emoji: '👍' }, creatorToken);
+        assertStatus(status, 201);
+    });
+
+    await test('POST /feed/posts/:postId/react duplicate returns 409', async () => {
+        const { status } = await post(`/feed/posts/${feedPostId}/react`, { emoji: '👍' }, creatorToken);
+        assertStatus(status, 409);
+    });
+
+    await test('DELETE /feed/posts/:postId/react removes reaction (200)', async () => {
+        const { status } = await del(`/feed/posts/${feedPostId}/react`, creatorToken, { emoji: '👍' });
+        assertStatus(status, 200);
+    });
+
+    await test('DELETE /feed/posts/:postId/react non-existent returns 404', async () => {
+        const { status } = await del(`/feed/posts/${feedPostId}/react`, creatorToken, { emoji: '🔥' });
+        assertStatus(status, 404);
+    });
+
+    section('Feed — Comments');
+
+    await test('POST /feed/posts/:postId/comments without auth returns 401', async () => {
+        const { status } = await post(`/feed/posts/${feedPostId}/comments`, { content: 'Hi' });
+        assertStatus(status, 401);
+    });
+
+    await test('POST /feed/posts/:postId/comments as non-member returns 403', async () => {
+        const { status } = await post(`/feed/posts/${feedPostId}/comments`, { content: 'Hi' }, outsiderToken);
+        assertStatus(status, 403);
+    });
+
+    await test('POST /feed/posts/:postId/comments adds comment (201)', async () => {
+        const { status, data } = await post(
+            `/feed/posts/${feedPostId}/comments`,
+            { content: 'Great post! Really enjoyed reading this.' },
+            memberToken,
+        );
+        assertStatus(status, 201);
+        const c = data.data as Record<string, unknown>;
+        assertHas(c, 'id');
+        assertHas(c, 'content');
+        assertHas(c, 'author');
+        assert(c.parentId === null, `Expected top-level comment, got parentId=${c.parentId}`);
+        feedCommentId = c.id as string;
+    });
+
+    await test('POST /feed/posts/:postId/comments with empty content returns 422', async () => {
+        const { status } = await post(`/feed/posts/${feedPostId}/comments`, { content: '' }, memberToken);
+        assertStatus(status, 422);
+    });
+
+    await test('POST /feed/posts/:postId/comments as a threaded reply (201)', async () => {
+        const { status, data } = await post(
+            `/feed/posts/${feedPostId}/comments`,
+            { content: 'Replying to your comment!', parent_id: feedCommentId },
+            creatorToken,
+        );
+        assertStatus(status, 201);
+        const c = data.data as Record<string, unknown>;
+        assert(c.parentId === feedCommentId, `Expected parentId=${feedCommentId}, got ${c.parentId}`);
+        feedReplyId = c.id as string;
+    });
+
+    await test('POST /feed/posts/:postId/comments with wrong-post parent_id returns 404', async () => {
+        const { status } = await post(
+            `/feed/posts/${feedPostId}/comments`,
+            { content: 'Bad reply', parent_id: '00000000-0000-0000-0000-000000000000' },
+            creatorToken,
+        );
+        assertStatus(status, 404);
+    });
+
+    await test('GET /feed/posts/:postId/comments returns top-level comments only (200)', async () => {
+        const { status, data } = await get(`/feed/posts/${feedPostId}/comments`, memberToken);
+        assertStatus(status, 200);
+        const comments = data.data as any[];
+        assert(comments.length > 0, 'Expected at least one comment');
+        assert(comments.every((c: any) => c.parentId === null), 'Expected top-level only');
+        const c = comments.find((c: any) => c.id === feedCommentId);
+        assert(c !== undefined, 'Top-level comment not found');
+        assert(c._count.replies >= 1, 'Expected at least one reply counted');
+    });
+
+    await test('GET /feed/comments/:commentId/replies returns replies (200)', async () => {
+        const { status, data } = await get(`/feed/comments/${feedCommentId}/replies`, memberToken);
+        assertStatus(status, 200);
+        const replies = data.data as any[];
+        assert(replies.some((r: any) => r.id === feedReplyId), 'Reply not found in list');
+    });
+
+    await test('PATCH /feed/comments/:commentId updates content (200)', async () => {
+        const { status, data } = await patch(
+            `/feed/comments/${feedCommentId}`,
+            { content: 'Edited comment text' },
+            memberToken,
+        );
+        assertStatus(status, 200);
+        const c = data.data as Record<string, unknown>;
+        assert(c.content === 'Edited comment text', `Content mismatch: ${c.content}`);
+    });
+
+    await test('PATCH /feed/comments/:commentId by non-author returns 403', async () => {
+        const { status } = await patch(`/feed/comments/${feedCommentId}`, { content: 'Hijack' }, creatorToken);
+        assertStatus(status, 403);
+    });
+
+    await test('POST /feed/comments/:commentId/react adds reaction to comment (201)', async () => {
+        const { status } = await post(`/feed/comments/${feedCommentId}/react`, { emoji: '❤️' }, creatorToken);
+        assertStatus(status, 201);
+    });
+
+    await test('POST /feed/comments/:commentId/react duplicate returns 409', async () => {
+        const { status } = await post(`/feed/comments/${feedCommentId}/react`, { emoji: '❤️' }, creatorToken);
+        assertStatus(status, 409);
+    });
+
+    await test('DELETE /feed/comments/:commentId/react removes reaction (200)', async () => {
+        const { status } = await del(`/feed/comments/${feedCommentId}/react`, creatorToken, { emoji: '❤️' });
+        assertStatus(status, 200);
+    });
+
+    await test('DELETE /feed/comments/:commentId as non-author non-admin returns 403', async () => {
+        const { status } = await del(`/feed/comments/${feedReplyId}`, outsiderToken);
+        assertStatus(status, 403);
+    });
+
+    await test('DELETE /feed/comments/:commentId as admin soft-deletes (200)', async () => {
+        const { status } = await del(`/feed/comments/${feedReplyId}`, creatorToken);
+        assertStatus(status, 200);
+    });
+
+    await test('DELETE /feed/posts/:postId as non-author non-admin returns 403', async () => {
+        const { status } = await del(`/feed/posts/${feedPostId}`, outsiderToken);
+        assertStatus(status, 403);
+    });
+
+    await test('DELETE /feed/posts/:postId as admin soft-deletes (200)', async () => {
+        // Create a fresh post from member, then admin deletes it
+        const { data: pd } = await post(
+            `/groups/${openGroupId}/feed`,
+            { content: 'Admin will delete this' },
+            memberToken,
+        );
+        const tempId = (pd.data as any).id as string;
+        const { status } = await del(`/feed/posts/${tempId}`, creatorToken);
+        assertStatus(status, 200);
+    });
+
+    await test('GET /feed/posts/:postId after deletion returns 404', async () => {
+        // Create and immediately delete
+        const { data: pd } = await post(
+            `/groups/${openGroupId}/feed`,
+            { content: 'Will be deleted' },
+            creatorToken,
+        );
+        const tmpId = (pd.data as any).id as string;
+        await del(`/feed/posts/${tmpId}`, creatorToken);
+        const { status } = await get(`/feed/posts/${tmpId}`, creatorToken);
+        assertStatus(status, 404);
     });
 
     // ── 16. Group Deletion ─────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "groupsync-api-v1",
     "name": "GroupSync API",
-    "description": "Complete API documentation for GroupSync \u2014 location-based social platform.\n\n## Quick Setup\n1. Import this collection\n2. Set `baseUrl` to `http://localhost:3000/api/v1`\n3. Run Register or Login \u2014 tokens saved automatically\n4. All authenticated requests use `{{accessToken}}` via collection-level Auth\n\n## Variables\n| Variable | Description | Auto-set |\n|---|---|---|\n| `baseUrl` | API base URL | No |\n| `accessToken` | JWT (15 min) | Yes \u2014 Login/Register |\n| `refreshToken` | Opaque token (30d) | Yes \u2014 Login/Register |\n| `userId` | Auth user UUID | Yes \u2014 Login/Register |\n| `targetUserId` | Another user UUID | No \u2014 set manually |\n| `groupId` | Group UUID | Yes \u2014 Create Group |\n| `groupSlug` | Group slug | Yes \u2014 Create Group |\n| `applicationId` | Application UUID | Yes \u2014 Apply to Group |\n| `inviteLinkId` | Invite link UUID | Yes \u2014 Generate Invite |\n| `inviteToken` | Invite token string | Yes \u2014 Generate Invite |\n\n## Response Envelope\n```json\n{ \"success\": true|false, \"message\": \"string\", \"data\": {}|[]|null, \"error\": null }\n```\nPaginated: includes `pagination: { page, limit, total }`",
+    "description": "Complete API documentation for GroupSync — location-based social platform.\n\n## Quick Setup\n1. Import this collection\n2. Set `baseUrl` to `http://localhost:3000/api/v1`\n3. Run Register or Login — tokens saved automatically\n4. All authenticated requests use `{{accessToken}}` via collection-level Auth\n\n## Variables\n| Variable | Description | Auto-set |\n|---|---|---|\n| `baseUrl` | API base URL | No |\n| `accessToken` | JWT (15 min) | Yes — Login/Register |\n| `refreshToken` | Opaque token (30d) | Yes — Login/Register |\n| `userId` | Auth user UUID | Yes — Login/Register |\n| `targetUserId` | Another user UUID | No — set manually |\n| `groupId` | Group UUID | Yes — Create Group |\n| `groupSlug` | Group slug | Yes — Create Group |\n| `applicationId` | Application UUID | Yes — Apply to Group |\n| `inviteLinkId` | Invite link UUID | Yes — Generate Invite |\n| `inviteToken` | Invite token string | Yes — Generate Invite |\n| `postId` | Feed post UUID | Yes — Create Post |\n| `commentId` | Comment UUID | Yes — Add Comment |\n\n## Response Envelope\n```json\n{ \"success\": true|false, \"message\": \"string\", \"data\": {}|[]|null, \"error\": null }\n```\nPaginated: includes `pagination: { page, limit, total }`",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "version": {
       "major": 1,
@@ -110,7 +110,7 @@
       "key": "socketUrl",
       "value": "http://localhost:3000",
       "type": "string",
-      "description": "Socket.IO server root \u2014 no /api/v1 prefix (e.g. http://localhost:3000 or https://group-sync-ovzh.onrender.com)"
+      "description": "Socket.IO server root — no /api/v1 prefix (e.g. http://localhost:3000 or https://group-sync-ovzh.onrender.com)"
     }
   ],
   "auth": {
@@ -243,7 +243,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Account created successfully. Please check your email to verify your account.\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"email\": \"testuser@example.com\",\n      \"displayName\": \"Test User\",\n      \"username\": null,\n      \"profilePhotoUrl\": null,\n      \"bio\": null,\n      \"city\": null,\n      \"state\": null,\n      \"country\": \"NG\",\n      \"interests\": [],\n      \"emailVerifiedAt\": null,\n      \"idVerificationStatus\": \"unsubmitted\",\n      \"status\": \"active\",\n      \"lastLoginAt\": null,\n      \"preferredLanguage\": \"en\",\n      \"createdAt\": \"2026-05-03T16:00:00.000Z\",\n      \"updatedAt\": \"2026-05-03T16:00:00.000Z\"\n    }\n  }\n}"
             },
             {
-              "name": "409 Conflict \u2014 Email exists",
+              "name": "409 Conflict — Email exists",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -255,7 +255,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"An account with this email address already exists.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "422 Unprocessable \u2014 Validation failed",
+              "name": "422 Unprocessable — Validation failed",
               "status": "Unprocessable Entity",
               "code": 422,
               "header": [
@@ -333,7 +333,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Login successful.\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"email\": \"testuser@example.com\",\n      \"displayName\": \"Test User\",\n      \"idVerificationStatus\": \"unsubmitted\",\n      \"status\": \"active\",\n      \"lastLoginAt\": \"2026-05-03T16:00:00.000Z\",\n      \"createdAt\": \"2026-05-03T16:00:00.000Z\",\n      \"updatedAt\": \"2026-05-03T16:00:00.000Z\"\n    },\n    \"tokens\": {\n      \"accessToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n      \"refreshToken\": \"a3f8b2c1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0\",\n      \"expiresIn\": 900\n    }\n  }\n}"
             },
             {
-              "name": "401 Unauthorized \u2014 Wrong credentials",
+              "name": "401 Unauthorized — Wrong credentials",
               "status": "Unauthorized",
               "code": 401,
               "header": [
@@ -345,7 +345,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"Invalid email or password.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Email not verified",
+              "name": "403 Forbidden — Email not verified",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -357,7 +357,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"Please verify your email address before proceeding.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "429 Too Many Requests \u2014 Account locked",
+              "name": "429 Too Many Requests — Account locked",
               "status": "Too Many Requests",
               "code": 429,
               "header": [
@@ -419,7 +419,7 @@
                 "social"
               ]
             },
-            "description": "Login or register via Google or Apple ID token.\n\nResolution flow:\n1. Provider ID linked \u2192 sign in\n2. Email exists, no link \u2192 link provider, sign in\n3. Neither \u2192 create account + link, sign in\n\nisNewUser=true triggers onboarding flow on client.\nApple returns 501 until Apple JWK verification is configured."
+            "description": "Login or register via Google or Apple ID token.\n\nResolution flow:\n1. Provider ID linked → sign in\n2. Email exists, no link → link provider, sign in\n3. Neither → create account + link, sign in\n\nisNewUser=true triggers onboarding flow on client.\nApple returns 501 until Apple JWK verification is configured."
           },
           "response": [
             {
@@ -435,7 +435,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Login successful.\",\n  \"data\": {\n    \"user\": { \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\", \"email\": \"testuser@gmail.com\", \"displayName\": \"Test User\", \"idVerificationStatus\": \"unsubmitted\", \"status\": \"active\" },\n    \"tokens\": { \"accessToken\": \"eyJhbGci...\", \"refreshToken\": \"a3f8b2c1...\", \"expiresIn\": 900 },\n    \"isNewUser\": false\n  }\n}"
             },
             {
-              "name": "401 Unauthorized \u2014 Invalid token",
+              "name": "401 Unauthorized — Invalid token",
               "status": "Unauthorized",
               "code": 401,
               "header": [
@@ -492,7 +492,7 @@
                 "logout"
               ]
             },
-            "description": "Revoke refresh token and session. Auth required.\n\nAccess token remains valid until 15-min TTL expires (stateless JWT).\nIdempotent \u2014 already-revoked tokens return 200.\nClears presence:{userId} in Redis.",
+            "description": "Revoke refresh token and session. Auth required.\n\nAccess token remains valid until 15-min TTL expires (stateless JWT).\nIdempotent — already-revoked tokens return 200.\nClears presence:{userId} in Redis.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -567,7 +567,7 @@
                 "refresh"
               ]
             },
-            "description": "Exchange refresh token for new token pair. No auth header needed.\n\nToken rotation: old token atomically revoked \u2014 each token usable once only.\nCall when access token expires (HTTP 401 TOKEN_EXPIRED)."
+            "description": "Exchange refresh token for new token pair. No auth header needed.\n\nToken rotation: old token atomically revoked — each token usable once only.\nCall when access token expires (HTTP 401 TOKEN_EXPIRED)."
           },
           "response": [
             {
@@ -583,7 +583,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Tokens refreshed successfully.\",\n  \"data\": {\n    \"tokens\": { \"accessToken\": \"eyJhbGci...\", \"refreshToken\": \"b4c9d0e1...\", \"expiresIn\": 900 }\n  }\n}"
             },
             {
-              "name": "401 Unauthorized \u2014 Invalid refresh token",
+              "name": "401 Unauthorized — Invalid refresh token",
               "status": "Unauthorized",
               "code": 401,
               "header": [
@@ -628,11 +628,11 @@
                 "forgot-password"
               ]
             },
-            "description": "Request 6-digit OTP for password reset.\n\nAlways returns 200 regardless of email existence \u2014 prevents enumeration.\nOTP TTL: 10 min (Redis: verify:forgot:{email}).\n\nFlow: forgot-password \u2192 verify-forgot-otp \u2192 reset-password"
+            "description": "Request 6-digit OTP for password reset.\n\nAlways returns 200 regardless of email existence — prevents enumeration.\nOTP TTL: 10 min (Redis: verify:forgot:{email}).\n\nFlow: forgot-password → verify-forgot-otp → reset-password"
           },
           "response": [
             {
-              "name": "200 OK \u2014 Always returned",
+              "name": "200 OK — Always returned",
               "status": "OK",
               "code": 200,
               "header": [
@@ -694,11 +694,11 @@
                 "verify-forgot-otp"
               ]
             },
-            "description": "Verify forgot-password OTP without DB changes.\n\nDoes NOT consume or extend the OTP \u2014 same OTP must be sent to reset-password.\nGate the new password UI behind a 200 from this endpoint."
+            "description": "Verify forgot-password OTP without DB changes.\n\nDoes NOT consume or extend the OTP — same OTP must be sent to reset-password.\nGate the new password UI behind a 200 from this endpoint."
           },
           "response": [
             {
-              "name": "200 OK \u2014 OTP valid",
+              "name": "200 OK — OTP valid",
               "status": "OK",
               "code": 200,
               "header": [
@@ -710,7 +710,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"OTP is valid.\",\n  \"data\": null\n}"
             },
             {
-              "name": "400 Bad Request \u2014 OTP invalid/expired",
+              "name": "400 Bad Request — OTP invalid/expired",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -771,7 +771,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Password has been reset successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "400 Bad Request \u2014 OTP invalid/expired",
+              "name": "400 Bad Request — OTP invalid/expired",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -813,7 +813,7 @@
                 "change-password"
               ]
             },
-            "description": "Change authenticated user's password. Auth required.\n\nRequires current password \u2014 use forgot-password flow if unknown.\nSocial-only accounts: returns 400 (no password set).",
+            "description": "Change authenticated user's password. Auth required.\n\nRequires current password — use forgot-password flow if unknown.\nSocial-only accounts: returns 400 (no password set).",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -839,7 +839,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Password changed successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "400 Bad Request \u2014 Wrong current password",
+              "name": "400 Bad Request — Wrong current password",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -917,7 +917,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Email verified successfully.\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"email\": \"testuser@example.com\",\n      \"displayName\": \"Test User\",\n      \"emailVerifiedAt\": \"2026-05-03T16:05:00.000Z\",\n      \"idVerificationStatus\": \"unsubmitted\",\n      \"status\": \"active\"\n    },\n    \"tokens\": {\n      \"accessToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n      \"refreshToken\": \"a3f8b2c1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0\",\n      \"expiresIn\": 900\n    }\n  }\n}"
             },
             {
-              "name": "400 Bad Request \u2014 Invalid/expired OTP",
+              "name": "400 Bad Request — Invalid/expired OTP",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -966,7 +966,7 @@
           },
           "response": [
             {
-              "name": "200 OK \u2014 Always returned",
+              "name": "200 OK — Always returned",
               "status": "OK",
               "code": 200,
               "header": [
@@ -1034,7 +1034,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Identity document submitted for review.\",\n  \"data\": { \"idVerificationStatus\": \"pending\" }\n}"
             },
             {
-              "name": "409 Conflict \u2014 Already pending/verified",
+              "name": "409 Conflict — Already pending/verified",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -1084,11 +1084,11 @@
                 "kyc-webhook"
               ]
             },
-            "description": "Internal endpoint \u2014 called by KYC provider, not client app.\n\nSignature: sha256=HMAC-SHA256(body, KYC_WEBHOOK_SECRET). Invalid \u2192 401.\nIdempotency: event_id cached in Redis 24hr. Duplicates silently ignored.\n\nOn approved: status=verified, document fields nulled, S3 cleanup queued, approval email sent.\nOn rejected: status=rejected, document fields nulled, rejection email sent."
+            "description": "Internal endpoint — called by KYC provider, not client app.\n\nSignature: sha256=HMAC-SHA256(body, KYC_WEBHOOK_SECRET). Invalid → 401.\nIdempotency: event_id cached in Redis 24hr. Duplicates silently ignored.\n\nOn approved: status=verified, document fields nulled, S3 cleanup queued, approval email sent.\nOn rejected: status=rejected, document fields nulled, rejection email sent."
           },
           "response": [
             {
-              "name": "200 OK \u2014 Processed",
+              "name": "200 OK — Processed",
               "status": "OK",
               "code": 200,
               "header": [
@@ -1100,7 +1100,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Webhook received\",\n  \"data\": null\n}"
             },
             {
-              "name": "401 Unauthorized \u2014 Invalid signature",
+              "name": "401 Unauthorized — Invalid signature",
               "status": "Unauthorized",
               "code": 401,
               "header": [
@@ -1117,7 +1117,7 @@
     },
     {
       "name": "Users",
-      "description": "Profile management, public profiles, interests, group memberships, applications, blocking.\n\nPrivacy rules:\n- phone, phoneIv, passwordHash, idDocumentUrl, idDocumentIv \u2014 never returned\n- email \u2014 only to owning user (GET /users/me)\n- idVerificationStatus \u2014 only to owning user\n- Block in either direction \u2192 GET /users/:id returns 404",
+      "description": "Profile management, public profiles, interests, group memberships, applications, blocking.\n\nPrivacy rules:\n- phone, phoneIv, passwordHash, idDocumentUrl, idDocumentIv — never returned\n- email — only to owning user (GET /users/me)\n- idVerificationStatus — only to owning user\n- Block in either direction → GET /users/:id returns 404",
       "item": [
         {
           "name": "Get My Profile",
@@ -1245,7 +1245,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Profile updated successfully.\",\n  \"data\": {\n    \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"email\": \"testuser@example.com\",\n    \"displayName\": \"Test User Updated\",\n    \"username\": \"test_user\",\n    \"city\": \"Lagos\",\n    \"state\": \"Lagos\",\n    \"country\": \"NG\",\n    \"bio\": \"Lagos-based software engineer passionate about communities.\",\n    \"interests\": [\"tech\"],\n    \"idVerificationStatus\": \"verified\",\n    \"status\": \"active\",\n    \"createdAt\": \"2026-05-03T16:00:00.000Z\",\n    \"updatedAt\": \"2026-05-03T17:00:00.000Z\"\n  }\n}"
             },
             {
-              "name": "409 Conflict \u2014 Username taken",
+              "name": "409 Conflict — Username taken",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -1288,7 +1288,7 @@
                 "me"
               ]
             },
-            "description": "Soft-delete account (GDPR). Auth required.\n\nSets deletedAt, status=banned, rewrites email to deleted_{id}@deleted.groupsync.\nRevokes all refresh tokens and sessions.\nIrreversible from API \u2014 requires direct DB restoration.",
+            "description": "Soft-delete account (GDPR). Auth required.\n\nSets deletedAt, status=banned, rewrites email to deleted_{id}@deleted.groupsync.\nRevokes all refresh tokens and sessions.\nIrreversible from API — requires direct DB restoration.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1550,7 +1550,7 @@
                   "key": "photo",
                   "type": "file",
                   "src": "",
-                  "description": "Profile photo \u2014 JPEG, PNG, or WebP, max 5 MB"
+                  "description": "Profile photo — JPEG, PNG, or WebP, max 5 MB"
                 }
               ]
             },
@@ -1591,7 +1591,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Profile photo updated successfully.\",\n  \"data\": {\n    \"url\": \"https://res.cloudinary.com/dmayydar0/image/upload/groupsync/avatars/user-uuid.jpg\"\n  }\n}"
             },
             {
-              "name": "422 \u2014 Invalid file type",
+              "name": "422 — Invalid file type",
               "status": "Unprocessable Entity",
               "code": 422,
               "header": [
@@ -1603,7 +1603,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"Only JPEG, PNG, and WebP images are allowed\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "400 \u2014 No file attached",
+              "name": "400 — No file attached",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -1738,7 +1738,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"User blocked successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "400 Bad Request \u2014 Cannot block yourself",
+              "name": "400 Bad Request — Cannot block yourself",
               "status": "Bad Request",
               "code": 400,
               "header": [
@@ -1778,7 +1778,7 @@
                 "block"
               ]
             },
-            "description": "Remove block. Auth required. Idempotent (deleteMany \u2014 no error if not blocked).\n400 if self-unblock.",
+            "description": "Remove block. Auth required. Idempotent (deleteMany — no error if not blocked).\n400 if self-unblock.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1809,7 +1809,7 @@
     },
     {
       "name": "Groups",
-      "description": "Group CRUD \u2014 create, list/search, get by slug, update, delete, members, stats.\n\nRole hierarchy: super_admin > admin > moderator > member\nInvite-only groups: hidden from discovery, profile returns 404 for non-members.",
+      "description": "Group CRUD — create, list/search, get by slug, update, delete, members, stats.\n\nRole hierarchy: super_admin > admin > moderator > member\nInvite-only groups: hidden from discovery, profile returns 404 for non-members.",
       "item": [
         {
           "name": "Create Group",
@@ -1881,7 +1881,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Group created successfully.\",\n  \"data\": {\n    \"id\": \"b2c3d4e5-f6a7-8901-bcde-f12345678901\",\n    \"name\": \"Lagos Tech Community\",\n    \"slug\": \"lagos-tech-community\",\n    \"category\": \"Technology\",\n    \"subcategory\": \"Software Engineering\",\n    \"description\": \"A community for software engineers in Lagos.\",\n    \"coverImageUrl\": \"https://bucket.s3.amazonaws.com/covers/ltc.jpg\",\n    \"logoUrl\": \"https://bucket.s3.amazonaws.com/logos/ltc.png\",\n    \"city\": \"Lagos\",\n    \"state\": \"Lagos\",\n    \"country\": \"NG\",\n    \"membershipType\": \"open\",\n    \"membershipFee\": null,\n    \"membershipFeeCurrency\": \"NGN\",\n    \"membershipFeeFrequency\": null,\n    \"howToJoinContent\": \"Just click join!\",\n    \"rules\": \"Be respectful. No spam.\",\n    \"foundingDate\": null,\n    \"isVerified\": false,\n    \"isDiscoverable\": true,\n    \"memberCount\": 1,\n    \"status\": \"active\",\n    \"createdBy\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"createdAt\": \"2026-05-03T16:00:00.000Z\",\n    \"updatedAt\": \"2026-05-03T16:00:00.000Z\"\n  }\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Not verified",
+              "name": "403 Forbidden — Not verified",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -1893,7 +1893,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"You must complete identity verification to perform this action.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "422 Unprocessable \u2014 Validation failed",
+              "name": "422 Unprocessable — Validation failed",
               "status": "Unprocessable Entity",
               "code": 422,
               "header": [
@@ -2025,7 +2025,7 @@
                 }
               ]
             },
-            "description": "List and search groups. Auth optional \u2014 affects invite-only visibility.\n\nSearch: full-text via fts_vector (name, description, category, subcategory).\nDistance filter: requires lat + lng + radius_km.\nDistance sort: requires lat + lng.\nInvite-only groups excluded unless caller is an active member.\nDeleted/inactive groups always excluded."
+            "description": "List and search groups. Auth optional — affects invite-only visibility.\n\nSearch: full-text via fts_vector (name, description, category, subcategory).\nDistance filter: requires lat + lng + radius_km.\nDistance sort: requires lat + lng.\nInvite-only groups excluded unless caller is an active member.\nDeleted/inactive groups always excluded."
           },
           "response": [
             {
@@ -2172,7 +2172,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Group updated successfully.\",\n  \"data\": {\n    \"id\": \"b2c3d4e5-f6a7-8901-bcde-f12345678901\",\n    \"name\": \"Lagos Tech Community\",\n    \"slug\": \"lagos-tech-community\",\n    \"membershipType\": \"application\",\n    \"status\": \"active\",\n    \"updatedAt\": \"2026-05-03T17:00:00.000Z\"\n  }\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Not admin",
+              "name": "403 Forbidden — Not admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2237,7 +2237,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Group deleted successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Not super_admin",
+              "name": "403 Forbidden — Not super_admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2419,7 +2419,7 @@
                   "key": "cover",
                   "type": "file",
                   "src": "",
-                  "description": "Cover image \u2014 JPEG, PNG, or WebP, max 5 MB. Recommended: 1200\u00d7400 px"
+                  "description": "Cover image — JPEG, PNG, or WebP, max 5 MB. Recommended: 1200×400 px"
                 }
               ]
             },
@@ -2434,7 +2434,7 @@
                 "cover"
               ]
             },
-            "description": "Upload or replace the group's cover image. Requires admin or super_admin role.\n\nAccepts multipart/form-data with field name `cover`.\nAllowed formats: JPEG, PNG, WebP. Max 5 MB.\nImage is cropped and optimised to 1200\u00d7400 px.\n\n403 if caller is not admin/super_admin.",
+            "description": "Upload or replace the group's cover image. Requires admin or super_admin role.\n\nAccepts multipart/form-data with field name `cover`.\nAllowed formats: JPEG, PNG, WebP. Max 5 MB.\nImage is cropped and optimised to 1200×400 px.\n\n403 if caller is not admin/super_admin.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2460,7 +2460,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Cover image updated successfully.\",\n  \"data\": {\n    \"url\": \"https://res.cloudinary.com/dmayydar0/image/upload/groupsync/groups/group-uuid/cover.jpg\"\n  }\n}"
             },
             {
-              "name": "403 \u2014 Not admin",
+              "name": "403 — Not admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2500,7 +2500,7 @@
                   "key": "logo",
                   "type": "file",
                   "src": "",
-                  "description": "Logo \u2014 JPEG, PNG, or WebP, max 5 MB. Recommended: 400\u00d7400 px (square)"
+                  "description": "Logo — JPEG, PNG, or WebP, max 5 MB. Recommended: 400×400 px (square)"
                 }
               ]
             },
@@ -2515,7 +2515,7 @@
                 "logo"
               ]
             },
-            "description": "Upload or replace the group's logo. Requires admin or super_admin role.\n\nAccepts multipart/form-data with field name `logo`.\nAllowed formats: JPEG, PNG, WebP. Max 5 MB.\nImage is cropped and optimised to 400\u00d7400 px.\n\n403 if caller is not admin/super_admin.",
+            "description": "Upload or replace the group's logo. Requires admin or super_admin role.\n\nAccepts multipart/form-data with field name `logo`.\nAllowed formats: JPEG, PNG, WebP. Max 5 MB.\nImage is cropped and optimised to 400×400 px.\n\n403 if caller is not admin/super_admin.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2541,7 +2541,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Logo updated successfully.\",\n  \"data\": {\n    \"url\": \"https://res.cloudinary.com/dmayydar0/image/upload/groupsync/groups/group-uuid/logo.jpg\"\n  }\n}"
             },
             {
-              "name": "403 \u2014 Not admin",
+              "name": "403 — Not admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2613,7 +2613,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"You have joined the group successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Not open group",
+              "name": "403 Forbidden — Not open group",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2625,7 +2625,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"This group requires an application. Use POST /groups/:id/apply instead.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "409 Conflict \u2014 Already a member",
+              "name": "409 Conflict — Already a member",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -2709,7 +2709,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Application submitted successfully.\",\n  \"data\": {\n    \"applicationId\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n    \"status\": \"pending\"\n  }\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Not application group",
+              "name": "403 Forbidden — Not application group",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2721,7 +2721,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"This group is open. Use POST /groups/:id/join instead.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "409 Conflict \u2014 Pending application exists",
+              "name": "409 Conflict — Pending application exists",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -2733,7 +2733,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"You already have a pending application for this group.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "422 Unprocessable \u2014 Required fields missing",
+              "name": "422 Unprocessable — Required fields missing",
               "status": "Unprocessable Entity",
               "code": 422,
               "header": [
@@ -2799,7 +2799,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"You have left the group.\",\n  \"data\": null\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Owner cannot leave",
+              "name": "403 Forbidden — Owner cannot leave",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -2938,7 +2938,7 @@
           },
           "response": [
             {
-              "name": "200 OK \u2014 Approved",
+              "name": "200 OK — Approved",
               "status": "OK",
               "code": 200,
               "header": [
@@ -2950,7 +2950,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Application approved. Member added to the group.\",\n  \"data\": null\n}"
             },
             {
-              "name": "200 OK \u2014 Rejected",
+              "name": "200 OK — Rejected",
               "status": "OK",
               "code": 200,
               "header": [
@@ -2962,7 +2962,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Application rejected.\",\n  \"data\": null\n}"
             },
             {
-              "name": "409 Conflict \u2014 Not pending",
+              "name": "409 Conflict — Not pending",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -3005,7 +3005,7 @@
                 "{{applicationId}}"
               ]
             },
-            "description": "Reject with a reason. Same endpoint as approve \u2014 just set action=reject and include rejection_reason.\n\nrejection_reason is included in the notification email sent to the applicant.\nMax 1000 characters.",
+            "description": "Reject with a reason. Same endpoint as approve — just set action=reject and include rejection_reason.\n\nrejection_reason is included in the notification email sent to the applicant.\nMax 1000 characters.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -3085,7 +3085,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Application withdrawn successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "409 Conflict \u2014 Not pending",
+              "name": "409 Conflict — Not pending",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -3141,7 +3141,7 @@
           },
           "response": [
             {
-              "name": "200 OK \u2014 Form exists",
+              "name": "200 OK — Form exists",
               "status": "OK",
               "code": 200,
               "header": [
@@ -3153,7 +3153,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"fields\": [\n      { \"id\": \"field_001\", \"type\": \"textarea\", \"label\": \"Why do you want to join?\", \"required\": true },\n      { \"id\": \"field_002\", \"type\": \"select\", \"label\": \"Years of experience\", \"required\": true, \"options\": [\"0-1\", \"2-5\", \"5-10\", \"10+\"] },\n      { \"id\": \"field_003\", \"type\": \"checkbox\", \"label\": \"I agree to the group rules\", \"required\": true }\n    ]\n  }\n}"
             },
             {
-              "name": "200 OK \u2014 No form configured",
+              "name": "200 OK — No form configured",
               "status": "OK",
               "code": 200,
               "header": [
@@ -3277,7 +3277,7 @@
                 "{{targetUserId}}"
               ]
             },
-            "description": "Promote, demote, suspend, or ban a group member. Auth required. Role: admin or super_admin.\n\nRole hierarchy rules:\n- Cannot modify super_admin (403)\n- Admin cannot modify another admin \u2014 only super_admin can (403)\n- Can only assign roles BELOW your own rank (403)\n- Caller must outrank target to modify them (403)\n\nCan send role, status, or both.\nroles: admin | moderator | member (cannot set super_admin via this endpoint)\nstatuses: active | suspended | banned\n\nNotifies affected member via BullMQ.",
+            "description": "Promote, demote, suspend, or ban a group member. Auth required. Role: admin or super_admin.\n\nRole hierarchy rules:\n- Cannot modify super_admin (403)\n- Admin cannot modify another admin — only super_admin can (403)\n- Can only assign roles BELOW your own rank (403)\n- Caller must outrank target to modify them (403)\n\nCan send role, status, or both.\nroles: admin | moderator | member (cannot set super_admin via this endpoint)\nstatuses: active | suspended | banned\n\nNotifies affected member via BullMQ.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -3303,7 +3303,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Member updated successfully.\",\n  \"data\": null\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Cannot modify super_admin",
+              "name": "403 Forbidden — Cannot modify super_admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -3315,7 +3315,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"The group owner cannot be modified. Transfer ownership first.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Admin vs admin",
+              "name": "403 Forbidden — Admin vs admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -3359,7 +3359,7 @@
                 "{{targetUserId}}"
               ]
             },
-            "description": "Suspend a member. Same endpoint as role update \u2014 set status=suspended.\n\nSuspended members cannot send messages or participate in the group.\nRestored by setting status=active.",
+            "description": "Suspend a member. Same endpoint as role update — set status=suspended.\n\nSuspended members cannot send messages or participate in the group.\nRestored by setting status=active.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -3556,7 +3556,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Member removed from the group.\",\n  \"data\": null\n}"
             },
             {
-              "name": "403 Forbidden \u2014 Cannot remove super_admin",
+              "name": "403 Forbidden — Cannot remove super_admin",
               "status": "Forbidden",
               "code": 403,
               "header": [
@@ -3750,7 +3750,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Invite link revoked.\",\n  \"data\": null\n}"
             },
             {
-              "name": "409 Conflict \u2014 Already revoked",
+              "name": "409 Conflict — Already revoked",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -3817,7 +3817,7 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"You have joined the group via invite link.\",\n  \"data\": null\n}"
             },
             {
-              "name": "410 Gone \u2014 Link revoked/expired/exhausted",
+              "name": "410 Gone — Link revoked/expired/exhausted",
               "status": "Gone",
               "code": 410,
               "header": [
@@ -3829,7 +3829,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"This invite link has expired.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "409 Conflict \u2014 Already a member",
+              "name": "409 Conflict — Already a member",
               "status": "Conflict",
               "code": 409,
               "header": [
@@ -3841,7 +3841,7 @@
               "body": "{\n  \"success\": false,\n  \"message\": \"You are already a member of this group.\",\n  \"data\": null,\n  \"error\": null\n}"
             },
             {
-              "name": "404 Not Found \u2014 Invalid token",
+              "name": "404 Not Found — Invalid token",
               "status": "Not Found",
               "code": 404,
               "header": [
@@ -5056,7 +5056,7 @@
     },
     {
       "name": "Socket.io / Chat",
-      "description": "Real-time events over Socket.IO namespace `/chat`.\n\n## How to use in Postman\n1. Open any request below \u2014 the URL already includes `?token={{accessToken}}`.\n2. Click **Connect**. Postman establishes the Socket.IO handshake.\n3. In the **Messages** tab, enter the **Event name** (shown in each request name) and paste the JSON body as the **Message**. Click **Send**.\n4. Listen for incoming events in the **Messages** panel.\n\n## Authentication\nToken is passed as a query param: `?token={{accessToken}}`. Run Login first so `accessToken` is populated.\n\n## Server \u2192 Client events\n| Event | When fired |\n|-------|------------|\n| `new_message` | A new group message was sent |\n| `message_deleted` | A group message was soft-deleted |\n| `message_pinned` | A message was pinned/unpinned |\n| `reaction_added` | Emoji reaction added |\n| `reaction_removed` | Emoji reaction removed |\n| `typing` | Another member is typing |\n| `presence_update` | A user came online / went offline |\n| `chat_lock_changed` | Group chat was locked/unlocked |\n| `kicked_from_group` | You were removed from a group |\n| `dm_received` | Incoming DM |\n| `dm_read` | Receiver read your DMs |\n| `error` | Error in processing your event |",
+      "description": "Real-time events over Socket.IO namespace `/chat`.\n\n## How to use in Postman\n1. Open any request below — the URL already includes `?token={{accessToken}}`.\n2. Click **Connect**. Postman establishes the Socket.IO handshake.\n3. In the **Messages** tab, enter the **Event name** (shown in each request name) and paste the JSON body as the **Message**. Click **Send**.\n4. Listen for incoming events in the **Messages** panel.\n\n## Authentication\nToken is passed as a query param: `?token={{accessToken}}`. Run Login first so `accessToken` is populated.\n\n## Server → Client events\n| Event | When fired |\n|-------|------------|\n| `new_message` | A new group message was sent |\n| `message_deleted` | A group message was soft-deleted |\n| `message_pinned` | A message was pinned/unpinned |\n| `reaction_added` | Emoji reaction added |\n| `reaction_removed` | Emoji reaction removed |\n| `typing` | Another member is typing |\n| `presence_update` | A user came online / went offline |\n| `chat_lock_changed` | Group chat was locked/unlocked |\n| `kicked_from_group` | You were removed from a group |\n| `dm_received` | Incoming DM |\n| `dm_read` | Receiver read your DMs |\n| `error` | Error in processing your event |",
       "item": [
         {
           "name": "join_group",
@@ -5084,11 +5084,11 @@
                 {
                   "key": "token",
                   "value": "{{accessToken}}",
-                  "description": "JWT \u2014 auto-set by Login"
+                  "description": "JWT — auto-set by Login"
                 }
               ]
             },
-            "description": "**Event name to emit:** `join_group`\n\nJoins the socket to the `group:{groupId}` room. Must be an active member. All subsequent `new_message`, `typing`, `reaction_added`, etc. events for this group will be received.\n\n**Payload:**\n```json\n{ \"group_id\": \"<uuid>\" }\n```\n\n**Error:** If not an active member \u2192 `error` event with `{ message: \"Not an active member...\" }`"
+            "description": "**Event name to emit:** `join_group`\n\nJoins the socket to the `group:{groupId}` room. Must be an active member. All subsequent `new_message`, `typing`, `reaction_added`, etc. events for this group will be received.\n\n**Payload:**\n```json\n{ \"group_id\": \"<uuid>\" }\n```\n\n**Error:** If not an active member → `error` event with `{ message: \"Not an active member...\" }`"
           },
           "response": []
         },
@@ -5154,7 +5154,7 @@
                 }
               ]
             },
-            "description": "**Event name to emit:** `send_message`\n\nSend a message to a group room. Rate-limited: 10 messages per 10 seconds. Blocked if chat is locked and caller is not admin/super_admin.\n\n**Payload:**\n```json\n{\n  \"group_id\": \"<uuid>\",\n  \"content\": \"Hello!\",\n  \"reply_to_id\": \"<uuid | null>\"\n}\n```\n\n**Broadcasts:** `new_message` event to all members in the room including sender.\n**Error:** `error` event \u2014 locked chat, rate limit, non-member."
+            "description": "**Event name to emit:** `send_message`\n\nSend a message to a group room. Rate-limited: 10 messages per 10 seconds. Blocked if chat is locked and caller is not admin/super_admin.\n\n**Payload:**\n```json\n{\n  \"group_id\": \"<uuid>\",\n  \"content\": \"Hello!\",\n  \"reply_to_id\": \"<uuid | null>\"\n}\n```\n\n**Broadcasts:** `new_message` event to all members in the room including sender.\n**Error:** `error` event — locked chat, rate limit, non-member."
           },
           "response": []
         },
@@ -5187,7 +5187,7 @@
                 }
               ]
             },
-            "description": "**Event name to emit:** `user_typing`\n\nBroadcasts a `typing` event to all other members in the group room.\n\n**Payload:**\n```json\n{ \"group_id\": \"<uuid>\" }\n```\n\n**Broadcasts:** `typing` \u2192 `{ user_id, group_id, display_name }` to all room members except sender."
+            "description": "**Event name to emit:** `user_typing`\n\nBroadcasts a `typing` event to all other members in the group room.\n\n**Payload:**\n```json\n{ \"group_id\": \"<uuid>\" }\n```\n\n**Broadcasts:** `typing` → `{ user_id, group_id, display_name }` to all room members except sender."
           },
           "response": []
         },
@@ -5253,7 +5253,7 @@
                 }
               ]
             },
-            "description": "**Event name to emit:** `dm_send`\n\nSend a direct message via socket. Same business rules as `POST /dm/:userId` \u2014 shared-group check and block check both enforced.\n\n**Payload:**\n```json\n{\n  \"receiver_id\": \"<uuid>\",\n  \"content\": \"Hello!\",\n  \"reply_to_id\": \"<uuid | null>\",\n  \"media_url\": \"<url | null>\"\n}\n```\n\n**Emits:**\n- `dm_received` \u2192 to receiver's personal room `user:{receiverId}`\n- `dm_received` \u2192 echoed back to sender (for multi-device)\n\n**Server \u2192 Client events for DM reactions:**\n- `dm_reaction_added` \u2192 `{ dm_id, emoji, user_id }` emitted to both participant rooms\n- `dm_reaction_removed` \u2192 `{ dm_id, emoji, user_id }` emitted to both participant rooms\n\n**Error:** `error` event \u2014 no shared group, blocked user, empty content."
+            "description": "**Event name to emit:** `dm_send`\n\nSend a direct message via socket. Same business rules as `POST /dm/:userId` — shared-group check and block check both enforced.\n\n**Payload:**\n```json\n{\n  \"receiver_id\": \"<uuid>\",\n  \"content\": \"Hello!\",\n  \"reply_to_id\": \"<uuid | null>\",\n  \"media_url\": \"<url | null>\"\n}\n```\n\n**Emits:**\n- `dm_received` → to receiver's personal room `user:{receiverId}`\n- `dm_received` → echoed back to sender (for multi-device)\n\n**Server → Client events for DM reactions:**\n- `dm_reaction_added` → `{ dm_id, emoji, user_id }` emitted to both participant rooms\n- `dm_reaction_removed` → `{ dm_id, emoji, user_id }` emitted to both participant rooms\n\n**Error:** `error` event — no shared group, blocked user, empty content."
           },
           "response": []
         }
@@ -5677,7 +5677,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"emoji\": \"\ud83d\udc4d\"\n}"
+              "raw": "{\n  \"emoji\": \"👍\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/messages/{{messageId}}/react",
@@ -5716,7 +5716,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"emoji\": \"\ud83d\udc4d\"\n}"
+              "raw": "{\n  \"emoji\": \"👍\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/messages/{{messageId}}/react",
@@ -5919,7 +5919,7 @@
                 "read"
               ]
             },
-            "description": "Mark all unread DMs from the target user as read. Returns { count: N } \u2014 number of messages updated.",
+            "description": "Mark all unread DMs from the target user as read. Returns { count: N } — number of messages updated.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -5948,7 +5948,7 @@
                 "{{dmId}}"
               ]
             },
-            "description": "Soft-delete a single DM. Caller must be the sender or receiver. Sets isDeletedBySender or isDeletedByReceiver \u2014 the message is hidden only for that side.",
+            "description": "Soft-delete a single DM. Caller must be the sender or receiver. Sets isDeletedBySender or isDeletedByReceiver — the message is hidden only for that side.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -5974,7 +5974,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"emoji\": \"\ud83d\udc4d\"\n}",
+              "raw": "{\n  \"emoji\": \"👍\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -5992,7 +5992,7 @@
                 "react"
               ]
             },
-            "description": "Add an emoji reaction to a DM. Caller must be the sender or receiver of the DM. Unique per (dm, user, emoji) \u2014 returns 409 if already reacted with the same emoji.\n\nBroadcasts `dm_reaction_added` socket event to both participants' personal rooms (`user:{id}`).",
+            "description": "Add an emoji reaction to a DM. Caller must be the sender or receiver of the DM. Unique per (dm, user, emoji) — returns 409 if already reacted with the same emoji.\n\nBroadcasts `dm_reaction_added` socket event to both participants' personal rooms (`user:{id}`).",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -6009,14 +6009,24 @@
               "name": "201 Created",
               "status": "Created",
               "code": 201,
-              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"success\": true,\n  \"message\": \"Reaction added.\",\n  \"data\": null\n}"
             },
             {
-              "name": "409 Conflict \u2014 Already reacted",
+              "name": "409 Conflict — Already reacted",
               "status": "Conflict",
               "code": 409,
-              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"success\": false,\n  \"message\": \"You already reacted with this emoji.\",\n  \"data\": null,\n  \"error\": null\n}"
             }
           ]
@@ -6033,7 +6043,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"emoji\": \"\ud83d\udc4d\"\n}",
+              "raw": "{\n  \"emoji\": \"👍\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -6068,15 +6078,676 @@
               "name": "200 OK",
               "status": "OK",
               "code": 200,
-              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"success\": true,\n  \"message\": \"Reaction removed.\",\n  \"data\": null\n}"
             },
             {
               "name": "404 Not Found",
               "status": "Not Found",
               "code": 404,
-              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"success\": false,\n  \"message\": \"Reaction not found.\",\n  \"data\": null,\n  \"error\": null\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Feed (Group Timeline)",
+      "description": "The group timeline — an async content wall separate from real-time chat.\n\n**Visibility rules**\n- Private posts (default): active members only\n- Public posts (admin toggle): visible to everyone including non-members\n\n**Variables needed**\n| Variable | Set by |\n|---|---|\n| `groupId` | Create Group |\n| `postId` | Create Post |\n| `commentId` | Add Comment |\n| `commentReplyId` | Add Reply |",
+      "item": [
+        {
+          "name": "Posts",
+          "item": [
+            {
+              "name": "List Feed",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/groups/{{groupId}}/feed?limit=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "groups",
+                    "{{groupId}}",
+                    "feed"
+                  ],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "20",
+                      "description": "Posts per page (1-50, default 20)"
+                    },
+                    {
+                      "key": "cursor",
+                      "value": "",
+                      "description": "Post UUID — load the next page after this post",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Returns the group timeline in two sections:\n- `pinned` — all pinned posts (always full set, no pagination)\n- `data` — cursor-paginated non-pinned posts, newest first\n\n**Visibility**\n- Authenticated members → all posts (public + private)\n- Unauthenticated / non-members → public posts only\n\nQuery params:\n- `limit`: 1-50 (default 20)\n- `cursor`: post UUID — returns posts created before this one",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Single Post",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/feed/posts/{{postId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "feed",
+                    "posts",
+                    "{{postId}}"
+                  ]
+                },
+                "description": "Fetch a single post by ID.\n\n- Public posts: no auth required\n- Private posts: must be an active group member\n\nIncludes author snippet, full reactions array (with user info), and a `_count.comments` for the comment badge.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Post",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/groups/{{groupId}}/feed",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "groups",
+                    "{{groupId}}",
+                    "feed"
+                  ]
+                },
+                "description": "Create a new feed post. At least one of `content`, `link_url`, or `media` files must be provided.\n\n**Upload up to 4 images** via multipart `media` field (JPEG/PNG/WebP, max 5 MB each). Images are stored on Cloudinary/S3.\n\nNew posts are private (`isPublic: false`) by default. An admin can make them public via PATCH visibility.",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "content",
+                      "value": "Exciting news from our community! 🎉",
+                      "type": "text",
+                      "description": "Post text body (max 5000 chars). Required if no link_url or media."
+                    },
+                    {
+                      "key": "link_url",
+                      "value": "",
+                      "type": "text",
+                      "description": "HTTPS URL to embed a link preview. Required if no content or media.",
+                      "disabled": true
+                    },
+                    {
+                      "key": "media",
+                      "type": "file",
+                      "src": "",
+                      "description": "Image file (JPEG/PNG/WebP, max 5 MB). Repeat this field up to 4 times for multiple images.",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Edit Post",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/feed/posts/{{postId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "feed",
+                    "posts",
+                    "{{postId}}"
+                  ]
+                },
+                "description": "Edit the text content or link URL of a post.\n\n**Only the original author** can edit. Admins cannot edit other people's posts (they can only delete).\n\nProvide at least one of `content` or `link_url`.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"content\": \"Updated post text with corrections.\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Post",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/feed/posts/{{postId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "feed",
+                    "posts",
+                    "{{postId}}"
+                  ]
+                },
+                "description": "Soft-delete a post. The post is hidden but not removed from the database.\n\n- **Author** can delete their own post\n- **Group admin/super_admin** can delete any post\n- Regular members cannot delete other people's posts",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Toggle Pin Post (Admin)",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/feed/posts/{{postId}}/pin",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "feed",
+                    "posts",
+                    "{{postId}}",
+                    "pin"
+                  ]
+                },
+                "description": "Toggle `isPinned` on a post. Pinned posts always appear at the top of the feed in the `pinned` array, regardless of when they were posted.\n\n**Admin only** (super_admin or admin role).\n\nCalling this endpoint again unpins the post (toggle behaviour).",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Toggle Post Visibility (Admin)",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/feed/posts/{{postId}}/visibility",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "feed",
+                    "posts",
+                    "{{postId}}",
+                    "visibility"
+                  ]
+                },
+                "description": "Toggle `isPublic` on a post.\n\n- `isPublic: false` (default) — members only\n- `isPublic: true` — visible to anyone, including non-members browsing the group landing page\n\n**Admin only** (super_admin or admin role). Use this to surface high-quality member content as a public teaser.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Post Reactions",
+          "item": [
+            {
+              "name": "Add Reaction to Post",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/feed/posts/{{postId}}/react",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "feed",
+                    "posts",
+                    "{{postId}}",
+                    "react"
+                  ]
+                },
+                "description": "Add an emoji reaction to a feed post. Each user can react with the same emoji only once (returns 409 on duplicate).\n\nMust be an active group member.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"emoji\": \"\\ud83d\\udc4d\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Remove Reaction from Post",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/feed/posts/{{postId}}/react",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "feed",
+                    "posts",
+                    "{{postId}}",
+                    "react"
+                  ]
+                },
+                "description": "Remove an emoji reaction from a post. Returns 404 if the reaction does not exist.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"emoji\": \"\\ud83d\\udc4d\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Comments",
+          "item": [
+            {
+              "name": "List Comments",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/feed/posts/{{postId}}/comments",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "feed",
+                    "posts",
+                    "{{postId}}",
+                    "comments"
+                  ]
+                },
+                "description": "List **top-level comments** on a post (where `parentId` is null). Ordered by `createdAt` ascending (oldest first, conversation order).\n\nEach comment includes:\n- `author` snippet\n- `reactions` array\n- `_count.replies` — number of child replies (load replies separately via GET replies)\n\nSame visibility rules as the post: non-members only see comments on public posts.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Add Comment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/feed/posts/{{postId}}/comments",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "feed",
+                    "posts",
+                    "{{postId}}",
+                    "comments"
+                  ]
+                },
+                "description": "Add a comment to a post. Must be an active group member.\n\nTo create a **threaded reply**, include `parent_id` pointing to the comment UUID. The parent must belong to the same post.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"content\": \"This is a great post! Thanks for sharing.\",\n  \"parent_id\": null\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "List Replies to a Comment",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/feed/comments/{{commentId}}/replies",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "feed",
+                    "comments",
+                    "{{commentId}}",
+                    "replies"
+                  ]
+                },
+                "description": "Fetch all replies to a specific comment (where `parentId = commentId`). Ordered oldest first.\n\nLoad replies lazily (on expand) to keep the initial feed payload light.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Edit Comment",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/feed/comments/{{commentId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "feed",
+                    "comments",
+                    "{{commentId}}"
+                  ]
+                },
+                "description": "Edit the text of a comment. **Only the original author** can edit. `content` is required.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"content\": \"Edited comment \\u2014 fixed a typo.\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Comment",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/feed/comments/{{commentId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "feed",
+                    "comments",
+                    "{{commentId}}"
+                  ]
+                },
+                "description": "Soft-delete a comment. Replies are not deleted — they remain but the parent content is hidden.\n\n- **Author** can delete their own comment\n- **Group admin/super_admin** can delete any comment",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Comment Reactions",
+          "item": [
+            {
+              "name": "Add Reaction to Comment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/feed/comments/{{commentId}}/react",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "feed",
+                    "comments",
+                    "{{commentId}}",
+                    "react"
+                  ]
+                },
+                "description": "Add an emoji reaction to a comment. Same uniqueness rules as post reactions (one emoji per user, 409 on duplicate).\n\nMust be an active group member.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"emoji\": \"\\u2764\\ufe0f\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Remove Reaction from Comment",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/feed/comments/{{commentId}}/react",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "feed",
+                    "comments",
+                    "{{commentId}}",
+                    "react"
+                  ]
+                },
+                "description": "Remove an emoji reaction from a comment. Returns 404 if the reaction does not exist.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"emoji\": \"\\u2764\\ufe0f\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
             }
           ]
         }

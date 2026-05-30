@@ -1,0 +1,75 @@
+// ─── Group Feed / Timeline ────────────────────────────────────────────────────
+
+model GroupPost {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  groupId   String   @map("group_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  content   String?
+  mediaUrls String[] @default([]) @map("media_urls")
+  linkUrl   String?  @map("link_url")
+  isPublic  Boolean  @default(false) @map("is_public")
+  isPinned  Boolean  @default(false) @map("is_pinned")
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  group     Group              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  author    User               @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  comments  GroupPostComment[]
+  reactions GroupPostReaction[]
+
+  @@index([groupId, isPinned, createdAt(sort: Desc)], map: "idx_group_posts_group")
+  @@index([groupId, isPublic, createdAt(sort: Desc)],  map: "idx_group_posts_public")
+  @@map("group_posts")
+}
+
+model GroupPostComment {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  parentId  String?  @map("parent_id") @db.Uuid
+  content   String
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  post      GroupPost                  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User                       @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  parent    GroupPostComment?          @relation("CommentThread", fields: [parentId], references: [id])
+  replies   GroupPostComment[]         @relation("CommentThread")
+  reactions GroupPostCommentReaction[]
+
+  @@index([postId, createdAt(sort: Desc)], map: "idx_post_comments_post")
+  @@index([parentId],                      map: "idx_post_comments_parent")
+  @@map("group_post_comments")
+}
+
+model GroupPostReaction {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  emoji     String   @db.VarChar(10)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  post GroupPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User      @relation("PostReactor", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId, emoji])
+  @@index([postId], map: "idx_post_reactions_post")
+  @@map("group_post_reactions")
+}
+
+model GroupPostCommentReaction {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  commentId String   @map("comment_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  emoji     String   @db.VarChar(10)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  comment GroupPostComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User             @relation("CommentReactor", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId, emoji])
+  @@index([commentId], map: "idx_comment_reactions_comment")
+  @@map("group_post_comment_reactions")
+}

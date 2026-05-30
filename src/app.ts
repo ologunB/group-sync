@@ -26,6 +26,7 @@ import reportRoutes from "./features/reports/report.routes";
 import adminRoutes from "./features/admin/admin.routes";
 import messageRoutes from "./features/messages/message.routes";
 import dmRoutes from "./features/dm/dm.routes";
+import feedRoutes from "./features/feed/feed.routes";
 import testRoutes from "./shared/utils/test.routes";
 import { SocketService } from "./shared/socket/socket.service";
 
@@ -85,6 +86,7 @@ export class App {
       this.app.use(`${apiPrefix}/admin`, adminRoutes);
       this.app.use(`${apiPrefix}`, messageRoutes);
       this.app.use(`${apiPrefix}`, dmRoutes);
+      this.app.use(`${apiPrefix}`, feedRoutes);
 
       // Test-helper endpoints — only mounted when TEST_ROUTES_ENABLED=true
       if (config.server.testRoutesEnabled) {

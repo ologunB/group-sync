@@ -51,6 +51,10 @@ model User {
   directMessagesSent   DirectMessage[]           @relation("DMSender")
   directMessagesRecv   DirectMessage[]           @relation("DMReceiver")
   chatReadReceipts     ChatReadReceipt[]
+  feedPosts            GroupPost[]               @relation("PostAuthor")
+  feedComments         GroupPostComment[]        @relation("CommentAuthor")
+  feedPostReactions    GroupPostReaction[]       @relation("PostReactor")
+  feedCommentReactions GroupPostCommentReaction[] @relation("CommentReactor")
 
   @@index([role],   map: "idx_users_role")
   @@index([status], map: "idx_users_status")

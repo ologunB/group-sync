@@ -39,6 +39,7 @@ model Group {
   notificationPrefs     NotificationPreference[]
   messages              Message[]
   chatReadReceipts      ChatReadReceipt[]
+  feedPosts             GroupPost[]
 
   @@index([category], map: "idx_groups_category")
   @@index([slug], map: "idx_groups_slug")

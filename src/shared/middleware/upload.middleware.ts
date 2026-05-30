@@ -40,6 +40,13 @@ const mediaMulter = multer({
     },
 });
 
+// Multi-image uploader (for feed posts — up to 4 images)
+const multiImageMulter = multer({
+    storage:    multer.memoryStorage(),
+    limits:     { fileSize: IMAGE_MAX, files: 4 },
+    fileFilter: (_req, file, cb) => makeFilter(cb, file, ALLOWED_IMAGE_TYPES, 'JPEG, PNG, and WebP image'),
+});
+
 function wrapMulter(instance: multer.Multer, fieldName: string, maxMb: number) {
     return (req: Request, res: Response, next: NextFunction): void => {
         instance.single(fieldName)(req, res, (err) => {
@@ -55,5 +62,24 @@ function wrapMulter(instance: multer.Multer, fieldName: string, maxMb: number) {
     };
 }
 
-export const uploadImage = (fieldName: string) => wrapMulter(imageMulter, fieldName, IMAGE_MAX / (1024 * 1024));
+function wrapMulterArray(instance: multer.Multer, fieldName: string, maxFiles: number, maxMb: number) {
+    return (req: Request, res: Response, next: NextFunction): void => {
+        instance.array(fieldName, maxFiles)(req, res, (err) => {
+            if (!err) return next();
+            if (err instanceof multer.MulterError) {
+                if (err.code === 'LIMIT_FILE_SIZE') {
+                    return next(new ApiError(`File too large. Maximum allowed size is ${maxMb} MB.`, StatusCodes.REQUEST_TOO_LONG));
+                }
+                if (err.code === 'LIMIT_FILE_COUNT') {
+                    return next(new ApiError(`Too many files. Maximum ${maxFiles} images allowed.`, StatusCodes.UNPROCESSABLE_ENTITY));
+                }
+                return next(new ApiError(err.message, StatusCodes.UNPROCESSABLE_ENTITY));
+            }
+            return next(new ApiError(err.message, StatusCodes.UNPROCESSABLE_ENTITY));
+        });
+    };
+}
+
+export const uploadImage  = (fieldName: string) => wrapMulter(imageMulter, fieldName, IMAGE_MAX / (1024 * 1024));
 export const uploadMedia  = (fieldName: string) => wrapMulter(mediaMulter, fieldName, AUDIO_MAX / (1024 * 1024));
+export const uploadImages = (fieldName: string, maxFiles = 4) => wrapMulterArray(multiImageMulter, fieldName, maxFiles, IMAGE_MAX / (1024 * 1024));
