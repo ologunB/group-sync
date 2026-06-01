@@ -12,7 +12,7 @@ import { EncryptionUtil } from '../shared/utils/encryption';
 import { io as ioClient, Socket as ClientSocket } from 'socket.io-client';
 import { SocketEvents } from '../shared/socket/socket.events';
 
-const BASE = Boolean(false) ? 'https://group-sync-ovzh.onrender.com/api/v1' : 'http://localhost:3000/api/v1';
+const BASE = Boolean(true) ? 'https://group-sync-ovzh.onrender.com/api/v1' : 'http://localhost:3000/api/v1';
 const ts = Date.now();
 
 // ─── Shared assertion helpers ─────────────────────────────────────────────────
@@ -72,23 +72,33 @@ const del  = (path: string, token?: string, body?: object)   => request('DELETE'
 
 // ─── Shared test runner ───────────────────────────────────────────────────────
 
-type Result = { name: string; passed: boolean; error?: string };
+type Result = { name: string; section: string; passed: boolean; durationMs: number; error?: string };
 const results: Result[] = [];
+let _currentSection = 'Uncategorised';
 
 function section(title: string): void {
+    _currentSection = title;
     console.log(`\n  ${title}`);
     console.log('  ' + '─'.repeat(title.length));
 }
 
+function fmtMs(ms: number): string {
+    if (ms < 1000) return `${ms}ms`;
+    return `${(ms / 1000).toFixed(2)}s`;
+}
+
 async function test(name: string, fn: () => Promise<void>): Promise<void> {
+    const t0 = Date.now();
     try {
         await fn();
-        results.push({ name, passed: true });
-        console.log(`  ✓  ${name}`);
+        const durationMs = Date.now() - t0;
+        results.push({ name, section: _currentSection, passed: true, durationMs });
+        console.log(`  ✓  ${name}  ${fmtMs(durationMs)}`);
     } catch (err: unknown) {
+        const durationMs = Date.now() - t0;
         const msg = err instanceof Error ? err.message : String(err);
-        results.push({ name, passed: false, error: msg });
-        console.log(`  ✗  ${name}`);
+        results.push({ name, section: _currentSection, passed: false, durationMs, error: msg });
+        console.log(`  ✗  ${name}  ${fmtMs(durationMs)}`);
         console.log(`       → ${msg}`);
     }
 }
@@ -3591,26 +3601,98 @@ async function runFeaturesSuite(): Promise<void> {
 //  MAIN
 // ═══════════════════════════════════════════════════════════════════════════════
 
+function fmtDuration(ms: number): string {
+    const totalSec = Math.floor(ms / 1000);
+    const min      = Math.floor(totalSec / 60);
+    const sec      = totalSec % 60;
+    const ms_      = ms % 1000;
+    if (min > 0) return `${min}m ${sec}s`;
+    if (sec > 0) return `${sec}.${String(ms_).padStart(3, '0').slice(0, 2)}s`;
+    return `${ms}ms`;
+}
+
 async function run(): Promise<void> {
+    const suiteStart = Date.now();
+
     await runAuthSuite();
     await runFeaturesSuite();
 
-    const passed = results.filter((r) => r.passed).length;
-    const failed = results.filter((r) => !r.passed).length;
-    const total  = results.length;
+    const totalMs = Date.now() - suiteStart;
+    const passed  = results.filter((r) => r.passed).length;
+    const failed  = results.filter((r) => !r.passed).length;
+    const total   = results.length;
+    const totalDuration = results.reduce((s, r) => s + r.durationMs, 0);
+    const avgMs   = Math.round(totalDuration / total);
+    const rps     = (total / (totalMs / 1000)).toFixed(1);
 
-    console.log('\n══════════════════════════════════════════════════════════════');
+    const W = 66;
+    const bar = '═'.repeat(W);
+
+    console.log(`\n${bar}`);
     console.log(`  Results: ${passed}/${total} passed  |  ${failed} failed`);
-    console.log('══════════════════════════════════════════════════════════════');
+    console.log(bar);
 
-    if (failed > 0) {
-        console.log('\n  Failed tests:');
-        results
-            .filter((r) => !r.passed)
-            .forEach((r) => console.log(`    ✗  ${r.name}\n       ${r.error}`));
+    // ── Timing overview ──────────────────────────────────────────────────────
+    console.log('\n  ⏱  Timing');
+    console.log('  ' + '─'.repeat(30));
+    console.log(`  Total wall time   ${fmtDuration(totalMs)}`);
+    console.log(`  Total test time   ${fmtDuration(totalDuration)}`);
+    console.log(`  Average per test  ${fmtDuration(avgMs)}`);
+    console.log(`  Throughput        ${rps} tests/sec`);
+
+    // ── Per-section breakdown ────────────────────────────────────────────────
+    const sectionMap = new Map<string, { pass: number; fail: number; ms: number }>();
+    for (const r of results) {
+        const s = sectionMap.get(r.section) ?? { pass: 0, fail: 0, ms: 0 };
+        s.pass += r.passed ? 1 : 0;
+        s.fail += r.passed ? 0 : 1;
+        s.ms   += r.durationMs;
+        sectionMap.set(r.section, s);
     }
 
-    console.log('');
+    console.log('\n  📋  Section breakdown');
+    console.log('  ' + '─'.repeat(58));
+    const colW = 38;
+    for (const [name, s] of sectionMap) {
+        const label   = name.length > colW ? name.slice(0, colW - 1) + '…' : name.padEnd(colW);
+        const counts  = `${s.pass + s.fail}`.padStart(3);
+        const pct     = `${Math.round((s.pass / (s.pass + s.fail)) * 100)}%`.padStart(4);
+        const time    = fmtDuration(s.ms).padStart(8);
+        const badge   = s.fail > 0 ? `✗ ${s.fail} failed` : '✓';
+        console.log(`  ${label}  ${counts} tests  ${pct}  ${time}  ${badge}`);
+    }
+
+    // ── Slowest 5 tests ──────────────────────────────────────────────────────
+    const slowest = [...results].sort((a, b) => b.durationMs - a.durationMs).slice(0, 5);
+    console.log('\n  🐢  Slowest tests');
+    console.log('  ' + '─'.repeat(58));
+    slowest.forEach((r, i) => {
+        const label = r.name.length > colW ? r.name.slice(0, colW - 1) + '…' : r.name.padEnd(colW);
+        console.log(`  ${i + 1}. ${label}  ${fmtDuration(r.durationMs)}`);
+    });
+
+    // ── Fastest 5 tests ──────────────────────────────────────────────────────
+    const fastest = [...results].sort((a, b) => a.durationMs - b.durationMs).slice(0, 5);
+    console.log('\n  ⚡  Fastest tests');
+    console.log('  ' + '─'.repeat(58));
+    fastest.forEach((r, i) => {
+        const label = r.name.length > colW ? r.name.slice(0, colW - 1) + '…' : r.name.padEnd(colW);
+        console.log(`  ${i + 1}. ${label}  ${fmtDuration(r.durationMs)}`);
+    });
+
+    // ── Failed tests ──────────────────────────────────────────────────────────
+    if (failed > 0) {
+        console.log('\n  ❌  Failed tests');
+        console.log('  ' + '─'.repeat(58));
+        results
+            .filter((r) => !r.passed)
+            .forEach((r) => {
+                console.log(`  ✗  [${r.section}]  ${r.name}`);
+                console.log(`       → ${r.error}`);
+            });
+    }
+
+    console.log(`\n${bar}\n`);
 }
 
 run()
