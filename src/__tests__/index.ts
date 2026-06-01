@@ -75,11 +75,18 @@ const del  = (path: string, token?: string, body?: object)   => request('DELETE'
 type Result = { name: string; section: string; passed: boolean; durationMs: number; error?: string };
 const results: Result[] = [];
 let _currentSection = 'Uncategorised';
+let _lastSection    = 'Uncategorised';
 
 function section(title: string): void {
+    _lastSection    = title;
     _currentSection = title;
     console.log(`\n  ${title}`);
     console.log('  ' + '─'.repeat(title.length));
+}
+
+function subsection(title: string): void {
+    _currentSection = `${_lastSection} — ${title}`;
+    console.log(`\n    · ${title}`);
 }
 
 function fmtMs(ms: number): string {
@@ -3156,11 +3163,9 @@ async function runFeaturesSuite(): Promise<void> {
         assert(!present, `Presence should be cleared after disconnect`);
     });
 
-    // ── 15b. Feed (Group Timeline) ────────────────────────────────────────────
+    // ── 16. Feed (Group Timeline) ─────────────────────────────────────────────
 
-    console.log('\n══════════════════════════════════════════════════════════════');
-    console.log('  Suite — Feed / Group Timeline');
-    console.log('══════════════════════════════════════════════════════════════');
+    section('16. Feed (Group Timeline)');
 
     // Re-login before feed tests — prior sections can push us past the 15-min JWT TTL
     await test('refresh tokens before feed tests', async () => {
@@ -3183,7 +3188,7 @@ async function runFeaturesSuite(): Promise<void> {
     let feedCommentId   = '';
     let feedReplyId     = '';
 
-    section('Feed — Post CRUD');
+    subsection('Post CRUD');
 
     await test('POST /test/seed-feed seeds 100 diverse posts', async () => {
         const { status, data } = await post('/test/seed-feed', { groupId: openGroupId, authorId: creatorId });
@@ -3276,8 +3281,10 @@ async function runFeaturesSuite(): Promise<void> {
     });
 
     await test('GET /groups/:id/feed with cursor returns next page (200)', async () => {
-        const first  = await get(`/groups/${openGroupId}/feed?limit=5`, creatorToken);
-        const cursor = ((first.data.data as any).next_cursor) as string;
+        const first = await get(`/groups/${openGroupId}/feed?limit=5`, creatorToken);
+        assertStatus(first.status, 200);
+        const cursor = (first.data.data as any)?.next_cursor as string;
+        assert(typeof cursor === 'string' && cursor.length > 0, 'Expected next_cursor on first page');
         const { status, data } = await get(`/groups/${openGroupId}/feed?limit=5&cursor=${cursor}`, creatorToken);
         assertStatus(status, 200);
         const secondPage = (data.data as any).data as any[];
@@ -3316,7 +3323,7 @@ async function runFeaturesSuite(): Promise<void> {
         assertStatus(status, 403);
     });
 
-    section('Feed — Visibility & Pin');
+    subsection('Visibility & Pin');
 
     await test('PATCH /feed/posts/:postId/visibility as non-admin returns 403', async () => {
         const { status } = await patch(`/feed/posts/${feedPostId}/visibility`, {}, memberToken);
@@ -3362,7 +3369,7 @@ async function runFeaturesSuite(): Promise<void> {
         assert(p.isPinned === false, `Expected isPinned=false after toggle, got ${p.isPinned}`);
     });
 
-    section('Feed — Reactions');
+    subsection('Reactions');
 
     await test('POST /feed/posts/:postId/react without auth returns 401', async () => {
         const { status } = await post(`/feed/posts/${feedPostId}/react`, { emoji: '👍' });
@@ -3394,7 +3401,7 @@ async function runFeaturesSuite(): Promise<void> {
         assertStatus(status, 404);
     });
 
-    section('Feed — Comments');
+    subsection('Comments');
 
     await test('POST /feed/posts/:postId/comments without auth returns 401', async () => {
         const { status } = await post(`/feed/posts/${feedPostId}/comments`, { content: 'Hi' });
@@ -3536,9 +3543,9 @@ async function runFeaturesSuite(): Promise<void> {
         assertStatus(status, 404);
     });
 
-    // ── 16. Group Deletion ─────────────────────────────────────────────────────
+    // ── 17. Group Deletion ─────────────────────────────────────────────────────
 
-    section('16. Group Deletion');
+    section('17. Group Deletion');
 
     // Re-login to get fresh tokens — the suite can exceed the 15-min JWT TTL
     await test('refresh tokens before deletion tests', async () => {
@@ -3577,9 +3584,9 @@ async function runFeaturesSuite(): Promise<void> {
         assertStatus(status, 404);
     });
 
-    // ── 17. Account Deletion ───────────────────────────────────────────────────
+    // ── 18. Account Deletion ───────────────────────────────────────────────────
 
-    section('17. Account Deletion');
+    section('18. Account Deletion');
 
     await test('DELETE /users/me without auth returns 401', async () => {
         const { status } = await del('/users/me');
