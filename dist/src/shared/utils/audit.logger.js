@@ -71,6 +71,15 @@ exports.LogActions = {
     // Chat admin
     CHAT_LOCK: 'chat.lock',
     CHAT_UNLOCK: 'chat.unlock',
+    // Feed
+    FEED_POST_CREATE: 'feed.post_create',
+    FEED_POST_UPDATE: 'feed.post_update',
+    FEED_POST_DELETE: 'feed.post_delete',
+    FEED_POST_PIN: 'feed.post_pin',
+    FEED_POST_VISIBILITY: 'feed.post_visibility',
+    FEED_COMMENT_CREATE: 'feed.comment_create',
+    FEED_COMMENT_UPDATE: 'feed.comment_update',
+    FEED_COMMENT_DELETE: 'feed.comment_delete',
 };
 // ─── Resource type constants ──────────────────────────────────────────────────
 exports.ResourceTypes = {
@@ -87,6 +96,8 @@ exports.ResourceTypes = {
     REPORT: 'report',
     GROUP_FORM: 'group_form',
     DM: 'dm',
+    FEED_POST: 'feed_post',
+    FEED_COMMENT: 'feed_comment',
 };
 // ─── AuditLogger ──────────────────────────────────────────────────────────────
 class AuditLogger {

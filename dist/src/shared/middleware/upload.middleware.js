@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.uploadMedia = exports.uploadImage = void 0;
+exports.uploadImages = exports.uploadMedia = exports.uploadImage = void 0;
 const multer_1 = __importDefault(require("multer"));
 const http_status_codes_1 = require("http-status-codes");
 const error_middleware_1 = require("./error.middleware");
@@ -41,6 +41,12 @@ const mediaMulter = (0, multer_1.default)({
         }
     },
 });
+// Multi-image uploader (for feed posts — up to 4 images)
+const multiImageMulter = (0, multer_1.default)({
+    storage: multer_1.default.memoryStorage(),
+    limits: { fileSize: IMAGE_MAX, files: 4 },
+    fileFilter: (_req, file, cb) => makeFilter(cb, file, ALLOWED_IMAGE_TYPES, 'JPEG, PNG, and WebP image'),
+});
 function wrapMulter(instance, fieldName, maxMb) {
     return (req, res, next) => {
         instance.single(fieldName)(req, res, (err) => {
@@ -56,8 +62,28 @@ function wrapMulter(instance, fieldName, maxMb) {
         });
     };
 }
+function wrapMulterArray(instance, fieldName, maxFiles, maxMb) {
+    return (req, res, next) => {
+        instance.array(fieldName, maxFiles)(req, res, (err) => {
+            if (!err)
+                return next();
+            if (err instanceof multer_1.default.MulterError) {
+                if (err.code === 'LIMIT_FILE_SIZE') {
+                    return next(new error_middleware_1.ApiError(`File too large. Maximum allowed size is ${maxMb} MB.`, http_status_codes_1.StatusCodes.REQUEST_TOO_LONG));
+                }
+                if (err.code === 'LIMIT_FILE_COUNT') {
+                    return next(new error_middleware_1.ApiError(`Too many files. Maximum ${maxFiles} images allowed.`, http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY));
+                }
+                return next(new error_middleware_1.ApiError(err.message, http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY));
+            }
+            return next(new error_middleware_1.ApiError(err.message, http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY));
+        });
+    };
+}
 const uploadImage = (fieldName) => wrapMulter(imageMulter, fieldName, IMAGE_MAX / (1024 * 1024));
 exports.uploadImage = uploadImage;
 const uploadMedia = (fieldName) => wrapMulter(mediaMulter, fieldName, AUDIO_MAX / (1024 * 1024));
 exports.uploadMedia = uploadMedia;
+const uploadImages = (fieldName, maxFiles = 4) => wrapMulterArray(multiImageMulter, fieldName, maxFiles, IMAGE_MAX / (1024 * 1024));
+exports.uploadImages = uploadImages;
 //# sourceMappingURL=upload.middleware.js.map

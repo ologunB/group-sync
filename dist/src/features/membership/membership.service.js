@@ -56,6 +56,9 @@ class MembershipService {
             if (existing?.status === 'banned') {
                 throw new error_middleware_1.ApiError('You have been banned from this group.', http_status_codes_1.StatusCodes.FORBIDDEN);
             }
+            if (existing?.status === 'suspended') {
+                throw new error_middleware_1.ApiError('Your membership in this group has been suspended.', http_status_codes_1.StatusCodes.FORBIDDEN);
+            }
             // Create membership — DB trigger handles member_count increment
             await connection_1.prisma.membership.create({
                 data: { userId: actor.userId, groupId, role: 'member', status: 'active' },
@@ -127,9 +130,6 @@ class MembershipService {
             if (existingApp?.status === 'pending') {
                 throw new error_middleware_1.ApiError('You already have a pending application for this group.', http_status_codes_1.StatusCodes.CONFLICT);
             }
-            if (existingApp?.status === 'approved') {
-                throw new error_middleware_1.ApiError('Your previous application was approved. You are already a member.', http_status_codes_1.StatusCodes.CONFLICT);
-            }
             // Validate required form fields if a form exists
             if (group.groupForm) {
                 const fields = group.groupForm.fields;
@@ -141,8 +141,8 @@ class MembershipService {
                     throw new error_middleware_1.ApiError(`Missing required form fields: ${missingRequired.join(', ')}`, http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY);
                 }
             }
-            // Delete rejected or withdrawn application if exists (allow re-application)
-            if (existingApp?.status === 'rejected' || existingApp?.status === 'withdrawn') {
+            // Delete old application if it exists and is no longer blocking (allow re-application)
+            if (existingApp && existingApp.status !== 'pending') {
                 await connection_1.prisma.application.delete({ where: { id: existingApp.id } });
             }
             const application = await connection_1.prisma.application.create({

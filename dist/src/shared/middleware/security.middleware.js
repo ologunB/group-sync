@@ -31,7 +31,7 @@ const authLimiter = (0, express_rate_limit_1.default)({
         data: null,
         error: null,
     },
-    skip: () => !app_config_1.config.server.isProduction, // Disable in development for convenience
+    skip: () => !app_config_1.config.server.isProduction || app_config_1.config.server.testRoutesEnabled,
 });
 // General API: 100 requests / minute per authenticated user / IP
 const apiLimiter = (0, express_rate_limit_1.default)({

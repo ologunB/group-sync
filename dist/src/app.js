@@ -28,6 +28,7 @@ const report_routes_1 = __importDefault(require("./features/reports/report.route
 const admin_routes_1 = __importDefault(require("./features/admin/admin.routes"));
 const message_routes_1 = __importDefault(require("./features/messages/message.routes"));
 const dm_routes_1 = __importDefault(require("./features/dm/dm.routes"));
+const feed_routes_1 = __importDefault(require("./features/feed/feed.routes"));
 const test_routes_1 = __importDefault(require("./shared/utils/test.routes"));
 const socket_service_1 = require("./shared/socket/socket.service");
 class App {
@@ -76,6 +77,7 @@ class App {
             this.app.use(`${apiPrefix}/admin`, admin_routes_1.default);
             this.app.use(`${apiPrefix}`, message_routes_1.default);
             this.app.use(`${apiPrefix}`, dm_routes_1.default);
+            this.app.use(`${apiPrefix}`, feed_routes_1.default);
             // Test-helper endpoints — only mounted when TEST_ROUTES_ENABLED=true
             if (app_config_1.config.server.testRoutesEnabled) {
                 this.app.use(`${apiPrefix}/test`, test_routes_1.default);

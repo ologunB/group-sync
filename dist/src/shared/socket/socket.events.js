@@ -21,7 +21,9 @@ exports.SocketEvents = {
     KICKED_FROM_GROUP: 'kicked_from_group',
     // ── DM — client → server ──────────────────────────────────────────────────
     DM_SEND: 'dm_send',
+    DM_TYPING: 'dm_typing',
     // ── DM — server → client ──────────────────────────────────────────────────
+    DM_TYPING_UPDATE: 'dm_typing_update',
     DM_RECEIVED: 'dm_received',
     DM_READ: 'dm_read',
     DM_REACTION_ADDED: 'dm_reaction_added',

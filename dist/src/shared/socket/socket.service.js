@@ -8,6 +8,7 @@ const encryption_1 = require("../utils/encryption");
 const asLogger_1 = require("../utils/asLogger");
 const socket_events_1 = require("./socket.events");
 const app_config_1 = require("../config/app.config");
+const message_types_1 = require("../../features/messages/message.types");
 const PRESENCE_TTL = 90; // seconds
 const MSG_RATE_LIMIT = 10;
 const MSG_RATE_WINDOW = 10; // seconds
@@ -107,12 +108,7 @@ async function handleConnection(socket, nsp) {
                     messageType: message_type,
                     replyToId: reply_to_id ?? null,
                 },
-                select: {
-                    id: true, groupId: true, senderId: true, content: true,
-                    messageType: true, mediaUrl: true, replyToId: true,
-                    isPinned: true, isDeleted: true, createdAt: true,
-                    sender: { select: { id: true, displayName: true, profilePhotoUrl: true } },
-                },
+                select: message_types_1.messageSelect,
             });
             nsp.to(`group:${group_id}`).emit(socket_events_1.SocketEvents.NEW_MESSAGE, { message });
         }
@@ -187,6 +183,12 @@ async function handleConnection(socket, nsp) {
             asLogger_1.asLogger.error('socket dm_send error:', err);
             socket.emit(socket_events_1.SocketEvents.ERROR, { message: 'Failed to send DM.' });
         }
+    });
+    // ── DM typing indicator ───────────────────────────────────────────────────
+    socket.on(socket_events_1.SocketEvents.DM_TYPING, ({ receiver_id }) => {
+        nsp.to(`user:${receiver_id}`).emit(socket_events_1.SocketEvents.DM_TYPING_UPDATE, {
+            sender_id: userId,
+        });
     });
     // ── Disconnect ────────────────────────────────────────────────────────────
     socket.on('disconnect', async () => {

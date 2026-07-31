@@ -70,20 +70,14 @@ class InitialSeeder {
     }
     // ── Default notification preferences ──────────────────────────────────────
     static async seedNotifPreferences(userId) {
-        // Build upsert data for all platform-level notification types (groupId = null).
-        // Group-specific types (message, group_announcement) have no platform default —
-        // they're created when the user first customises per-group settings.
-        await Promise.all(PLATFORM_NOTIF_TYPES.map(async (prefType) => {
-            const existing = await connection_1.prisma.notificationPreference.findFirst({
-                where: { userId, groupId: null, prefType },
-                select: { id: true },
-            });
-            if (!existing) {
-                await connection_1.prisma.notificationPreference.create({
-                    data: { userId, groupId: null, prefType, pushEnabled: true, inAppEnabled: true },
-                });
-            }
-        }));
+        // Single query — createMany with skipDuplicates avoids the concurrent-client
+        // pg@8 DeprecationWarning that Promise.all over findFirst+create causes.
+        await connection_1.prisma.notificationPreference.createMany({
+            data: PLATFORM_NOTIF_TYPES.map((prefType) => ({
+                userId, groupId: null, prefType, pushEnabled: true, inAppEnabled: true,
+            })),
+            skipDuplicates: true,
+        });
     }
 }
 exports.InitialSeeder = InitialSeeder;

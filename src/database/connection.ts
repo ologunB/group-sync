@@ -36,7 +36,11 @@ class Database {
         if (this._connected) return;
 
         try {
-            await this._client.$connect(); // internally validates the connection via the adapter
+            // With a driver adapter, $connect() never opens a socket — it cannot surface a bad
+            // host or bad credentials. Issue a real query so startup fails here, loudly, instead
+            // of at whichever query happens to run first (previously the seeder).
+            await this._client.$connect();
+            await this._client.$queryRaw`SELECT 1`;
             this._connected = true;
             asLogger.info('PostgreSQL connected successfully');
         } catch (error) {
