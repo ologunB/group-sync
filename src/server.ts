@@ -1,6 +1,13 @@
 import dns from 'dns';
 dns.setDefaultResultOrder('ipv4first');
 
+// Declared before the handlers below, not next to shutdownGracefully(). The handlers are
+// registered ahead of the imports on purpose, so they can fire while those imports are still
+// evaluating — at which point a `let` declared further down is still in its temporal dead zone.
+// Reading it there threw "Cannot access 'shuttingDown' before initialization", which replaced
+// the real crash in the logs with a bogus ReferenceError and skipped the graceful shutdown.
+let shuttingDown = false;
+
 // Register process-level handlers FIRST — before any other imports
 process.on('uncaughtException', async (error: Error) => {
     console.error('[uncaughtException]', error.message, error.stack);
@@ -25,8 +32,6 @@ process.on('SIGINT', async () => {
 import { App } from './app';
 import { AgendaManager } from './agenda';
 import { Database, redis } from './database/connection';
-
-let shuttingDown = false;
 
 async function shutdownGracefully(code: number): Promise<never> {
     // Guard against concurrent shutdown calls (e.g. multiple unhandledRejections)

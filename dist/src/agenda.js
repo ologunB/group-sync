@@ -61,6 +61,8 @@ const makeConnection = () => {
 };
 // ─── Queue defaults ───────────────────────────────────────────────────────────
 const QUEUE_NAME = 'system-jobs';
+// How long a request may wait for a job to be accepted by Redis before it gives up and responds.
+const ENQUEUE_TIMEOUT_MS = 2_000;
 const defaultJobOptions = {
     attempts: 3,
     backoff: { type: 'exponential', delay: 10_000 },
@@ -151,11 +153,33 @@ class AgendaManager {
     }
     // ─── Internal: enqueue ────────────────────────────────────────────────────────
     static async enqueue(name, data) {
-        console.log(`Enqueuing job: ${name}`, data);
         if (!AgendaManager.queue) {
             throw new Error('AgendaManager not started. Call AgendaManager.start() first.');
         }
-        await AgendaManager.queue.add(name, data, defaultJobOptions);
+        // Callers dispatch jobs *after* their DB write has committed, and the BullMQ connection
+        // runs with maxRetriesPerRequest: null (a BullMQ requirement), so a reconnecting Redis
+        // makes queue.add() queue the command indefinitely rather than reject. That stranded
+        // completed requests with no response: the write landed, the client timed out, and the
+        // user saw the action "fail" even though it had succeeded.
+        //
+        // Bound how long a request can wait on the enqueue. The add keeps running in the
+        // background, so a job still lands if Redis recovers shortly after.
+        const add = AgendaManager.queue.add(name, data, defaultJobOptions);
+        add.catch((err) => asLogger_1.asLogger.error(`AgendaManager: failed to enqueue job "${name}"`, { err: err.message }));
+        let timer;
+        const settled = await Promise.race([
+            add.then(() => 'ok', () => 'failed'),
+            new Promise((resolve) => {
+                timer = setTimeout(() => resolve('timeout'), ENQUEUE_TIMEOUT_MS);
+                timer.unref();
+            }),
+        ]);
+        if (timer)
+            clearTimeout(timer);
+        if (settled === 'timeout') {
+            asLogger_1.asLogger.warn(`AgendaManager: job "${name}" not confirmed within ${ENQUEUE_TIMEOUT_MS}ms — ` +
+                'responding without it to avoid stranding the request');
+        }
     }
     // ─── Internal: job processor ──────────────────────────────────────────────────
     static async processor(job) {

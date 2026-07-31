@@ -1,4 +1,4 @@
-import { Application } from 'express';
+import { Application, RequestHandler } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
@@ -16,6 +16,35 @@ const makeRedisStore = (prefix: string) =>
         prefix,
     });
 
+// The shared ioredis client runs with maxRetriesPerRequest: null (so commands queue instead of
+// failing while Redis reconnects) and these limiters run before every handler — which means a
+// stalled Redis silently stalls the entire API. Bound the limiter itself rather than the store:
+// RedisStore.init() stores an un-awaited promise for its Lua script load, so making sendCommand
+// reject on timeout instead surfaces as an unhandledRejection and kills the process.
+//
+// On timeout we fail open. A rate limiter that can take the API down is worse than one that
+// occasionally lets a request through.
+const RATE_LIMIT_TIMEOUT_MS = 1_000;
+
+const failOpenOnStall = (limiter: RequestHandler, label: string): RequestHandler =>
+    (req, res, next) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            asLogger.warn(`Rate limiter "${label}" stalled >${RATE_LIMIT_TIMEOUT_MS}ms — allowing request through`);
+            next();
+        }, RATE_LIMIT_TIMEOUT_MS);
+        timer.unref();
+
+        limiter(req, res, (err?: unknown) => {
+            if (settled) return; // already passed through on timeout
+            settled = true;
+            clearTimeout(timer);
+            next(err as any);
+        });
+    };
+
 // ─── Rate limiters ────────────────────────────────────────────────────────────
 
 // Auth routes: 10 requests / 15 minutes per IP
@@ -25,6 +54,7 @@ const authLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     store: makeRedisStore('rl:auth:'),
+    passOnStoreError: true,  // Redis down => allow the request, never hang or 500
     message: {
         success: false,
         message: 'Too many authentication attempts. Please try again after 15 minutes.',
@@ -41,6 +71,7 @@ const apiLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     store: makeRedisStore('rl:api:'),
+    passOnStoreError: true,  // Redis down => allow the request, never hang or 500
     message: {
         success: false,
         message: 'Rate limit exceeded. Please slow down.',
@@ -87,6 +118,6 @@ export const securityMiddleware = (app: Application): void => {
     app.options('*', cors(corsOptions)); // Pre-flight for all routes
 
     // Rate limiting — auth routes first (more restrictive), then general
-    app.use(`${config.server.apiPrefix}/auth`, authLimiter);
-    app.use(config.server.apiPrefix, apiLimiter);
+    app.use(`${config.server.apiPrefix}/auth`, failOpenOnStall(authLimiter, 'auth'));
+    app.use(config.server.apiPrefix, failOpenOnStall(apiLimiter, 'api'));
 };

@@ -5,6 +5,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const dns_1 = __importDefault(require("dns"));
 dns_1.default.setDefaultResultOrder('ipv4first');
+// Declared before the handlers below, not next to shutdownGracefully(). The handlers are
+// registered ahead of the imports on purpose, so they can fire while those imports are still
+// evaluating — at which point a `let` declared further down is still in its temporal dead zone.
+// Reading it there threw "Cannot access 'shuttingDown' before initialization", which replaced
+// the real crash in the logs with a bogus ReferenceError and skipped the graceful shutdown.
+let shuttingDown = false;
 // Register process-level handlers FIRST — before any other imports
 process.on('uncaughtException', async (error) => {
     console.error('[uncaughtException]', error.message, error.stack);
@@ -25,7 +31,6 @@ process.on('SIGINT', async () => {
 const app_1 = require("./app");
 const agenda_1 = require("./agenda");
 const connection_1 = require("./database/connection");
-let shuttingDown = false;
 async function shutdownGracefully(code) {
     // Guard against concurrent shutdown calls (e.g. multiple unhandledRejections)
     if (shuttingDown) {

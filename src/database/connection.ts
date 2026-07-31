@@ -17,7 +17,11 @@ class Database {
         this.pool = new Pool({
             connectionString: config.database.url,
             ssl: { rejectUnauthorized: false },
-            max: 3,
+            // Most handlers use more than one connection (the query itself, plus the fire-and-forget
+            // audit-log insert), so max: 3 meant ~2 concurrent requests before queueing. Measured
+            // against production, p50 tripled at 5 concurrent requests. Goes through the transaction
+            // pooler, which multiplexes, so this is well within budget.
+            max: parseInt(process.env.DB_POOL_MAX ?? '10', 10),
             idleTimeoutMillis: 30_000,
             connectionTimeoutMillis: 5_000,
         });
