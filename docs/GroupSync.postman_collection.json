@@ -3893,7 +3893,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Lagos Tech Meetup\",\n  \"description\": \"Monthly engineering meetup\",\n  \"location_name\": \"Tech Hub Lagos\",\n  \"lat\": 6.5244,\n  \"lng\": 3.3792,\n  \"starts_at\": \"2027-06-15T18:00:00.000Z\",\n  \"ends_at\": \"2027-06-15T21:00:00.000Z\",\n  \"rsvp_limit\": 100\n}",
+              "raw": "{\n  \"title\": \"Lagos Tech Meetup\",\n  \"description\": \"Monthly engineering meetup\",\n  \"location_name\": \"Tech Hub Lagos\",\n  \"lat\": 6.5244,\n  \"lng\": 3.3792,\n  \"starts_at\": \"2027-06-15T18:00:00.000Z\",\n  \"ends_at\": \"2027-06-15T21:00:00.000Z\",\n  \"rsvp_limit\": 100,\n  \"visibility\": \"public\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3946,7 +3946,13 @@
                 {
                   "key": "status",
                   "value": "scheduled",
-                  "description": "Filter by status: scheduled | cancelled | completed",
+                  "description": "NOT IMPLEMENTED — ignored by the API. Cancelled events are always excluded; scheduled and completed are always included.",
+                  "disabled": true
+                },
+                {
+                  "key": "visibility",
+                  "value": "public",
+                  "description": "Filter by visibility: public | private. Omit for everything you may see. Non-members are always restricted to public — asking for private returns an empty list, not an error.",
                   "disabled": true
                 }
               ]
@@ -3985,7 +3991,7 @@
                 "{{eventId}}"
               ]
             },
-            "description": "Get event details. Includes myRsvp field showing current user's RSVP status.",
+            "description": "Returns the event plus the caller's own RSVP status.\n\nPrivate events are members-only: a non-member gets 404 (not 403), so the existence of a group's private events is not probeable.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4032,7 +4038,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Updated Meetup Title\",\n  \"description\": \"Updated description\",\n  \"location_name\": \"New Venue\",\n  \"lat\": 6.5244,\n  \"lng\": 3.3792,\n  \"starts_at\": \"2027-07-01T18:00:00.000Z\",\n  \"ends_at\": \"2027-07-01T21:00:00.000Z\",\n  \"rsvp_limit\": 150\n}",
+              "raw": "{\n  \"title\": \"Updated Meetup Title\",\n  \"description\": \"Updated description\",\n  \"location_name\": \"New Venue\",\n  \"lat\": 6.5244,\n  \"lng\": 3.3792,\n  \"starts_at\": \"2027-07-01T18:00:00.000Z\",\n  \"ends_at\": \"2027-07-01T21:00:00.000Z\",\n  \"rsvp_limit\": 150,\n  \"visibility\": \"private\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

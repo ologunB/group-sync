@@ -654,7 +654,7 @@ git pull → npm install → npm run build (tsc) → pm2 restart {id}
 ## 18. Events
 
 ### Prisma models
-- `Event` → `events` table. Key fields: `groupId`, `createdBy`, `startsAt`, `endsAt`, `rsvpLimit`, `rsvpCount` (denormalized), `status` (`scheduled|cancelled|completed`), optional PostGIS `locationPoint`.
+- `Event` → `events` table. Key fields: `groupId`, `createdBy`, `startsAt`, `endsAt`, `rsvpLimit`, `rsvpCount` (denormalized), `status` (`scheduled|cancelled|completed`), `visibility` (`public|private`, defaults to `private`), optional PostGIS `locationPoint`. Reads must gate on `visibility` — non-members see `public` only; see `backend-srs.md § 4.6`.
 - `EventRsvp` → `event_rsvps` table. Unique on `(eventId, userId)`. Status: `going|maybe|not_going`.
 
 ### Business rules
