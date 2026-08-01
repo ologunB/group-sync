@@ -48,6 +48,10 @@ exports.createEventValidator = [
     (0, express_validator_1.body)('rsvp_limit')
         .optional()
         .isInt({ min: 1 }).withMessage('rsvp_limit must be a positive integer'),
+    (0, express_validator_1.body)('visibility')
+        .optional()
+        .isIn(event_types_1.EVENT_VISIBILITIES)
+        .withMessage(`visibility must be one of: ${event_types_1.EVENT_VISIBILITIES.join(', ')}`),
 ];
 exports.updateEventValidator = [
     (0, express_validator_1.body)('title')
@@ -75,6 +79,10 @@ exports.updateEventValidator = [
     (0, express_validator_1.body)('rsvp_limit')
         .optional()
         .isInt({ min: 1 }).withMessage('rsvp_limit must be a positive integer'),
+    (0, express_validator_1.body)('visibility')
+        .optional()
+        .isIn(event_types_1.EVENT_VISIBILITIES)
+        .withMessage(`visibility must be one of: ${event_types_1.EVENT_VISIBILITIES.join(', ')}`),
     (0, express_validator_1.body)('status')
         .optional()
         .isIn(event_types_1.EVENT_STATUSES).withMessage(`status must be one of: ${event_types_1.EVENT_STATUSES.join(', ')}`),
@@ -87,5 +95,9 @@ exports.rsvpValidator = [
 exports.listEventsValidator = [
     (0, express_validator_1.query)('page').optional().isInt({ min: 1 }).withMessage('page must be a positive integer'),
     (0, express_validator_1.query)('limit').optional().isInt({ min: 1, max: 50 }).withMessage('limit must be between 1 and 50'),
+    (0, express_validator_1.query)('visibility')
+        .optional()
+        .isIn(event_types_1.EVENT_VISIBILITIES)
+        .withMessage(`visibility must be one of: ${event_types_1.EVENT_VISIBILITIES.join(', ')}`),
 ];
 //# sourceMappingURL=event.validator.js.map

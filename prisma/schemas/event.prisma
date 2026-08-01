@@ -13,6 +13,9 @@ model Event {
   rsvpLimit    Int?                                  @map("rsvp_limit")
   rsvpCount    Int                                   @default(0) @map("rsvp_count")
   status       String                                @default("scheduled") @db.VarChar(20) @map("status")
+  // 'private' (default) — visible to active group members only.
+  // 'public'  — also visible to non-members in the group's event preview.
+  visibility   String                                @default("private") @db.VarChar(20) @map("visibility")
   createdAt    DateTime                              @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime                              @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -21,6 +24,7 @@ model Event {
   rsvps   EventRsvp[]
 
   @@index([groupId, startsAt], map: "idx_events_group_starts")
+  @@index([groupId, visibility, startsAt], map: "idx_events_group_visibility_starts")
   @@map("events")
 }
 

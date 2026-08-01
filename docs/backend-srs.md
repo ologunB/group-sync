@@ -840,7 +840,7 @@ Rules:
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | POST | `/groups/:id/events` | ✓ admin | Create event |
-| GET | `/groups/:id/events` | ✓ member (public preview: non-member) | List events |
+| GET | `/groups/:id/events` | ✓ member (public preview: non-member) | List events. `?visibility=public\|private` |
 | GET | `/events/:id` | ✓ member | Get event details |
 | PATCH | `/events/:id` | ✓ admin | Update event |
 | DELETE | `/events/:id` | ✓ admin | Cancel/delete event |
@@ -851,10 +851,26 @@ Rules:
 
 **POST `/groups/:id/events`**
 ```
-Body: { title, description?, location_name?, lat?, lng?, starts_at, ends_at?, rsvp_limit? }
+Body: { title, description?, location_name?, lat?, lng?, starts_at, ends_at?, rsvp_limit?,
+        visibility? }
 Rules:
   - starts_at must be in the future
+  - visibility: 'public' | 'private', defaults to 'private'
   - Notify all group members: 'event_created' (queued via BullMQ)
+```
+
+**Event visibility**
+```
+private (default) — active group members only
+public            — also visible to non-members in the group's event preview
+
+GET /groups/:id/events?visibility=public|private
+  - Members may filter freely across both.
+  - Non-members are always constrained to public. Asking for private returns an
+    empty list rather than public results.
+GET /events/:id
+  - Private event + non-member -> 404 (not 403, so existence isn't probeable).
+Only group admins can set visibility, via POST/PATCH.
 ```
 
 **POST `/events/:id/rsvp`**

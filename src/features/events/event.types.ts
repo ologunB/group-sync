@@ -2,9 +2,11 @@ import { Prisma } from '@prisma/client';
 
 export const EVENT_STATUSES = ['scheduled', 'cancelled', 'completed'] as const;
 export const RSVP_STATUSES = ['going', 'maybe', 'not_going'] as const;
+export const EVENT_VISIBILITIES = ['public', 'private'] as const;
 
 export type EventStatus = (typeof EVENT_STATUSES)[number];
 export type RsvpStatus = (typeof RSVP_STATUSES)[number];
+export type EventVisibility = (typeof EVENT_VISIBILITIES)[number];
 
 export interface CreateEventDTO {
     title: string;
@@ -15,6 +17,7 @@ export interface CreateEventDTO {
     starts_at: string;
     ends_at?: string;
     rsvp_limit?: number;
+    visibility?: EventVisibility;
 }
 
 export interface UpdateEventDTO {
@@ -27,6 +30,7 @@ export interface UpdateEventDTO {
     ends_at?: string;
     rsvp_limit?: number;
     status?: EventStatus;
+    visibility?: EventVisibility;
 }
 
 export interface RsvpDTO {
@@ -45,6 +49,7 @@ export const eventSelect = {
     rsvpLimit: true,
     rsvpCount: true,
     status: true,
+    visibility: true,
     createdAt: true,
     updatedAt: true,
 } as const satisfies Prisma.EventSelect;

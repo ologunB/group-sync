@@ -1,5 +1,5 @@
 import { body, param, query } from 'express-validator';
-import { RSVP_STATUSES, EVENT_STATUSES } from './event.types';
+import { RSVP_STATUSES, EVENT_STATUSES, EVENT_VISIBILITIES } from './event.types';
 
 export const eventIdParamValidator = [
     param('id').isUUID().withMessage('Event ID must be a valid UUID'),
@@ -55,6 +55,11 @@ export const createEventValidator = [
     body('rsvp_limit')
         .optional()
         .isInt({ min: 1 }).withMessage('rsvp_limit must be a positive integer'),
+
+    body('visibility')
+        .optional()
+        .isIn(EVENT_VISIBILITIES)
+        .withMessage(`visibility must be one of: ${EVENT_VISIBILITIES.join(', ')}`),
 ];
 
 export const updateEventValidator = [
@@ -91,6 +96,11 @@ export const updateEventValidator = [
         .optional()
         .isInt({ min: 1 }).withMessage('rsvp_limit must be a positive integer'),
 
+    body('visibility')
+        .optional()
+        .isIn(EVENT_VISIBILITIES)
+        .withMessage(`visibility must be one of: ${EVENT_VISIBILITIES.join(', ')}`),
+
     body('status')
         .optional()
         .isIn(EVENT_STATUSES).withMessage(`status must be one of: ${EVENT_STATUSES.join(', ')}`),
@@ -105,4 +115,8 @@ export const rsvpValidator = [
 export const listEventsValidator = [
     query('page').optional().isInt({ min: 1 }).withMessage('page must be a positive integer'),
     query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('limit must be between 1 and 50'),
+    query('visibility')
+        .optional()
+        .isIn(EVENT_VISIBILITIES)
+        .withMessage(`visibility must be one of: ${EVENT_VISIBILITIES.join(', ')}`),
 ];

@@ -18,6 +18,15 @@ async function requireGroupAdmin(groupId, userId) {
         throw new error_middleware_1.ApiError(response_constants_1.Messages.FORBIDDEN, http_status_codes_1.StatusCodes.FORBIDDEN);
     }
 }
+// Non-members get the public preview: public events only. Reads used to apply no membership
+// check at all, so any authenticated user could read every event of any group.
+async function isActiveMember(groupId, userId) {
+    const membership = await connection_1.prisma.membership.findUnique({
+        where: { userId_groupId: { userId, groupId } },
+        select: { status: true },
+    });
+    return membership?.status === 'active';
+}
 class EventService {
     // ── createEvent ───────────────────────────────────────────────────────────
     async createEvent(groupId, dto, actor) {
@@ -40,6 +49,7 @@ class EventService {
                     endsAt: dto.ends_at ? new Date(dto.ends_at) : null,
                     rsvpLimit: dto.rsvp_limit ?? null,
                     status: 'scheduled',
+                    visibility: dto.visibility ?? 'private',
                 },
                 select: event_types_1.eventSelect,
             });
@@ -71,10 +81,21 @@ class EventService {
         }
     }
     // ── listEvents ────────────────────────────────────────────────────────────
-    async listEvents(groupId, page, limit) {
+    async listEvents(groupId, page, limit, actor, visibility) {
         try {
             const skip = (page - 1) * limit;
-            const where = { groupId, status: { not: 'cancelled' } };
+            const isMember = await isActiveMember(groupId, actor.userId);
+            // Intersect what was asked for with what the caller may see, rather than overriding
+            // it. Overriding meant a non-member asking ?visibility=private got the *public*
+            // events back — not a leak, but it answered a different question than it was asked.
+            // An empty intersection yields `in: []`, which correctly matches nothing.
+            const allowed = isMember ? ['public', 'private'] : ['public'];
+            const effective = visibility ? allowed.filter((v) => v === visibility) : allowed;
+            const where = {
+                groupId,
+                status: { not: 'cancelled' },
+                visibility: { in: effective },
+            };
             const [data, total] = await Promise.all([
                 connection_1.prisma.event.findMany({
                     where,
@@ -102,6 +123,11 @@ class EventService {
                 select: event_types_1.eventSelect,
             });
             if (!event) {
+                throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('Event'), http_status_codes_1.StatusCodes.NOT_FOUND);
+            }
+            // Private events are members-only. 404 rather than 403 so a non-member can't probe
+            // for the existence of a group's private events.
+            if (event.visibility !== 'public' && !(await isActiveMember(event.groupId, actor.userId))) {
                 throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('Event'), http_status_codes_1.StatusCodes.NOT_FOUND);
             }
             const myRsvp = await connection_1.prisma.eventRsvp.findUnique({
@@ -138,6 +164,7 @@ class EventService {
                     ...(dto.ends_at !== undefined && { endsAt: new Date(dto.ends_at) }),
                     ...(dto.rsvp_limit !== undefined && { rsvpLimit: dto.rsvp_limit }),
                     ...(dto.status !== undefined && { status: dto.status }),
+                    ...(dto.visibility !== undefined && { visibility: dto.visibility }),
                 },
                 select: event_types_1.eventSelect,
             });

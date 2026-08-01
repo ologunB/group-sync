@@ -3,7 +3,7 @@ import { StatusCodes } from 'http-status-codes';
 import { AuthenticatedRequest } from '../../shared/middleware/auth.middleware';
 import { ResponseHelper } from '../../shared/utils/response.helper';
 import { eventService } from './event.service';
-import { CreateEventDTO, UpdateEventDTO, RsvpDTO } from './event.types';
+import { CreateEventDTO, UpdateEventDTO, RsvpDTO, EventVisibility } from './event.types';
 
 export class EventController {
     createEvent = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
@@ -19,7 +19,8 @@ export class EventController {
         try {
             const page = parseInt(req.query.page as string) || 1;
             const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
-            const result = await eventService.listEvents(req.params.id, page, limit);
+            const visibility = req.query.visibility as EventVisibility | undefined;
+            const result = await eventService.listEvents(req.params.id, page, limit, req.user!, visibility);
             ResponseHelper.success(res, result.data, 'Events retrieved successfully.', StatusCodes.OK, result.pagination);
         } catch (error) {
             next(error);

@@ -11,6 +11,7 @@ import {
     UpdateEventDTO,
     RsvpDTO,
     EventPublic,
+    EventVisibility,
     RsvpPublic,
     eventSelect,
     rsvpSelect,
@@ -24,6 +25,16 @@ async function requireGroupAdmin(groupId: string, userId: string): Promise<void>
     if (!membership || membership.status !== 'active' || !['super_admin', 'admin'].includes(membership.role)) {
         throw new ApiError(Messages.FORBIDDEN, StatusCodes.FORBIDDEN);
     }
+}
+
+// Non-members get the public preview: public events only. Reads used to apply no membership
+// check at all, so any authenticated user could read every event of any group.
+async function isActiveMember(groupId: string, userId: string): Promise<boolean> {
+    const membership = await prisma.membership.findUnique({
+        where: { userId_groupId: { userId, groupId } },
+        select: { status: true },
+    });
+    return membership?.status === 'active';
 }
 
 export class EventService {
@@ -51,6 +62,7 @@ export class EventService {
                     endsAt: dto.ends_at ? new Date(dto.ends_at) : null,
                     rsvpLimit: dto.rsvp_limit ?? null,
                     status: 'scheduled',
+                    visibility: dto.visibility ?? 'private',
                 },
                 select: eventSelect,
             });
@@ -90,10 +102,25 @@ export class EventService {
         groupId: string,
         page: number,
         limit: number,
+        actor: TokenPayload,
+        visibility?: EventVisibility,
     ): Promise<{ data: EventPublic[]; pagination: { page: number; limit: number; total: number } }> {
         try {
             const skip = (page - 1) * limit;
-            const where = { groupId, status: { not: 'cancelled' } };
+            const isMember = await isActiveMember(groupId, actor.userId);
+
+            // Intersect what was asked for with what the caller may see, rather than overriding
+            // it. Overriding meant a non-member asking ?visibility=private got the *public*
+            // events back — not a leak, but it answered a different question than it was asked.
+            // An empty intersection yields `in: []`, which correctly matches nothing.
+            const allowed: EventVisibility[] = isMember ? ['public', 'private'] : ['public'];
+            const effective = visibility ? allowed.filter((v) => v === visibility) : allowed;
+
+            const where = {
+                groupId,
+                status: { not: 'cancelled' },
+                visibility: { in: effective },
+            };
 
             const [data, total] = await Promise.all([
                 prisma.event.findMany({
@@ -124,6 +151,12 @@ export class EventService {
             });
 
             if (!event) {
+                throw new ApiError(Messages.RESOURCE_NOT_FOUND('Event'), StatusCodes.NOT_FOUND);
+            }
+
+            // Private events are members-only. 404 rather than 403 so a non-member can't probe
+            // for the existence of a group's private events.
+            if (event.visibility !== 'public' && !(await isActiveMember(event.groupId, actor.userId))) {
                 throw new ApiError(Messages.RESOURCE_NOT_FOUND('Event'), StatusCodes.NOT_FOUND);
             }
 
@@ -165,6 +198,7 @@ export class EventService {
                     ...(dto.ends_at !== undefined && { endsAt: new Date(dto.ends_at) }),
                     ...(dto.rsvp_limit !== undefined && { rsvpLimit: dto.rsvp_limit }),
                     ...(dto.status !== undefined && { status: dto.status }),
+                    ...(dto.visibility !== undefined && { visibility: dto.visibility }),
                 },
                 select: eventSelect,
             });

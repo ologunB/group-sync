@@ -18,7 +18,8 @@ class EventController {
         try {
             const page = parseInt(req.query.page) || 1;
             const limit = Math.min(parseInt(req.query.limit) || 20, 50);
-            const result = await event_service_1.eventService.listEvents(req.params.id, page, limit);
+            const visibility = req.query.visibility;
+            const result = await event_service_1.eventService.listEvents(req.params.id, page, limit, req.user, visibility);
             response_helper_1.ResponseHelper.success(res, result.data, 'Events retrieved successfully.', http_status_codes_1.StatusCodes.OK, result.pagination);
         }
         catch (error) {
