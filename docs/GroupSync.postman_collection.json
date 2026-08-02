@@ -3972,6 +3972,66 @@
           "response": []
         },
         {
+          "name": "List Nearby Events (Discovery)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/near?lat=6.5244&lng=3.3792&radius_km=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "near"
+              ],
+              "query": [
+                {
+                  "key": "lat",
+                  "value": "6.5244",
+                  "description": "REQUIRED. Latitude of the search centre."
+                },
+                {
+                  "key": "lng",
+                  "value": "3.3792",
+                  "description": "REQUIRED. Longitude of the search centre."
+                },
+                {
+                  "key": "radius_km",
+                  "value": "50",
+                  "description": "Search radius in km (default 50, max 500)."
+                },
+                {
+                  "key": "category",
+                  "value": "tech",
+                  "description": "Filter by the group's category.",
+                  "disabled": true
+                },
+                {
+                  "key": "sort",
+                  "value": "distance",
+                  "description": "distance (default) | soonest",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default 1)",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Items per page (default 20, max 50)",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Cross-group event discovery — NOT scoped to the groups you belong to. This is what \"Events near you\" should call: every other event endpoint is scoped to a single group, so a brand-new account with no memberships had nothing to show.\n\nReturns public, upcoming events from discoverable groups within the radius, each with distanceKm and the group name/slug/logo/category inlined so a card renders without a second call.\n\nExcluded: private events, past events, cancelled events, events with no location, and anything in a non-discoverable (invite-only) group."
+          },
+          "response": []
+        },
+        {
           "name": "Get Event",
           "request": {
             "method": "GET",

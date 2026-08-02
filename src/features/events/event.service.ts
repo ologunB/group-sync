@@ -1,4 +1,5 @@
 import { StatusCodes } from 'http-status-codes';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../database/connection';
 import { ApiError } from '../../shared/middleware/error.middleware';
 import { Messages } from '../../shared/utils/response.constants';
@@ -12,6 +13,9 @@ import {
     RsvpDTO,
     EventPublic,
     EventVisibility,
+    NearbyEvent,
+    NearbyEventsQuery,
+    PaginatedResult,
     RsvpPublic,
     eventSelect,
     rsvpSelect,
@@ -137,6 +141,107 @@ export class EventService {
         } catch (error) {
             if (error instanceof ApiError) throw error;
             asLogger.error('EventService.listEvents error:', error);
+            throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ── listNearbyEvents ──────────────────────────────────────────────────────
+    // Cross-group discovery. Deliberately NOT scoped to the caller's memberships:
+    // every other event read is group-scoped, so a new account with no groups had
+    // nothing to show. Only public events from discoverable groups surface here.
+
+    async listNearbyEvents(
+        query: NearbyEventsQuery,
+        actorId: string,
+    ): Promise<PaginatedResult<NearbyEvent>> {
+        try {
+            const page = Math.max(1, query.page ?? 1);
+            const limit = Math.min(50, Math.max(1, query.limit ?? 20));
+            const skip = (page - 1) * limit;
+            const radiusMeters = (query.radius_km ?? 50) * 1000;
+            const sort = query.sort ?? 'distance';
+
+            const conditions: Prisma.Sql[] = [
+                // Only events the caller is allowed to discover without membership.
+                Prisma.sql`e.visibility = 'public'`,
+                Prisma.sql`e.status <> 'cancelled'`,
+                // Discovery is forward-looking; past events are not "near you" any more.
+                Prisma.sql`e.starts_at >= NOW()`,
+                Prisma.sql`e.location_point IS NOT NULL`,
+                // The group must itself be discoverable, or this would leak the existence
+                // of invite-only groups through their events. Members still see their own
+                // groups' public events here, matching GroupService.listGroups.
+                Prisma.sql`g.status = 'active'`,
+                Prisma.sql`g.deleted_at IS NULL`,
+                Prisma.sql`
+                    (g.is_discoverable = TRUE OR EXISTS (
+                        SELECT 1 FROM memberships m
+                        WHERE m.group_id = g.id
+                          AND m.user_id = ${actorId}::uuid
+                          AND m.status = 'active'
+                    ))
+                `,
+                Prisma.sql`
+                    ST_DWithin(
+                        e.location_point::geography,
+                        ST_MakePoint(${query.lng}, ${query.lat})::geography,
+                        ${radiusMeters}
+                    )
+                `,
+            ];
+
+            if (query.category) {
+                conditions.push(Prisma.sql`g.category ILIKE ${query.category}`);
+            }
+
+            const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
+            const orderClause =
+                sort === 'soonest'
+                    ? Prisma.sql`ORDER BY e.starts_at ASC`
+                    : Prisma.sql`ORDER BY distance_m ASC, e.starts_at ASC`;
+
+            const [data, countResult] = await Promise.all([
+                prisma.$queryRaw<NearbyEvent[]>`
+                    SELECT
+                        e.id, e.group_id AS "groupId", e.title, e.description,
+                        e.location_name AS "locationName",
+                        e.starts_at AS "startsAt", e.ends_at AS "endsAt",
+                        e.rsvp_limit AS "rsvpLimit", e.rsvp_count AS "rsvpCount",
+                        e.status, e.visibility, e.created_at AS "createdAt",
+                        ROUND((ST_Distance(
+                            e.location_point::geography,
+                            ST_MakePoint(${query.lng}, ${query.lat})::geography
+                        ) / 1000)::numeric, 2)::float8 AS "distanceKm",
+                        ST_Distance(
+                            e.location_point::geography,
+                            ST_MakePoint(${query.lng}, ${query.lat})::geography
+                        ) AS distance_m,
+                        g.name AS "groupName", g.slug AS "groupSlug",
+                        g.logo_url AS "groupLogoUrl", g.category AS "groupCategory"
+                    FROM events e
+                    JOIN groups g ON g.id = e.group_id
+                    ${whereClause}
+                    ${orderClause}
+                    LIMIT ${limit} OFFSET ${skip}
+                `,
+                prisma.$queryRaw<[{ count: bigint }]>`
+                    SELECT COUNT(*) as count
+                    FROM events e
+                    JOIN groups g ON g.id = e.group_id
+                    ${whereClause}
+                `,
+            ]);
+
+            return {
+                data: data.map(({ ...row }) => {
+                    delete (row as Record<string, unknown>).distance_m;
+                    return row;
+                }),
+                pagination: { page, limit, total: Number(countResult[0]?.count ?? 0) },
+            };
+        } catch (error) {
+            if (error instanceof ApiError) throw error;
+            asLogger.error('EventService.listNearbyEvents error:', error);
             throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }

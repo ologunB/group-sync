@@ -841,6 +841,7 @@ Rules:
 |---|---|---|---|
 | POST | `/groups/:id/events` | ✓ admin | Create event |
 | GET | `/groups/:id/events` | ✓ member (public preview: non-member) | List events. `?visibility=public\|private` |
+| GET | `/events/near` | ✓ | Discover public events near a point (cross-group) |
 | GET | `/events/:id` | ✓ member | Get event details |
 | PATCH | `/events/:id` | ✓ admin | Update event |
 | DELETE | `/events/:id` | ✓ admin | Cancel/delete event |
@@ -857,6 +858,28 @@ Rules:
   - starts_at must be in the future
   - visibility: 'public' | 'private', defaults to 'private'
   - Notify all group members: 'event_created' (queued via BullMQ)
+```
+
+**GET `/events/near`**
+```
+Query params:
+  - lat, lng: number        (required)
+  - radius_km: number       (default 50, max 500)
+  - category: string        (matches the group's category)
+  - sort: distance|soonest  (default: distance)
+  - page, limit (default limit: 20, max: 50)
+Returns: { data: NearbyEvent[], pagination: { page, limit, total } }
+  NearbyEvent = event fields + distanceKm + groupName, groupSlug, groupLogoUrl,
+                groupCategory  (inlined so a card renders without a second call)
+Rules:
+  - Not scoped to the caller's memberships — this is the discovery surface for
+    accounts with no groups yet. Every other event read is group-scoped.
+  - visibility = 'public' only
+  - starts_at >= NOW() and status != 'cancelled'
+  - location_point IS NOT NULL (events with no location cannot be "near" anything)
+  - Group must be active, not deleted, and is_discoverable = TRUE — otherwise an
+    invite-only group's existence would leak through its events. Members still see
+    their own groups' public events here.
 ```
 
 **Event visibility**

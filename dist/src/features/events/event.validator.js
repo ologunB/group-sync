@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listEventsValidator = exports.rsvpValidator = exports.updateEventValidator = exports.createEventValidator = exports.groupIdParamValidator = exports.eventIdParamValidator = void 0;
+exports.nearbyEventsValidator = exports.listEventsValidator = exports.rsvpValidator = exports.updateEventValidator = exports.createEventValidator = exports.groupIdParamValidator = exports.eventIdParamValidator = void 0;
 const express_validator_1 = require("express-validator");
 const event_types_1 = require("./event.types");
 exports.eventIdParamValidator = [
@@ -99,5 +99,25 @@ exports.listEventsValidator = [
         .optional()
         .isIn(event_types_1.EVENT_VISIBILITIES)
         .withMessage(`visibility must be one of: ${event_types_1.EVENT_VISIBILITIES.join(', ')}`),
+];
+// Nearby discovery. lat/lng are required — without a location there is nothing to
+// anchor the search to, and silently returning global results would be misleading.
+exports.nearbyEventsValidator = [
+    (0, express_validator_1.query)('lat')
+        .exists().withMessage('lat is required')
+        .isFloat({ min: -90, max: 90 }).withMessage('lat must be between -90 and 90'),
+    (0, express_validator_1.query)('lng')
+        .exists().withMessage('lng is required')
+        .isFloat({ min: -180, max: 180 }).withMessage('lng must be between -180 and 180'),
+    (0, express_validator_1.query)('radius_km')
+        .optional()
+        .isFloat({ min: 0.1, max: 500 }).withMessage('radius_km must be between 0.1 and 500'),
+    (0, express_validator_1.query)('category').optional().isString().withMessage('category must be a string'),
+    (0, express_validator_1.query)('sort')
+        .optional()
+        .isIn(event_types_1.NEARBY_EVENT_SORTS)
+        .withMessage(`sort must be one of: ${event_types_1.NEARBY_EVENT_SORTS.join(', ')}`),
+    (0, express_validator_1.query)('page').optional().isInt({ min: 1 }).withMessage('page must be a positive integer'),
+    (0, express_validator_1.query)('limit').optional().isInt({ min: 1, max: 50 }).withMessage('limit must be between 1 and 50'),
 ];
 //# sourceMappingURL=event.validator.js.map

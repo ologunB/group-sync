@@ -10,6 +10,7 @@ import {
     updateEventValidator,
     rsvpValidator,
     listEventsValidator,
+    nearbyEventsValidator,
 } from './event.validator';
 
 const router = Router();
@@ -31,6 +32,15 @@ router.get(
 );
 
 // Event-level routes
+// NOTE: must stay above '/events/:id' — otherwise ':id' matches the literal 'near'
+// and the UUID validator rejects it with a 400.
+router.get(
+    '/events/near',
+    authenticate,
+    validateRequest(nearbyEventsValidator),
+    eventController.listNearbyEvents,
+);
+
 router.get(
     '/events/:id',
     authenticate,

@@ -1,5 +1,5 @@
 import { body, param, query } from 'express-validator';
-import { RSVP_STATUSES, EVENT_STATUSES, EVENT_VISIBILITIES } from './event.types';
+import { RSVP_STATUSES, EVENT_STATUSES, EVENT_VISIBILITIES, NEARBY_EVENT_SORTS } from './event.types';
 
 export const eventIdParamValidator = [
     param('id').isUUID().withMessage('Event ID must be a valid UUID'),
@@ -119,4 +119,30 @@ export const listEventsValidator = [
         .optional()
         .isIn(EVENT_VISIBILITIES)
         .withMessage(`visibility must be one of: ${EVENT_VISIBILITIES.join(', ')}`),
+];
+
+// Nearby discovery. lat/lng are required — without a location there is nothing to
+// anchor the search to, and silently returning global results would be misleading.
+export const nearbyEventsValidator = [
+    query('lat')
+        .exists().withMessage('lat is required')
+        .isFloat({ min: -90, max: 90 }).withMessage('lat must be between -90 and 90'),
+
+    query('lng')
+        .exists().withMessage('lng is required')
+        .isFloat({ min: -180, max: 180 }).withMessage('lng must be between -180 and 180'),
+
+    query('radius_km')
+        .optional()
+        .isFloat({ min: 0.1, max: 500 }).withMessage('radius_km must be between 0.1 and 500'),
+
+    query('category').optional().isString().withMessage('category must be a string'),
+
+    query('sort')
+        .optional()
+        .isIn(NEARBY_EVENT_SORTS)
+        .withMessage(`sort must be one of: ${NEARBY_EVENT_SORTS.join(', ')}`),
+
+    query('page').optional().isInt({ min: 1 }).withMessage('page must be a positive integer'),
+    query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('limit must be between 1 and 50'),
 ];

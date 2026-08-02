@@ -3,7 +3,7 @@ import { StatusCodes } from 'http-status-codes';
 import { AuthenticatedRequest } from '../../shared/middleware/auth.middleware';
 import { ResponseHelper } from '../../shared/utils/response.helper';
 import { eventService } from './event.service';
-import { CreateEventDTO, UpdateEventDTO, RsvpDTO, EventVisibility } from './event.types';
+import { CreateEventDTO, UpdateEventDTO, RsvpDTO, EventVisibility, NearbyEventSort } from './event.types';
 
 export class EventController {
     createEvent = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
@@ -22,6 +22,26 @@ export class EventController {
             const visibility = req.query.visibility as EventVisibility | undefined;
             const result = await eventService.listEvents(req.params.id, page, limit, req.user!, visibility);
             ResponseHelper.success(res, result.data, 'Events retrieved successfully.', StatusCodes.OK, result.pagination);
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    listNearbyEvents = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const result = await eventService.listNearbyEvents(
+                {
+                    lat: parseFloat(req.query.lat as string),
+                    lng: parseFloat(req.query.lng as string),
+                    radius_km: req.query.radius_km ? parseFloat(req.query.radius_km as string) : undefined,
+                    category: req.query.category as string | undefined,
+                    sort: req.query.sort as NearbyEventSort | undefined,
+                    page: req.query.page ? parseInt(req.query.page as string, 10) : undefined,
+                    limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
+                },
+                req.user!.userId,
+            );
+            ResponseHelper.success(res, result.data, 'Nearby events retrieved successfully.', StatusCodes.OK, result.pagination);
         } catch (error) {
             next(error);
         }

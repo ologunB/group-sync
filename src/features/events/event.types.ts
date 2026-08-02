@@ -37,6 +37,56 @@ export interface RsvpDTO {
     status: RsvpStatus;
 }
 
+export interface PaginationMeta {
+    page:  number;
+    limit: number;
+    total: number;
+}
+
+export interface PaginatedResult<T> {
+    data:       T[];
+    pagination: PaginationMeta;
+}
+
+// ─── Nearby event discovery ───────────────────────────────────────────────────
+// Cross-group, membership-independent. Every other event read is scoped to one
+// group, which is why a brand-new account with no memberships saw nothing.
+
+export const NEARBY_EVENT_SORTS = ['distance', 'soonest'] as const;
+export type NearbyEventSort = (typeof NEARBY_EVENT_SORTS)[number];
+
+export interface NearbyEventsQuery {
+    lat: number;
+    lng: number;
+    radius_km?: number;
+    category?: string;
+    sort?: NearbyEventSort;
+    page?: number;
+    limit?: number;
+}
+
+// Raw-SQL result: event fields plus distance and enough of the group to render a
+// card without a second call.
+export interface NearbyEvent {
+    id: string;
+    groupId: string;
+    title: string;
+    description: string | null;
+    locationName: string | null;
+    startsAt: Date;
+    endsAt: Date | null;
+    rsvpLimit: number | null;
+    rsvpCount: number;
+    status: string;
+    visibility: string;
+    createdAt: Date;
+    distanceKm: number;
+    groupName: string;
+    groupSlug: string;
+    groupLogoUrl: string | null;
+    groupCategory: string;
+}
+
 export const eventSelect = {
     id: true,
     groupId: true,

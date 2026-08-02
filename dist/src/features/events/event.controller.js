@@ -26,6 +26,23 @@ class EventController {
             next(error);
         }
     };
+    listNearbyEvents = async (req, res, next) => {
+        try {
+            const result = await event_service_1.eventService.listNearbyEvents({
+                lat: parseFloat(req.query.lat),
+                lng: parseFloat(req.query.lng),
+                radius_km: req.query.radius_km ? parseFloat(req.query.radius_km) : undefined,
+                category: req.query.category,
+                sort: req.query.sort,
+                page: req.query.page ? parseInt(req.query.page, 10) : undefined,
+                limit: req.query.limit ? parseInt(req.query.limit, 10) : undefined,
+            }, req.user.userId);
+            response_helper_1.ResponseHelper.success(res, result.data, 'Nearby events retrieved successfully.', http_status_codes_1.StatusCodes.OK, result.pagination);
+        }
+        catch (error) {
+            next(error);
+        }
+    };
     getEvent = async (req, res, next) => {
         try {
             const event = await event_service_1.eventService.getEvent(req.params.id, req.user);

@@ -1,9 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.rsvpSelect = exports.eventSelect = exports.EVENT_VISIBILITIES = exports.RSVP_STATUSES = exports.EVENT_STATUSES = void 0;
+exports.rsvpSelect = exports.eventSelect = exports.NEARBY_EVENT_SORTS = exports.EVENT_VISIBILITIES = exports.RSVP_STATUSES = exports.EVENT_STATUSES = void 0;
 exports.EVENT_STATUSES = ['scheduled', 'cancelled', 'completed'];
 exports.RSVP_STATUSES = ['going', 'maybe', 'not_going'];
 exports.EVENT_VISIBILITIES = ['public', 'private'];
+// ─── Nearby event discovery ───────────────────────────────────────────────────
+// Cross-group, membership-independent. Every other event read is scoped to one
+// group, which is why a brand-new account with no memberships saw nothing.
+exports.NEARBY_EVENT_SORTS = ['distance', 'soonest'];
 exports.eventSelect = {
     id: true,
     groupId: true,
