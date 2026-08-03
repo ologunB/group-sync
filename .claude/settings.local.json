@@ -2,8 +2,23 @@
   "permissions": {
     "defaultMode": "bypassPermissions",
     "allow": [
-      "Bash(npx tsx *)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/api/v1/auth/login -X POST -H \"Content-Type: application/json\" -d '{}')"
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch",
+      "NotebookEdit",
+      "Agent",
+      "TodoWrite",
+      "Artifact"
+    ],
+    "additionalDirectories": [
+      "/Users/temitope/Downloads",
+      "/Users/temitope/Desktop"
     ]
-  }
+  },
+  "skipDangerousModePermissionPrompt": true
 }
