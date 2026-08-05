@@ -65,6 +65,27 @@
     <code>NODE_ENV=production</code>.
   </p>
 
+  <!-- The one setup step people miss. Google grants consent, then silently drops the
+       credential if the origin isn't allowlisted — which looks exactly like a hang. -->
+  <div class="card" style="border-color:#F59E0B;">
+    <h2 style="color:#B45309;">⚠ Before you start</h2>
+    <p style="margin:0 0 12px;font-size:14px;line-height:1.6;">
+      This page's origin must be listed under <strong>Authorised JavaScript origins</strong>
+      for the OAuth client, or sign-in will stall at
+      <code>accounts.google.com/gsi/transform</code> after you grant permission and never
+      return a token.
+    </p>
+    <div class="row">
+      <input id="originValue" readonly style="flex:1;min-width:220px;font-weight:600;" />
+      <button id="copyOrigin" class="secondary">Copy</button>
+    </div>
+    <p class="hint">
+      Add it at <strong>Google Cloud console → APIs &amp; Services → Credentials →
+      your OAuth 2.0 Client ID → Authorised JavaScript origins</strong>, then save and give it
+      a minute or two to propagate.
+    </p>
+  </div>
+
   <!-- ── Setup ───────────────────────────────────────────────────────────── -->
   <div class="card">
     <h2>1 · Setup</h2>
@@ -95,6 +116,24 @@
     <h2>2 · Sign in with Google</h2>
     <div id="gsiButton"></div>
     <p class="hint" id="gsiHint">Enter a client ID above and press “Load Google button”.</p>
+
+    <hr style="border:0;border-top:1px solid #E5E7EB;margin:22px 0;" />
+
+    <p style="margin:0 0 10px;font-size:13px;font-weight:600;">Fallback: redirect flow</p>
+    <p class="hint" style="margin:0 0 12px;">
+      The button above uses Google Identity Services, which exchanges the credential inside a
+      hidden iframe. If third-party cookies are blocked, that stalls at
+      <code>accounts.google.com/gsi/transform</code> after you grant permission and never calls
+      back — the flow looks frozen.
+      <br /><br />
+      This fallback uses a plain full-page redirect instead: no iframe, no third-party cookies.
+      It needs <strong>Authorised redirect URIs</strong> to contain
+      <code id="redirectUriHint"></code> (a different console field from JavaScript origins).
+    </p>
+    <div class="row">
+      <button id="redirectFlow" class="secondary">Sign in via redirect</button>
+      <button id="copyRedirect" class="secondary">Copy redirect URI</button>
+    </div>
   </div>
 
   <!-- ── Exchange ────────────────────────────────────────────────────────── -->
@@ -132,6 +171,13 @@
   const statusEl = $('status');
 
   $('origin').textContent = window.location.origin;
+  $('originValue').value = window.location.origin;
+
+  $('copyOrigin').addEventListener('click', async function () {
+    await navigator.clipboard.writeText(window.location.origin);
+    this.textContent = 'Copied';
+    setTimeout(() => { this.textContent = 'Copy'; }, 1500);
+  });
 
   // Remember the client ID between reloads — retyping it on every test is the main
   // friction in this flow.
@@ -180,6 +226,11 @@
         // Off deliberately: auto-select silently reuses the last account and makes it
         // hard to test a second one.
         auto_select: false,
+        // Without this, an origin that is not on the client's "Authorised JavaScript
+        // origins" list fails *silently*: consent is granted, the flow reaches
+        // accounts.google.com/gsi/transform, and the callback simply never fires.
+        // That looks like a hang. Surfacing the error turns it into a readable message.
+        error_callback: onGsiError,
       });
 
       $('gsiButton').innerHTML = '';
@@ -193,6 +244,88 @@
       setStatus('err', 'Failed to initialise Google Sign-In: ' + err.message);
     }
   });
+
+  // ── Fallback: OAuth 2.0 implicit redirect, response_type=id_token ────────
+  // Deliberately not GIS. A full-page redirect never touches a cross-site iframe, so it
+  // is immune to the third-party-cookie blocking that stalls the button flow.
+  const REDIRECT_URI = window.location.origin + window.location.pathname;
+  $('redirectUriHint').textContent = REDIRECT_URI;
+
+  $('copyRedirect').addEventListener('click', async function () {
+    await navigator.clipboard.writeText(REDIRECT_URI);
+    this.textContent = 'Copied';
+    setTimeout(() => { this.textContent = 'Copy redirect URI'; }, 1500);
+  });
+
+  $('redirectFlow').addEventListener('click', function () {
+    const clientId = $('clientId').value.trim();
+    if (!clientId) {
+      setStatus('err', 'Enter your Google OAuth client ID first.');
+      return;
+    }
+    localStorage.setItem(SAVED_KEY, clientId);
+
+    // Google requires a nonce for response_type=id_token. Stash it so the value can be
+    // checked against the returned token after the redirect.
+    const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sessionStorage.setItem('groupsync.dev.nonce', nonce);
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: REDIRECT_URI,
+      response_type: 'id_token',
+      scope: 'openid email profile',
+      nonce: nonce,
+      prompt: 'select_account',
+    });
+    window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+  });
+
+  // Coming back from that redirect, the token arrives in the URL fragment.
+  (function readRedirectResult() {
+    if (!window.location.hash) return;
+
+    const frag = new URLSearchParams(window.location.hash.slice(1));
+    const idToken = frag.get('id_token');
+    const error = frag.get('error');
+
+    // Clear the fragment so a reload does not re-process a stale token.
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+
+    if (error) {
+      setStatus('err', 'Google returned an error: ' + error + ' — ' +
+        (frag.get('error_description') || 'check that the redirect URI is registered.'));
+      return;
+    }
+    if (!idToken) return;
+
+    const payload = decodeJwt(idToken);
+    const expected = sessionStorage.getItem('groupsync.dev.nonce');
+    if (expected && payload && payload.nonce !== expected) {
+      setStatus('err', 'Nonce mismatch — discarding this token.');
+      return;
+    }
+
+    $('idToken').value = idToken;
+    setTokenButtons(true);
+    setStatus('ok', 'Got an ID token via the redirect flow. Now exchange it with the API.');
+    show(payload || idToken);
+  })();
+
+  // ── Google could not complete the flow ───────────────────────────────────
+  function onGsiError(err) {
+    const type = (err && err.type) || 'unknown';
+
+    // By far the most common cause, and the one that otherwise presents as a hang
+    // partway through accounts.google.com/gsi/transform.
+    const originHint =
+      'Most likely cause: this page\'s origin (' + window.location.origin + ') is not ' +
+      'listed under "Authorised JavaScript origins" for this OAuth client in the Google ' +
+      'Cloud console. Add it, wait a minute or two for it to propagate, then reload.';
+
+    setStatus('err', 'Google Sign-In failed (' + type + '). ' + originHint);
+    show({ error: err, hint: originHint, pageOrigin: window.location.origin });
+  }
 
   // ── Google hands back the credential (an ID token JWT) ───────────────────
   function onCredential(response) {
