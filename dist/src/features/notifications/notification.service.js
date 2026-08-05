@@ -52,6 +52,24 @@ class NotificationService {
             throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }
+    // ── Unread count ──────────────────────────────────────────────────────────
+    // Dedicated endpoint for the badge. Listing notifications already returns
+    // `unread_count`, but the badge is polled on every app resume and does not need the
+    // page of rows that comes with it.
+    async getUnreadCount(actor) {
+        try {
+            const unread_count = await connection_1.prisma.notification.count({
+                where: { userId: actor.userId, isRead: false },
+            });
+            return { unread_count };
+        }
+        catch (error) {
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('NotificationService.getUnreadCount error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
     // ── Mark single notification as read ─────────────────────────────────────
     async markRead(notificationId, actor) {
         try {
@@ -146,10 +164,16 @@ class NotificationService {
                     where: { userId: actor.userId, groupId: pref.group_id ?? null, prefType: pref.pref_type },
                     select: { id: true },
                 });
+                // Each channel is patched independently — omitting `email_enabled` must not
+                // silently re-enable email just because the client only meant to mute push.
                 if (existing) {
                     await connection_1.prisma.notificationPreference.update({
                         where: { id: existing.id },
-                        data: { pushEnabled: pref.push_enabled, inAppEnabled: pref.in_app_enabled },
+                        data: {
+                            ...(pref.push_enabled !== undefined && { pushEnabled: pref.push_enabled }),
+                            ...(pref.in_app_enabled !== undefined && { inAppEnabled: pref.in_app_enabled }),
+                            ...(pref.email_enabled !== undefined && { emailEnabled: pref.email_enabled }),
+                        },
                     });
                 }
                 else {
@@ -158,8 +182,9 @@ class NotificationService {
                             userId: actor.userId,
                             groupId: pref.group_id ?? null,
                             prefType: pref.pref_type,
-                            pushEnabled: pref.push_enabled,
-                            inAppEnabled: pref.in_app_enabled,
+                            pushEnabled: pref.push_enabled ?? true,
+                            inAppEnabled: pref.in_app_enabled ?? true,
+                            emailEnabled: pref.email_enabled ?? true,
                         },
                     });
                 }

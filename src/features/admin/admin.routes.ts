@@ -15,6 +15,7 @@ import {
     adminListReportsValidator,
     adminAuditLogsValidator,
     adminChangeRoleValidator,
+    adminReviewGroupValidator,
 } from './admin.validator';
 
 const router = Router();
@@ -37,7 +38,10 @@ router.get('/users/:id/verification', validateRequest(userIdParamValidator), adm
 router.patch('/users/:id/verification', validateRequest([...userIdParamValidator, ...adminVerifyIdValidator]), adminController.reviewIdVerification);
 
 // ── Groups ────────────────────────────────────────────────────────────────────
+// '/groups/pending' must precede '/groups/:id' — otherwise ':id' swallows 'pending'.
+router.get('/groups/pending', validateRequest(adminListGroupsValidator), adminController.listPendingGroups);
 router.get('/groups', validateRequest(adminListGroupsValidator), adminController.listGroups);
+router.patch('/groups/:id/review', validateRequest([...groupIdParamValidator, ...adminReviewGroupValidator]), adminController.reviewGroup);
 router.patch('/groups/:id', validateRequest([...groupIdParamValidator, ...adminUpdateGroupValidator]), adminController.updateGroup);
 
 // ── Reports ───────────────────────────────────────────────────────────────────

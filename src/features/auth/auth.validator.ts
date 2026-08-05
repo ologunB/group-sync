@@ -24,6 +24,36 @@ export const registerValidator: ValidationChain[] = [
         .optional({ nullable: true, checkFalsy: true })
         .isString().withMessage('Phone must be a string')
         .isMobilePhone('any').withMessage('Must be a valid phone number'),
+
+    // ── Onboarding location + interests ───────────────────────────────────────
+    // Captured at signup so the home feed opens on the user's own city.
+
+    body('city')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('City must be a string')
+        .trim()
+        .isLength({ min: 2, max: 100 }).withMessage('City must be between 2 and 100 characters'),
+
+    body('state')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('State must be a string')
+        .trim()
+        .isLength({ min: 2, max: 100 }).withMessage('State must be between 2 and 100 characters'),
+
+    body('country')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('Country must be a string')
+        .trim()
+        .isLength({ min: 2, max: 100 }).withMessage('Country must be between 2 and 100 characters'),
+
+    body('interests')
+        .optional({ nullable: true })
+        .isArray({ max: 30 }).withMessage('interests must be an array of up to 30 items'),
+
+    body('interests.*')
+        .isString().withMessage('Each interest must be a string')
+        .trim()
+        .isLength({ min: 1, max: 50 }).withMessage('Each interest tag must be between 1 and 50 characters'),
 ];
 
 // ─── Login ────────────────────────────────────────────────────────────────────
@@ -49,6 +79,30 @@ export const socialLoginValidator: ValidationChain[] = [
     body('token')
         .exists({ checkFalsy: true }).withMessage('Token is required')
         .isString().withMessage('Token must be a string'),
+
+    // Apple only supplies the user's name to the client on first authorisation, so the
+    // client forwards it here. Ignored for Google, whose ID token already carries it.
+    body('display_name')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('Display name must be a string')
+        .trim()
+        .isLength({ min: 2, max: 100 }).withMessage('Display name must be between 2 and 100 characters'),
+];
+
+// ─── Phone verification ───────────────────────────────────────────────────────
+
+export const sendPhoneOtpValidator: ValidationChain[] = [
+    body('phone')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('Phone must be a string')
+        .isMobilePhone('any').withMessage('Must be a valid phone number'),
+];
+
+export const verifyPhoneOtpValidator: ValidationChain[] = [
+    body('otp')
+        .exists({ checkFalsy: true }).withMessage('OTP is required')
+        .isString().withMessage('OTP must be a string')
+        .isLength({ min: 6, max: 6 }).withMessage('OTP must be exactly 6 digits'),
 ];
 
 // ─── Logout ───────────────────────────────────────────────────────────────────

@@ -14,6 +14,8 @@ import {
     verifyEmailValidator,
     resendVerificationValidator,
     submitIdVerificationValidator, verifyForgotOtpValidator,
+    sendPhoneOtpValidator,
+    verifyPhoneOtpValidator,
 } from './auth.validator';
 
 const router = Router();
@@ -39,6 +41,11 @@ router.post('/kyc-webhook',            controller.handleKycWebhook);
 
 router.post('/logout',                 authenticate, validateRequest(logoutValidator),                controller.logout);
 router.post('/change-password',        authenticate, validateRequest(changePasswordValidator),         controller.changePassword);
+
+// Phone verification (tier 1). Plain `authenticate` — an unverified account is exactly
+// who needs to reach these.
+router.post('/phone/send-otp',         authenticate, validateRequest(sendPhoneOtpValidator),           controller.sendPhoneOtp);
+router.post('/phone/verify',           authenticate, validateRequest(verifyPhoneOtpValidator),         controller.verifyPhoneOtp);
 
 // verify-id uses authenticate (not authenticateVerified) — unverified users must submit this
 router.post('/verify-id',              authenticate, validateRequest(submitIdVerificationValidator),   controller.submitIdVerification);

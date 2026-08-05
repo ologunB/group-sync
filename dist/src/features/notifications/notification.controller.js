@@ -18,6 +18,16 @@ class NotificationController {
             next(error);
         }
     };
+    // GET /notifications/unread-count — cheap endpoint for the badge.
+    unreadCount = async (req, res, next) => {
+        try {
+            const result = await notification_service_1.notificationService.getUnreadCount(req.user);
+            response_helper_1.ResponseHelper.success(res, result, 'Unread count retrieved successfully.');
+        }
+        catch (error) {
+            next(error);
+        }
+    };
     markRead = async (req, res, next) => {
         try {
             const notification = await notification_service_1.notificationService.markRead(req.params.id, req.user);

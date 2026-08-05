@@ -19,6 +19,16 @@ export class NotificationController {
         }
     };
 
+    // GET /notifications/unread-count — cheap endpoint for the badge.
+    unreadCount = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const result = await notificationService.getUnreadCount(req.user!);
+            ResponseHelper.success(res, result, 'Unread count retrieved successfully.');
+        } catch (error) {
+            next(error);
+        }
+    };
+
     markRead = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         try {
             const notification = await notificationService.markRead(req.params.id, req.user!);

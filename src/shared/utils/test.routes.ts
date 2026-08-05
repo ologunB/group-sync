@@ -25,6 +25,19 @@ router.get('/otp', async (req: Request, res: Response) => {
     ResponseHelper.success(res, { otp });
 });
 
+// GET /test/phone-otp/:userId
+// Phone OTPs are keyed by user id rather than by number — the number itself is stored
+// encrypted, so putting it in a Redis key would defeat that.
+router.get('/phone-otp/:userId', async (req: Request, res: Response) => {
+    const { userId } = req.params;
+    const otp = await redis.get(`verify:phone:${userId}`);
+    if (!otp) {
+        ResponseHelper.error(res, `Phone OTP not found for ${userId}`, 404);
+        return;
+    }
+    ResponseHelper.success(res, { otp });
+});
+
 // PATCH /test/verify-user/:userId
 router.patch('/verify-user/:userId', async (req: Request, res: Response) => {
     const { userId } = req.params;
@@ -32,6 +45,53 @@ router.patch('/verify-user/:userId', async (req: Request, res: Response) => {
         where: { id: userId },
         data:  { idVerificationStatus: 'verified' },
     });
+    ResponseHelper.success(res, { userId });
+});
+
+// PATCH /test/verify-phone/:userId
+// Shortcut past the SMS round-trip. Joining a group, applying and RSVPing are all
+// gated on a verified phone, so almost every integration test needs this.
+router.patch('/verify-phone/:userId', async (req: Request, res: Response) => {
+    const { userId } = req.params;
+    await prisma.user.update({
+        where: { id: userId },
+        data:  { phoneVerifiedAt: new Date() },
+    });
+    ResponseHelper.success(res, { userId });
+});
+
+// PATCH /test/approve-group/:groupId
+// Groups are created 'pending' and stay out of Explore until reviewed, so a test that
+// asserts on discovery has to move them through the queue first.
+router.patch('/approve-group/:groupId', async (req: Request, res: Response) => {
+    const { groupId } = req.params;
+    await prisma.group.update({
+        where: { id: groupId },
+        data:  { reviewStatus: 'approved', reviewedAt: new Date() },
+    });
+    ResponseHelper.success(res, { groupId });
+});
+
+// POST /test/reset-group-quota/:userId
+// Group creation is capped at 3 per rolling 7 days, counted from groups.created_at.
+// Back-dating a user's existing groups puts them outside the window, which resets the
+// allowance without weakening the rule itself — the suite creates far more than 3.
+router.post('/reset-group-quota/:userId', async (req: Request, res: Response) => {
+    const { userId } = req.params;
+    const longAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    const result = await prisma.group.updateMany({
+        where: { createdBy: userId },
+        data:  { createdAt: longAgo },
+    });
+    ResponseHelper.success(res, { userId, backdated: result.count });
+});
+
+// POST /test/clear-phone-otp-cooldown/:userId
+// The 60-second resend lock is correct in production and pure friction in a test that
+// exercises the send path twice.
+router.post('/clear-phone-otp-cooldown/:userId', async (req: Request, res: Response) => {
+    const { userId } = req.params;
+    await redis.del(`verify:phone:cooldown:${userId}`);
     ResponseHelper.success(res, { userId });
 });
 

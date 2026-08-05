@@ -1,25 +1,79 @@
 import { StatusCodes } from 'http-status-codes';
 import { Prisma } from '@prisma/client';
-import { prisma } from '../../database/connection';
+import { prisma, redis } from '../../database/connection';
 import { ApiError } from '../../shared/middleware/error.middleware';
 import { Messages } from '../../shared/utils/response.constants';
 import { asLogger } from '../../shared/utils/asLogger';
 import { AuditLogger, LogActions, ResourceTypes } from '../../shared/utils/audit.logger';
 import { TokenPayload } from '../../shared/types/common.types';
 import { AgendaManager } from '../../agenda';
+import { config } from '../../shared/config/app.config';
+import { hasVerifiedId } from '../../shared/middleware/verification.middleware';
+import { NotificationDispatcher } from '../notifications/notification.dispatcher';
+import {
+    buildIcs,
+    buildGoogleCalendarUrl,
+    buildEventUrl,
+    CalendarEvent,
+} from '../../shared/utils/calendar';
 import {
     CreateEventDTO,
     UpdateEventDTO,
     RsvpDTO,
     EventPublic,
+    EventCalendarLinks,
     EventVisibility,
     NearbyEvent,
     NearbyEventsQuery,
     PaginatedResult,
     RsvpPublic,
+    buildVenueArea,
     eventSelect,
     rsvpSelect,
 } from './event.types';
+
+type EventRow = Prisma.EventGetPayload<{ select: typeof eventSelect }>;
+
+function calendarLinks(event: EventRow, location: string | null): EventCalendarLinks {
+    const calendarEvent: CalendarEvent = {
+        id: event.id,
+        title: event.title,
+        description: event.description,
+        location,
+        startsAt: event.startsAt,
+        endsAt: event.endsAt,
+        url: buildEventUrl(event.id),
+    };
+
+    return {
+        // Relative so the client is not tied to whichever host served the JSON.
+        ics: `${config.server.apiPrefix}/events/${event.id}/calendar.ics`,
+        google: buildGoogleCalendarUrl(calendarEvent),
+    };
+}
+
+/**
+ * The one place an event becomes a response body.
+ *
+ * `venueAddress` is deleted rather than nulled for non-members: a null would tell a
+ * stranger the field exists but is hidden, and the distinction between "no address set"
+ * and "address withheld" is not theirs to learn. Everything else — including the public
+ * `venueArea` label and the calendar links — is the same for every caller.
+ */
+function serializeEvent(event: EventRow, canSeeExactAddress: boolean): EventPublic {
+    const venueArea = buildVenueArea(event);
+    const { venueAddress, ...rest } = event;
+
+    return {
+        ...rest,
+        venueArea,
+        ...(canSeeExactAddress ? { venueAddress } : {}),
+        canSeeExactAddress,
+        // Members get the exact address in their calendar entry; everyone else gets the
+        // area label, so the .ics is still useful without leaking the street.
+        calendar: calendarLinks(event, (canSeeExactAddress ? venueAddress : null) ?? venueArea),
+    };
+}
 
 async function requireGroupAdmin(groupId: string, userId: string): Promise<void> {
     const membership = await prisma.membership.findUnique({
@@ -41,6 +95,26 @@ async function isActiveMember(groupId: string, userId: string): Promise<boolean>
     return membership?.status === 'active';
 }
 
+/**
+ * Who may see the exact street address.
+ *
+ * Active members, plus anyone holding a going/maybe RSVP. The RSVP clause matters:
+ * public events can be RSVP'd by non-members, and telling someone they are attending
+ * while withholding where it is makes the RSVP useless. Declining ('not_going') does
+ * not qualify — that person opted out.
+ */
+async function canSeeExactAddress(eventId: string, groupId: string, userId: string): Promise<boolean> {
+    const [member, rsvp] = await Promise.all([
+        isActiveMember(groupId, userId),
+        prisma.eventRsvp.findUnique({
+            where: { eventId_userId: { eventId, userId } },
+            select: { status: true },
+        }),
+    ]);
+
+    return member || rsvp?.status === 'going' || rsvp?.status === 'maybe';
+}
+
 export class EventService {
     // ── createEvent ───────────────────────────────────────────────────────────
 
@@ -48,11 +122,17 @@ export class EventService {
         try {
             const group = await prisma.group.findUnique({
                 where: { id: groupId, deletedAt: null },
-                select: { id: true, status: true },
+                select: { id: true, name: true, slug: true, status: true },
             });
 
             if (!group || group.status === 'deleted') {
                 throw new ApiError(Messages.RESOURCE_NOT_FOUND('Group'), StatusCodes.NOT_FOUND);
+            }
+
+            // Tier 3: publishing a street address means real people show up at a real
+            // place, so the organiser has to have cleared ID verification first.
+            if (dto.venue_address?.trim() && !(await hasVerifiedId(actor.userId))) {
+                throw new ApiError(Messages.ID_REQUIRED_FOR_PHYSICAL_EVENT, StatusCodes.FORBIDDEN);
             }
 
             const event = await prisma.event.create({
@@ -62,6 +142,9 @@ export class EventService {
                     title: dto.title.trim(),
                     description: dto.description?.trim() ?? null,
                     locationName: dto.location_name?.trim() ?? null,
+                    venueCity: dto.venue_city?.trim() ?? null,
+                    venueState: dto.venue_state?.trim() ?? null,
+                    venueAddress: dto.venue_address?.trim() ?? null,
                     startsAt: new Date(dto.starts_at),
                     endsAt: dto.ends_at ? new Date(dto.ends_at) : null,
                     rsvpLimit: dto.rsvp_limit ?? null,
@@ -80,18 +163,46 @@ export class EventService {
                 `;
             }
 
-            // Fan-out notifications to all group members via BullMQ
-            await AgendaManager.runNow('notify-group-members', {
+            const venueArea = buildVenueArea(event);
+
+            // In-app + email to every member except the organiser, who already knows.
+            await NotificationDispatcher.dispatchToGroup(
                 groupId,
-                type: 'event_created',
-                eventId: event.id,
-                title: 'New event in your group',
-                body: dto.title,
-            });
+                {
+                    type: 'event_created',
+                    title: `New event in ${group.name}`,
+                    body: venueArea ? `${event.title} — ${venueArea}` : event.title,
+                    referenceType: 'event',
+                    referenceId: event.id,
+                    email: {
+                        subject: `New event in ${group.name}: ${event.title}`,
+                        template: 'event_created',
+                        data: {
+                            groupName: group.name,
+                            eventTitle: event.title,
+                            eventDescription: event.description ?? '',
+                            venueArea: venueArea ?? 'Location to be announced',
+                            startsAt: event.startsAt.toISOString(),
+                            eventUrl: buildEventUrl(event.id),
+                            googleCalendarUrl: buildGoogleCalendarUrl({
+                                id: event.id,
+                                title: event.title,
+                                description: event.description,
+                                location: venueArea,
+                                startsAt: event.startsAt,
+                                endsAt: event.endsAt,
+                                url: buildEventUrl(event.id),
+                            }),
+                        },
+                    },
+                },
+                { excludeUserIds: [actor.userId] },
+            );
 
             await AuditLogger.log(actor, LogActions.EVENT_CREATE, ResourceTypes.EVENT, event.id, 1, { groupId });
 
-            return event;
+            // The organiser is an active member, so they always see the exact address.
+            return serializeEvent(event, true);
         } catch (error) {
             await AuditLogger.log(actor, LogActions.EVENT_CREATE, ResourceTypes.EVENT, null, 0, { error });
             if (error instanceof ApiError) throw error;
@@ -126,7 +237,7 @@ export class EventService {
                 visibility: { in: effective },
             };
 
-            const [data, total] = await Promise.all([
+            const [rows, total] = await Promise.all([
                 prisma.event.findMany({
                     where,
                     select: eventSelect,
@@ -137,7 +248,10 @@ export class EventService {
                 prisma.event.count({ where }),
             ]);
 
-            return { data, pagination: { page, limit, total } };
+            return {
+                data: rows.map((row) => serializeEvent(row, isMember)),
+                pagination: { page, limit, total },
+            };
         } catch (error) {
             if (error instanceof ApiError) throw error;
             asLogger.error('EventService.listEvents error:', error);
@@ -205,6 +319,9 @@ export class EventService {
                     SELECT
                         e.id, e.group_id AS "groupId", e.title, e.description,
                         e.location_name AS "locationName",
+                        -- venue_address is deliberately absent: nearby results are
+                        -- cross-group discovery, so the caller is a non-member by default.
+                        e.venue_city AS "venueCity", e.venue_state AS "venueState",
                         e.starts_at AS "startsAt", e.ends_at AS "endsAt",
                         e.rsvp_limit AS "rsvpLimit", e.rsvp_count AS "rsvpCount",
                         e.status, e.visibility, e.created_at AS "createdAt",
@@ -235,7 +352,23 @@ export class EventService {
             return {
                 data: data.map(({ ...row }) => {
                     delete (row as Record<string, unknown>).distance_m;
-                    return row;
+                    const venueArea = buildVenueArea(row);
+                    return {
+                        ...row,
+                        venueArea,
+                        calendar: {
+                            ics: `${config.server.apiPrefix}/events/${row.id}/calendar.ics`,
+                            google: buildGoogleCalendarUrl({
+                                id: row.id,
+                                title: row.title,
+                                description: row.description,
+                                location: venueArea,
+                                startsAt: new Date(row.startsAt),
+                                endsAt: row.endsAt ? new Date(row.endsAt) : null,
+                                url: buildEventUrl(row.id),
+                            }),
+                        },
+                    };
                 }),
                 pagination: { page, limit, total: Number(countResult[0]?.count ?? 0) },
             };
@@ -259,9 +392,11 @@ export class EventService {
                 throw new ApiError(Messages.RESOURCE_NOT_FOUND('Event'), StatusCodes.NOT_FOUND);
             }
 
+            const isMember = await isActiveMember(event.groupId, actor.userId);
+
             // Private events are members-only. 404 rather than 403 so a non-member can't probe
             // for the existence of a group's private events.
-            if (event.visibility !== 'public' && !(await isActiveMember(event.groupId, actor.userId))) {
+            if (event.visibility !== 'public' && !isMember) {
                 throw new ApiError(Messages.RESOURCE_NOT_FOUND('Event'), StatusCodes.NOT_FOUND);
             }
 
@@ -270,7 +405,10 @@ export class EventService {
                 select: { status: true },
             });
 
-            return { ...event, myRsvp: myRsvp?.status ?? null };
+            const showAddress =
+                isMember || myRsvp?.status === 'going' || myRsvp?.status === 'maybe';
+
+            return { ...serializeEvent(event, showAddress), myRsvp: myRsvp?.status ?? null };
         } catch (error) {
             if (error instanceof ApiError) throw error;
             asLogger.error('EventService.getEvent error:', error);
@@ -293,12 +431,20 @@ export class EventService {
 
             await requireGroupAdmin(existing.groupId, actor.userId);
 
+            // Same tier 3 gate as create — adding an address after the fact is the same act.
+            if (dto.venue_address?.trim() && !(await hasVerifiedId(actor.userId))) {
+                throw new ApiError(Messages.ID_REQUIRED_FOR_PHYSICAL_EVENT, StatusCodes.FORBIDDEN);
+            }
+
             const event = await prisma.event.update({
                 where: { id: eventId },
                 data: {
                     ...(dto.title !== undefined && { title: dto.title.trim() }),
                     ...(dto.description !== undefined && { description: dto.description.trim() }),
                     ...(dto.location_name !== undefined && { locationName: dto.location_name.trim() }),
+                    ...(dto.venue_city !== undefined && { venueCity: dto.venue_city?.trim() || null }),
+                    ...(dto.venue_state !== undefined && { venueState: dto.venue_state?.trim() || null }),
+                    ...(dto.venue_address !== undefined && { venueAddress: dto.venue_address?.trim() || null }),
                     ...(dto.starts_at !== undefined && { startsAt: new Date(dto.starts_at) }),
                     ...(dto.ends_at !== undefined && { endsAt: new Date(dto.ends_at) }),
                     ...(dto.rsvp_limit !== undefined && { rsvpLimit: dto.rsvp_limit }),
@@ -316,9 +462,25 @@ export class EventService {
                 `;
             }
 
+            // Time and place changes are the ones people need to hear about — a typo fix in
+            // the description is not worth a notification.
+            const materialChange =
+                dto.starts_at !== undefined ||
+                dto.ends_at !== undefined ||
+                dto.venue_address !== undefined ||
+                dto.venue_city !== undefined ||
+                dto.venue_state !== undefined;
+
+            if (materialChange) {
+                await this.notifyRsvpHolders(event, 'event_updated', {
+                    title: `${event.title} was updated`,
+                    body: 'The time or place of an event you RSVP\'d to has changed.',
+                });
+            }
+
             await AuditLogger.log(actor, LogActions.EVENT_UPDATE, ResourceTypes.EVENT, eventId, 1, { groupId: existing.groupId });
 
-            return event;
+            return serializeEvent(event, true);
         } catch (error) {
             await AuditLogger.log(actor, LogActions.EVENT_UPDATE, ResourceTypes.EVENT, eventId, 0, { error });
             if (error instanceof ApiError) throw error;
@@ -342,9 +504,25 @@ export class EventService {
 
             await requireGroupAdmin(existing.groupId, actor.userId);
 
-            await prisma.event.update({
+            const cancelled = await prisma.event.update({
                 where: { id: eventId },
                 data: { status: 'cancelled' },
+                select: eventSelect,
+            });
+
+            // Anyone who said they were coming needs to know they no longer are.
+            await this.notifyRsvpHolders(cancelled, 'event_cancelled', {
+                title: `${cancelled.title} was cancelled`,
+                body: 'An event you RSVP\'d to has been cancelled.',
+                email: {
+                    subject: `Cancelled: ${cancelled.title}`,
+                    template: 'event_cancelled',
+                    data: {
+                        eventTitle: cancelled.title,
+                        startsAt: cancelled.startsAt.toISOString(),
+                        eventUrl: buildEventUrl(cancelled.id),
+                    },
+                },
             });
 
             await AuditLogger.log(actor, LogActions.EVENT_DELETE, ResourceTypes.EVENT, eventId, 1, { groupId: existing.groupId });
@@ -358,6 +536,10 @@ export class EventService {
 
     // ── rsvp ─────────────────────────────────────────────────────────────────
 
+    // Idempotent by design. The client updates the RSVP optimistically and disables the
+    // button the instant it is tapped, so a retry — a double tap, a flaky network, a
+    // resumed request — must land on the same state instead of a 409 that would force
+    // the UI to roll an already-correct button back.
     async rsvp(eventId: string, dto: RsvpDTO, actor: TokenPayload): Promise<RsvpPublic> {
         try {
             const event = await prisma.event.findUnique({
@@ -378,21 +560,32 @@ export class EventService {
                 select: { id: true, status: true },
             });
 
-            if (existing) {
-                throw new ApiError('You have already RSVPed. Use PATCH to update your RSVP.', StatusCodes.CONFLICT);
+            // Same answer as last time — return it without touching rsvpCount.
+            if (existing?.status === dto.status) {
+                return prisma.eventRsvp.findUniqueOrThrow({
+                    where: { eventId_userId: { eventId, userId: actor.userId } },
+                    select: rsvpSelect,
+                });
             }
 
-            if (dto.status === 'going' && event.rsvpLimit !== null && event.rsvpCount >= event.rsvpLimit) {
+            const wasGoing = existing?.status === 'going';
+            const willBeGoing = dto.status === 'going';
+
+            if (willBeGoing && !wasGoing && event.rsvpLimit !== null && event.rsvpCount >= event.rsvpLimit) {
                 throw new ApiError('This event has reached its RSVP limit.', StatusCodes.UNPROCESSABLE_ENTITY);
             }
 
+            const countDelta = (willBeGoing ? 1 : 0) - (wasGoing ? 1 : 0);
+
             const [rsvp] = await prisma.$transaction([
-                prisma.eventRsvp.create({
-                    data: { eventId, userId: actor.userId, status: dto.status },
+                prisma.eventRsvp.upsert({
+                    where: { eventId_userId: { eventId, userId: actor.userId } },
+                    create: { eventId, userId: actor.userId, status: dto.status },
+                    update: { status: dto.status },
                     select: rsvpSelect,
                 }),
-                ...(dto.status === 'going'
-                    ? [prisma.event.update({ where: { id: eventId }, data: { rsvpCount: { increment: 1 } } })]
+                ...(countDelta !== 0
+                    ? [prisma.event.update({ where: { id: eventId }, data: { rsvpCount: { increment: countDelta } } })]
                     : []),
             ]);
 
@@ -500,6 +693,168 @@ export class EventService {
             asLogger.error('EventService.cancelRsvp error:', error);
             throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    // ── getCalendarFile ───────────────────────────────────────────────────────
+    // Streams an .ics for a single event. Applies exactly the same visibility rules as
+    // getEvent — the calendar file must not become a side door to a private event or to
+    // an address the caller cannot otherwise see.
+
+    async getCalendarFile(
+        eventId: string,
+        actor: TokenPayload,
+    ): Promise<{ filename: string; content: string }> {
+        try {
+            const event = await prisma.event.findUnique({
+                where: { id: eventId },
+                select: eventSelect,
+            });
+
+            if (!event) {
+                throw new ApiError(Messages.RESOURCE_NOT_FOUND('Event'), StatusCodes.NOT_FOUND);
+            }
+
+            const [isMember, showAddress] = await Promise.all([
+                isActiveMember(event.groupId, actor.userId),
+                canSeeExactAddress(event.id, event.groupId, actor.userId),
+            ]);
+
+            if (event.visibility !== 'public' && !isMember) {
+                throw new ApiError(Messages.RESOURCE_NOT_FOUND('Event'), StatusCodes.NOT_FOUND);
+            }
+
+            const venueArea = buildVenueArea(event);
+            const location = (showAddress ? event.venueAddress : null) ?? venueArea;
+
+            const content = buildIcs({
+                id: event.id,
+                title: event.title,
+                description: event.description,
+                location,
+                startsAt: event.startsAt,
+                endsAt: event.endsAt,
+                url: buildEventUrl(event.id),
+            });
+
+            // Slugify the title for the download name; fall back to the id when a title is
+            // entirely non-ASCII, so the filename never collapses to an empty string.
+            const slug = event.title
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '');
+
+            return { filename: `${slug || event.id}.ics`, content };
+        } catch (error) {
+            if (error instanceof ApiError) throw error;
+            asLogger.error('EventService.getCalendarFile error:', error);
+            throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ── sendUpcomingReminders ─────────────────────────────────────────────────
+    // Driven by the hourly `event-reminders` cron.
+    //
+    // A sweep rather than a per-event delayed job: a delayed job scheduled at creation
+    // time would still fire after the event was cancelled or moved, and would need
+    // cancelling and rescheduling on every edit. Sweeping the window reads current state
+    // every time, so a cancelled or rescheduled event simply falls out of it.
+    //
+    // The window is 23–25h wide against an hourly cron, so it overlaps deliberately;
+    // a Redis SET NX marker makes the send exactly-once per event.
+
+    async sendUpcomingReminders(): Promise<{ eventsReminded: number }> {
+        const now = Date.now();
+        const windowStart = new Date(now + 23 * 60 * 60 * 1000);
+        const windowEnd = new Date(now + 25 * 60 * 60 * 1000);
+
+        const events = await prisma.event.findMany({
+            where: {
+                status: 'scheduled',
+                startsAt: { gte: windowStart, lte: windowEnd },
+            },
+            select: { ...eventSelect, group: { select: { name: true } } },
+        });
+
+        let eventsReminded = 0;
+
+        for (const { group, ...event } of events) {
+            const claimed = await redis.set(
+                `event:reminded:${event.id}`,
+                '1',
+                'EX',
+                48 * 60 * 60,
+                'NX',
+            );
+            if (claimed !== 'OK') continue;
+
+            const venueArea = buildVenueArea(event);
+
+            // The reminder is the one place the exact address is pushed rather than
+            // pulled — everyone receiving it holds a going/maybe RSVP, which is exactly
+            // the audience allowed to see it.
+            await this.notifyRsvpHolders(event, 'event_reminder', {
+                title: `${event.title} is tomorrow`,
+                body: event.venueAddress ?? venueArea ?? 'Check the event page for details.',
+                email: {
+                    subject: `Tomorrow: ${event.title}`,
+                    template: 'event_reminder',
+                    data: {
+                        groupName: group.name,
+                        eventTitle: event.title,
+                        startsAt: event.startsAt.toISOString(),
+                        venueArea: venueArea ?? '',
+                        venueAddress: event.venueAddress ?? '',
+                        venue: event.venueAddress ?? venueArea ?? 'To be announced',
+                        eventUrl: buildEventUrl(event.id),
+                        googleCalendarUrl: buildGoogleCalendarUrl({
+                            id: event.id,
+                            title: event.title,
+                            description: event.description,
+                            location: event.venueAddress ?? venueArea,
+                            startsAt: event.startsAt,
+                            endsAt: event.endsAt,
+                            url: buildEventUrl(event.id),
+                        }),
+                    },
+                },
+            });
+
+            eventsReminded += 1;
+        }
+
+        return { eventsReminded };
+    }
+
+    // ── notifyRsvpHolders ─────────────────────────────────────────────────────
+    // Notifies everyone who said they were going or might be. 'not_going' is excluded —
+    // they already opted out of caring about this event.
+
+    private async notifyRsvpHolders(
+        event: EventRow,
+        type: 'event_cancelled' | 'event_updated' | 'event_reminder',
+        payload: {
+            title: string;
+            body: string;
+            email?: { subject: string; template: string; data?: Record<string, unknown> };
+        },
+    ): Promise<void> {
+        const rsvps = await prisma.eventRsvp.findMany({
+            where: { eventId: event.id, status: { in: ['going', 'maybe'] } },
+            select: { userId: true },
+        });
+
+        if (rsvps.length === 0) return;
+
+        await NotificationDispatcher.dispatch({
+            userIds: rsvps.map((r) => r.userId),
+            groupId: event.groupId,
+            type,
+            title: payload.title,
+            body: payload.body,
+            referenceType: 'event',
+            referenceId: event.id,
+            email: payload.email,
+        });
     }
 
     // ── listRsvps ─────────────────────────────────────────────────────────────

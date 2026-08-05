@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "groupsync-api-v1",
     "name": "GroupSync API",
-    "description": "Complete API documentation for GroupSync — location-based social platform.\n\n## Quick Setup\n1. Import this collection\n2. Set `baseUrl` to `http://localhost:3000/api/v1`\n3. Run Register or Login — tokens saved automatically\n4. All authenticated requests use `{{accessToken}}` via collection-level Auth\n\n## Variables\n| Variable | Description | Auto-set |\n|---|---|---|\n| `baseUrl` | API base URL | No |\n| `accessToken` | JWT (15 min) | Yes — Login/Register |\n| `refreshToken` | Opaque token (30d) | Yes — Login/Register |\n| `userId` | Auth user UUID | Yes — Login/Register |\n| `targetUserId` | Another user UUID | No — set manually |\n| `groupId` | Group UUID | Yes — Create Group |\n| `groupSlug` | Group slug | Yes — Create Group |\n| `applicationId` | Application UUID | Yes — Apply to Group |\n| `inviteLinkId` | Invite link UUID | Yes — Generate Invite |\n| `inviteToken` | Invite token string | Yes — Generate Invite |\n| `postId` | Feed post UUID | Yes — Create Post |\n| `commentId` | Comment UUID | Yes — Add Comment |\n\n## Response Envelope\n```json\n{ \"success\": true|false, \"message\": \"string\", \"data\": {}|[]|null, \"error\": null }\n```\nPaginated: includes `pagination: { page, limit, total }`",
+    "description": "Complete API documentation for GroupSync — location-based social platform.\n\n## Quick Setup\n1. Import this collection (Postman or Apidog)\n2. Set `baseUrl` to `http://localhost:3000/api/v1`\n3. Run Register → Verify Email — tokens saved automatically\n4. All authenticated requests use `{{accessToken}}` via collection-level Auth\n\n## Verification ladder\n\nCapability is bought in rungs, so friction only lands on users asking for the riskier thing.\nSeveral endpoints return **403** until the caller has climbed far enough.\n\n| Tier | Requirement | Unlocks |\n|---|---|---|\n| 0 | none | Browse groups and public events, view profiles |\n| 1 | email verified **+ phone OTP** | Join public groups, apply, accept invites, RSVP to events |\n| 2 | tier 1 + a non-empty `bio`, then **platform admin review of the group** | Create a group |\n| 3 | tier 2 + verified ID (NIN / BVN / passport) | Host an event at a **physical street address** |\n\nClimb tier 1 with `POST /auth/phone/send-otp` → `POST /auth/phone/verify`.\n\n## Two rules worth knowing before you test\n\n**Groups are not in Explore the moment you create them.** A new group has\n`reviewStatus: \"pending\"` and is excluded from `GET /groups` until a platform admin approves it\nvia `PATCH /admin/groups/:id/review`. It still works for its organiser and members, and is still\nreachable by slug — review gates discovery, not existence. A group also needs a `coverImageUrl`\nto be listed. `GET /groups/:slug` returns a `publishingChecklist` to the group's admins with\neverything still outstanding.\n\n**Event venues are split by audience.** `venue_city` + `venue_state` come back as the public\n`venueArea` (\"Ibadan, Oyo\") for everyone. `venue_address` — the exact street address — is\nserialised only for active members and going/maybe RSVP holders, and is **omitted from the\npayload entirely** for anyone else.\n\n## Variables\n| Variable | Description | Auto-set |\n|---|---|---|\n| `baseUrl` | API base URL | No |\n| `accessToken` | JWT (15 min) | Yes — Verify Email / Login |\n| `refreshToken` | Opaque token (30d) | Yes — Verify Email / Login |\n| `userId` | Auth user UUID | Yes — Login/Register |\n| `targetUserId` | Another user UUID | No — set manually |\n| `groupId` | Group UUID | Yes — Create Group |\n| `groupSlug` | Group slug | Yes — Create Group |\n| `applicationId` | Application UUID | Yes — Apply to Group |\n| `inviteLinkId` | Invite link UUID | Yes — Generate Invite |\n| `inviteToken` | Invite token string | Yes — Generate Invite |\n| `eventId` | Event UUID | Yes — Create Event |\n| `postId` | Feed post UUID | Yes — Create Post |\n| `commentId` | Comment UUID | Yes — Add Comment |\n\n## Response Envelope\n```json\n{ \"success\": true|false, \"message\": \"string\", \"data\": {}|[]|null, \"error\": null }\n```\nPaginated: includes `pagination: { page, limit, total }`\nCursor-paginated (messages, DMs, notifications): includes `next_cursor` and `has_more`\n\n**One exception**: `GET /events/:id/calendar.ics` returns a `text/calendar` file, not this\nenvelope — calendar clients follow the URL directly.\n\n## Testing Google Sign-In\nThe server serves a harness at `http://localhost:3000/dev/google-signin` (non-production only).\nIt fetches a real Google ID token in the browser and posts it to `POST /auth/social`, so you can\nget a working session without wiring up a client first.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "version": {
       "major": 1,
@@ -176,6 +176,152 @@
       ]
     },
     {
+      "name": "Reference",
+      "description": "Static catalogues backing the signup multi-selects.\n\nNo auth — these populate the signup form, which runs before the user has a token. They are product configuration, not user data.\n\nInterest `value`s are already normalised (lowercase, no whitespace) to match what the write path stores. `city`/`state` stay free text, so anything missing can still be typed in.",
+      "item": [
+        {
+          "name": "Get Onboarding Options",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reference/onboarding",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reference",
+                "onboarding"
+              ]
+            },
+            "description": "Everything the signup form needs in one round-trip: interests (with their groupings), the 36 Nigerian states + FCT with their main cities, and the group category list."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Operation completed successfully.\",\n  \"data\": {\n    \"interests\": [\n      {\n        \"value\": \"running\",\n        \"label\": \"Running\",\n        \"group\": \"Sports & Fitness\"\n      },\n      {\n        \"value\": \"books\",\n        \"label\": \"Books & Reading\",\n        \"group\": \"Arts & Culture\"\n      }\n    ],\n    \"interestGroups\": [\n      \"Sports & Fitness\",\n      \"Arts & Culture\",\n      \"Career & Learning\",\n      \"Community\",\n      \"Lifestyle\"\n    ],\n    \"states\": [\n      {\n        \"state\": \"Oyo\",\n        \"cities\": [\n          \"Ibadan\",\n          \"Ogbomoso\",\n          \"Oyo\",\n          \"Iseyin\"\n        ]\n      },\n      {\n        \"state\": \"Lagos\",\n        \"cities\": [\n          \"Ikeja\",\n          \"Lagos Island\",\n          \"Lekki\"\n        ]\n      }\n    ],\n    \"categories\": [\n      \"Sports & Fitness\",\n      \"Arts & Culture\",\n      \"Career & Learning\",\n      \"Community\",\n      \"Lifestyle\",\n      \"Faith\",\n      \"Education\",\n      \"Social\"\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Interests",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reference/interests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reference",
+                "interests"
+              ]
+            },
+            "description": "Interest tags for the multi-select, plus the distinct group headings so the client can render them in sections.\n\nStore `value`, display `label`."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Operation completed successfully.\",\n  \"data\": {\n    \"interests\": [\n      {\n        \"value\": \"football\",\n        \"label\": \"Football\",\n        \"group\": \"Sports & Fitness\"\n      }\n    ],\n    \"groups\": [\n      \"Sports & Fitness\",\n      \"Arts & Culture\",\n      \"Career & Learning\",\n      \"Community\",\n      \"Lifestyle\"\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get States & Cities",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reference/states",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reference",
+                "states"
+              ]
+            },
+            "description": "Nigeria's 36 states plus the FCT, each with the population centres a group is likely to be based in. Not an exhaustive gazetteer — the field is free text."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Operation completed successfully.\",\n  \"data\": [\n    {\n      \"state\": \"Oyo\",\n      \"cities\": [\n        \"Ibadan\",\n        \"Ogbomoso\",\n        \"Oyo\",\n        \"Iseyin\"\n      ]\n    },\n    {\n      \"state\": \"FCT\",\n      \"cities\": [\n        \"Abuja\",\n        \"Gwagwalada\",\n        \"Kuje\",\n        \"Bwari\"\n      ]\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Group Categories",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reference/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reference",
+                "categories"
+              ]
+            },
+            "description": "Categories a group can be filed under. Mirrors the interest catalogue's top level."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Operation completed successfully.\",\n  \"data\": [\n    \"Sports & Fitness\",\n    \"Arts & Culture\",\n    \"Career & Learning\",\n    \"Community\",\n    \"Lifestyle\",\n    \"Faith\",\n    \"Education\",\n    \"Social\"\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Auth",
       "description": "Registration, login, social OAuth, token management, password flows, email verification, KYC.\n\nRate limit: 10 req / 15 min per IP on all /auth/* routes in production.",
       "item": [
@@ -210,7 +356,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"testuser@example.com\",\n  \"password\": \"Password123\",\n  \"display_name\": \"Test User\",\n  \"phone\": \"+2348012345678\"\n}",
+              "raw": "{\n  \"email\": \"testuser@example.com\",\n  \"password\": \"Password123\",\n  \"display_name\": \"Test User\",\n  \"phone\": \"+2348012345678\",\n  \"city\": \"Ibadan\",\n  \"state\": \"Oyo\",\n  \"country\": \"NG\",\n  \"interests\": [\n    \"running\",\n    \"books\",\n    \"tech\"\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -227,7 +373,7 @@
                 "register"
               ]
             },
-            "description": "Create a new account.\n\nSide effects: Email OTP queued via BullMQ. User created with id_verification_status=unsubmitted.\n\nPassword rules: min 8 chars, one uppercase, one lowercase, one digit.\n\nphone: Stored AES-256 encrypted. Never returned in any response."
+            "description": "Create a new account.\n\nSide effects: email OTP queued via BullMQ. Tokens are NOT returned here — `POST /auth/verify-email` issues them.\n\nPassword rules: min 8 chars, one uppercase, one lowercase, one digit.\n\n**Onboarding fields (all optional)**\n- `city` / `state` — captured at signup so the home feed opens on the user's own city rather than a nationwide list nobody can act on. Values from `GET /reference/states`.\n- `interests` — up to 30 tags, lowercased and deduplicated before storing. Values from `GET /reference/interests`.\n- `phone` — stored AES-256 encrypted and never returned. Supplying it here does NOT verify it; run `POST /auth/phone/send-otp` for that."
           },
           "response": [
             {
@@ -402,7 +548,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"provider\": \"google\",\n  \"token\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\"\n}",
+              "raw": "{\n  \"provider\": \"google\",\n  \"token\": \"<id_token from the provider SDK>\",\n  \"display_name\": \"Test User\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -419,7 +565,7 @@
                 "social"
               ]
             },
-            "description": "Login or register via Google or Apple ID token.\n\nResolution flow:\n1. Provider ID linked → sign in\n2. Email exists, no link → link provider, sign in\n3. Neither → create account + link, sign in\n\nisNewUser=true triggers onboarding flow on client.\nApple returns 501 until Apple JWK verification is configured."
+            "description": "OAuth sign-in / sign-up. Returns `{ user, tokens, isNewUser }`.\n\n**google** — the ID token is verified against `GOOGLE_CLIENT_ID`.\n\n**apple** — the ID token is verified against Apple's JWKS (https://appleid.apple.com/auth/keys): signature, issuer and audience are all checked. Audience is matched against `APPLE_CLIENT_ID` (comma-separated — Apple issues a different `aud` per surface). If `APPLE_CLIENT_ID` is unset the endpoint returns **501**.\n\n`display_name` is **Apple only**. Apple returns the user's name to the client on the FIRST authorisation and never again, and never inside the identity token — so the client has to forward it or the account keeps a placeholder name forever. Ignored for Google.\n\nFlow: known `provider_id` → sign in · existing email → link the provider · otherwise create. When the provider asserts `email_verified`, `emailVerifiedAt` is set (or backfilled on an existing unverified account) — re-challenging with our own OTP would be pure friction.\n\n**Testing Google locally**: the server serves a harness at `/dev/google-signin` (non-production only) that fetches a real ID token in the browser and posts it here."
           },
           "response": [
             {
@@ -976,6 +1122,124 @@
                 }
               ],
               "body": "{\n  \"success\": true,\n  \"message\": \"A verification code has been sent to your email.\",\n  \"data\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "Send Phone OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+2348012345678\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/phone/send-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "phone",
+                "send-otp"
+              ]
+            },
+            "description": "**Tier 1 of the verification ladder.** A verified phone is required to join groups, apply, accept invites and RSVP to events.\n\nSupplying `phone` sets or replaces the number on the account and clears any prior verification — a new number has not been proven. Omit it to re-send to the number already on file.\n\n**Errors**\n- `400` no number on the account and none supplied\n- `409` the number is already verified, or already in use by another account\n- `429` a code was sent less than 60 seconds ago\n\n**Delivery**: `SMS_PROVIDER=log` (the default) writes the code to the application log instead of sending it, so the flow is exercisable before an SMS contract exists. Set `SMS_PROVIDER=termii` + `SMS_API_KEY` to send for real."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"A verification code has been sent to your phone.\",\n  \"data\": {\n    \"phoneVerified\": false\n  }\n}"
+            },
+            {
+              "name": "429 Too Many Requests",
+              "status": "Too Many Requests",
+              "code": 429,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"A verification code was just sent. Please wait a minute before requesting another.\",\n  \"data\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "Verify Phone OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"otp\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/phone/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "phone",
+                "verify"
+              ]
+            },
+            "description": "Confirms the code from `POST /auth/phone/send-otp` and sets `users.phone_verified_at`, which unlocks tier 1.\n\nThe OTP is consumed on success. A wrong or expired code returns `400`."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Phone number verified successfully.\",\n  \"data\": {\n    \"phoneVerified\": true,\n    \"phoneVerifiedAt\": \"2026-08-05T12:00:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "400 Bad Request",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"The verification code is invalid or has expired.\",\n  \"data\": null\n}"
             }
           ]
         },
@@ -1839,7 +2103,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Lagos Tech Community\",\n  \"category\": \"Technology\",\n  \"subcategory\": \"Software Engineering\",\n  \"description\": \"A community for software engineers in Lagos.\",\n  \"city\": \"Lagos\",\n  \"state\": \"Lagos\",\n  \"country\": \"NG\",\n  \"lat\": 6.5244,\n  \"lng\": 3.3792,\n  \"membership_type\": \"open\",\n  \"how_to_join_content\": \"Just click join!\",\n  \"rules\": \"Be respectful. No spam.\",\n  \"cover_image_url\": \"https://bucket.s3.amazonaws.com/covers/ltc.jpg\",\n  \"logo_url\": \"https://bucket.s3.amazonaws.com/logos/ltc.png\"\n}",
+              "raw": "{\n  \"name\": \"Ibadan Runners Club\",\n  \"category\": \"Sports & Fitness\",\n  \"subcategory\": \"Running\",\n  \"description\": \"A friendly running club that meets every Sunday morning at the stadium gate for a 10K.\",\n  \"city\": \"Ibadan\",\n  \"state\": \"Oyo\",\n  \"country\": \"NG\",\n  \"lat\": 7.3775,\n  \"lng\": 3.947,\n  \"membership_type\": \"open\",\n  \"cover_image_url\": \"https://cdn.example.com/cover.jpg\",\n  \"logo_url\": \"https://cdn.example.com/logo.jpg\",\n  \"rules\": \"Be on time. Be kind.\",\n  \"how_to_join_content\": \"Just tap join.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1855,7 +2119,7 @@
                 "groups"
               ]
             },
-            "description": "Create a new group. Requires id_verification_status=verified.\n\nSlug: auto-generated from name (slugify + collision suffix up to -10).\nCreator: automatically added as super_admin in same transaction.\ninvite_only: sets is_discoverable=false automatically.\nmembership_types: open | application | invite_only",
+            "description": "Create a group. Creator is added as `super_admin` in the same transaction.\n\n**Requires tier 2**: email + phone verified, and a non-empty `bio` on your profile. Without those you get `403`.\n\n**description is required** — 40-500 characters after trimming, with at least one non-whitespace character. A 60-character run of spaces is rejected.\n\n**Rate limit**: 3 groups per user per rolling 7 days -> `429`. Counted from the groups table, not Redis, so a cache flush does not hand out a fresh allowance; soft-deleted groups still count.\n\n**The group is created with `reviewStatus: \"pending\"`.** It works immediately for you and your members, but it is **hidden from Explore** until a platform admin approves it. You are notified \"Under review - usually within 24 hours\".\n\nTo reach Explore a group needs ALL of: `reviewStatus = approved`, a `coverImageUrl`, `isDiscoverable`, and `status = active`. `GET /groups/:slug` returns a `publishingChecklist` to the group's admins listing whatever is still outstanding.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2025,7 +2289,7 @@
                 }
               ]
             },
-            "description": "List and search groups. Auth optional — affects invite-only visibility.\n\nSearch: full-text via fts_vector (name, description, category, subcategory).\nDistance filter: requires lat + lng + radius_km.\nDistance sort: requires lat + lng.\nInvite-only groups excluded unless caller is an active member.\nDeleted/inactive groups always excluded."
+            "description": "List and search groups. Auth optional — affects invite-only visibility.\n\nSearch: full-text via fts_vector (name, description, category, subcategory).\nDistance filter: requires lat + lng + radius_km.\nDistance sort: requires lat + lng.\nInvite-only groups excluded unless caller is an active member.\nDeleted/inactive groups always excluded.\n\n---\n\n**Explore publish rule.** A group is listed only when ALL of: `is_discoverable = TRUE`, `review_status = 'approved'`, `cover_image_url IS NOT NULL`, `status = 'active'`. Members always see their own groups regardless, so an organiser can find a group that is still pending review.\n\n**Each row also carries**\n- `isPublished` - the rule above, so the client need not re-derive it\n- `isActiveThisMonth` - the group has a non-cancelled event starting within 30 days. This replaced the \"NEW\" badge: a claim about what the group is *doing*, not when it signed up. Render it as \"Active this month\"."
           },
           "response": [
             {
@@ -2076,7 +2340,7 @@
                 "{{groupSlug}}"
               ]
             },
-            "description": "Public group profile. Auth optional.\n\nReturns 404 if: group not found, deleted, or invite-only and caller not a member.\ncallerMembershipStatus included when authenticated: { isMember, role, status, joinedAt }"
+            "description": "Public group profile. Auth optional.\n\nReturns 404 if: group not found, deleted, or invite-only and caller not a member.\ncallerMembershipStatus included when authenticated: { isMember, role, status, joinedAt }\n\n---\n\nAlso returns `group.isActiveThisMonth`, `group.isPublished`, `group.reviewStatus`, and - **for the group's own admins only** - a `publishingChecklist`:\n\n```json\n{\n  \"reviewStatus\": \"pending\",\n  \"reviewMessage\": \"Under review - usually within 24 hours.\",\n  \"hasCoverImage\": true,\n  \"isDiscoverable\": true,\n  \"isPublished\": false,\n  \"blockers\": [\"Under review - usually within 24 hours.\"]\n}\n```\n\nIt is `null` for everyone else. Reviewer notes on a rejected group reach the organiser only through here.\n\nA pending group is still reachable by slug - review gates Explore, not access."
           },
           "response": [
             {
@@ -3880,7 +4144,7 @@
                 "events"
               ]
             },
-            "description": "Create an event in a group. Requires admin or super_admin role.\n\nBody fields:\n- `title` (string, required): max 200 chars\n- `description` (string, optional)\n- `location_name` (string, optional): venue name\n- `lat` / `lng` (number, optional): venue coordinates stored as PostGIS Point\n- `starts_at` (ISO 8601, required): must be in the future\n- `ends_at` (ISO 8601, optional): must be after starts_at\n- `rsvp_limit` (int, optional): max attendees with status `going`; null = unlimited\n\nSide effect: queues `notify-group-members` BullMQ job to fan-out `event_created` notifications.",
+            "description": "Create an event. Group `admin`/`super_admin` only.\n\n`starts_at` must be in the future; `ends_at` must be after it. `visibility` is `public` | `private`, defaulting to `private`.\n\n**Venue is split by audience.**\n\n- `venue_city` + `venue_state` -> serialised back as `venueArea` (\"Ibadan, Oyo\"). **Public** - present on every event payload including list and `/events/near`, so a card can show a location without a second call.\n- `venue_address` -> the exact street address. Serialised **only** for active members of the group and for anyone holding a `going`/`maybe` RSVP. For everyone else the field is **omitted entirely, not nulled** - a null would tell a stranger it exists but is hidden.\n\nSetting `venue_address` requires **tier 3** (`id_verification_status = verified`) on both create and update - publishing a street address means real people show up at a real place. `403` otherwise.\n\nEvery event also returns `canSeeExactAddress` (so the client knows which of the two it got) and a `calendar` block with `.ics` and Google Calendar links.\n\n**Notifications**: every member except you gets an in-app notification and an email (`event_created`). A `event_reminder` follows 24 hours before the start, to everyone holding a going/maybe RSVP, with the venue address included.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -3893,7 +4157,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Lagos Tech Meetup\",\n  \"description\": \"Monthly engineering meetup\",\n  \"location_name\": \"Tech Hub Lagos\",\n  \"lat\": 6.5244,\n  \"lng\": 3.3792,\n  \"starts_at\": \"2027-06-15T18:00:00.000Z\",\n  \"ends_at\": \"2027-06-15T21:00:00.000Z\",\n  \"rsvp_limit\": 100,\n  \"visibility\": \"public\"\n}",
+              "raw": "{\n  \"title\": \"Sunday 10K\",\n  \"description\": \"Meet at the stadium gate. Bring water.\",\n  \"venue_city\": \"Ibadan\",\n  \"venue_state\": \"Oyo\",\n  \"venue_address\": \"National Stadium, Liberty Road, Ibadan\",\n  \"lat\": 7.3775,\n  \"lng\": 3.947,\n  \"starts_at\": \"2026-09-12T06:30:00.000Z\",\n  \"ends_at\": \"2026-09-12T09:00:00.000Z\",\n  \"rsvp_limit\": 50,\n  \"visibility\": \"public\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4051,7 +4315,7 @@
                 "{{eventId}}"
               ]
             },
-            "description": "Returns the event plus the caller's own RSVP status.\n\nPrivate events are members-only: a non-member gets 404 (not 403), so the existence of a group's private events is not probeable.",
+            "description": "Returns the event plus the caller's own RSVP status.\n\nPrivate events are members-only: a non-member gets 404 (not 403), so the existence of a group's private events is not probeable.\n\n---\n\nReturns `venueArea` for everyone, `venueAddress` only for members and going/maybe RSVP holders (omitted otherwise), `canSeeExactAddress`, `myRsvp`, and a `calendar` block.\n\nA private event returns **404** (not 403) for a non-member, so its existence is not probeable.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4064,6 +4328,39 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Download Event Calendar (.ics)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/calendar.ics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events",
+                "{{eventId}}",
+                "calendar.ics"
+              ]
+            },
+            "description": "Downloads an iCalendar file for the event.\n\n**The only endpoint that does not return the JSON envelope** - it returns `text/calendar; charset=utf-8` with `Content-Disposition: attachment`, because calendar clients follow this URL directly and would choke on JSON.\n\nApplies exactly the same visibility rules as `GET /events/:id`: a private event returns **404** for a non-member, so the file cannot become a side door. `LOCATION` carries the exact address for those allowed to see it and the area label otherwise, so the file stays useful without leaking the street.\n\nRFC 5545 compliant: CRLF line endings, TEXT escaping, 75-octet line folding. An event with no `ends_at` is treated as two hours long.\n\nThe equivalent Google Calendar deep link ships inline on every event payload as `calendar.google` - no request needed."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/calendar; charset=utf-8"
+                }
+              ],
+              "body": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//GroupSync//Events//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:e1f2a3b4-0000-4000-8000-000000000001@groupsync\r\nDTSTAMP:20260805T120000Z\r\nDTSTART:20260912T063000Z\r\nDTEND:20260912T090000Z\r\nSUMMARY:Sunday 10K\r\nDESCRIPTION:Meet at the stadium gate. Bring water.\r\nLOCATION:National Stadium\\, Liberty Road\\, Ibadan\r\nURL:https://groupsync.app/events/e1f2a3b4-0000-4000-8000-000000000001\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+            }
+          ]
         },
         {
           "name": "Update Event",
@@ -4085,7 +4382,7 @@
                 "{{eventId}}"
               ]
             },
-            "description": "Update event details. Requires admin or super_admin role. All fields optional.\n\nBody fields (all optional):\n- `title` (string): max 200 chars\n- `description` (string)\n- `location_name` (string)\n- `lat` / `lng` (number): venue coordinates\n- `starts_at` (ISO 8601): must be in the future\n- `ends_at` (ISO 8601): must be after starts_at\n- `rsvp_limit` (int | null): null removes the limit\n- `status` (string): `scheduled` | `cancelled` | `completed`",
+            "description": "Update event details. Requires admin or super_admin role. All fields optional.\n\nBody fields (all optional):\n- `title` (string): max 200 chars\n- `description` (string)\n- `location_name` (string)\n- `lat` / `lng` (number): venue coordinates\n- `starts_at` (ISO 8601): must be in the future\n- `ends_at` (ISO 8601): must be after starts_at\n- `rsvp_limit` (int | null): null removes the limit\n- `status` (string): `scheduled` | `cancelled` | `completed`\n\n---\n\n**Venue is split by audience.**\n\n- `venue_city` + `venue_state` -> serialised back as `venueArea` (\"Ibadan, Oyo\"). **Public** - present on every event payload including list and `/events/near`, so a card can show a location without a second call.\n- `venue_address` -> the exact street address. Serialised **only** for active members of the group and for anyone holding a `going`/`maybe` RSVP. For everyone else the field is **omitted entirely, not nulled** - a null would tell a stranger it exists but is hidden.\n\nSetting `venue_address` requires **tier 3** (`id_verification_status = verified`) on both create and update - publishing a street address means real people show up at a real place. `403` otherwise.\n\nEvery event also returns `canSeeExactAddress` (so the client knows which of the two it got) and a `calendar` block with `.ics` and Google Calendar links.\n\nChanging the time or the venue notifies everyone holding a going/maybe RSVP (`event_updated`). Editing only the description does not - a typo fix is not worth a notification.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4098,7 +4395,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Updated Meetup Title\",\n  \"description\": \"Updated description\",\n  \"location_name\": \"New Venue\",\n  \"lat\": 6.5244,\n  \"lng\": 3.3792,\n  \"starts_at\": \"2027-07-01T18:00:00.000Z\",\n  \"ends_at\": \"2027-07-01T21:00:00.000Z\",\n  \"rsvp_limit\": 150,\n  \"visibility\": \"private\"\n}",
+              "raw": "{\n  \"title\": \"Sunday 10K (new route)\",\n  \"venue_city\": \"Ibadan\",\n  \"venue_state\": \"Oyo\",\n  \"venue_address\": \"Agodi Gardens, Ibadan\",\n  \"starts_at\": \"2026-09-12T07:00:00.000Z\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4129,7 +4426,7 @@
                 "rsvp"
               ]
             },
-            "description": "RSVP to an event. Status: going | maybe | not_going. Returns 409 if already RSVPed.",
+            "description": "RSVP to an event. `status` is `going` | `maybe` | `not_going`.\n\n`not_going` is the third option the UI labels **\"Unavailable\" / \"Can't make it\"**.\n\n**Requires tier 1** (email + phone verified) - attending an event is a tier 1 capability. `403` otherwise.\n\n**This endpoint is idempotent.** It upserts:\n- same status as before -> no-op, returns the existing RSVP (**not** a 409)\n- different status -> transitions it and adjusts `rsvpCount` by the delta\n\nThat exists because the client updates optimistically and disables the button the instant it is tapped. A 409 on retry - a double tap, a flaky network, a resumed request - would force the UI to roll back a button that was already correct.\n\nIf `rsvp_limit` is set and the transition is *into* `going`, the limit is checked (`422`).",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4354,6 +4651,38 @@
           "response": []
         },
         {
+          "name": "Get Unread Count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/unread-count",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "unread-count"
+              ]
+            },
+            "description": "Returns just `{ unread_count }` for the badge.\n\n`GET /notifications` already returns `unread_count` alongside its page of rows, but the badge is polled on every app resume and does not need the rows."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Unread count retrieved successfully.\",\n  \"data\": {\n    \"unread_count\": 7\n  }\n}"
+            }
+          ]
+        },
+        {
           "name": "Mark Notification Read",
           "request": {
             "method": "PATCH",
@@ -4510,7 +4839,7 @@
                 "preferences"
               ]
             },
-            "description": "Upsert notification preferences. group_id=null sets global default.",
+            "description": "Upserts on `(user_id, group_id, pref_type)`. `group_id: null` (or omitted) sets the account-wide default for that type; a row scoped to a group overrides it.\n\n`pref_type` must be a known notification type (`400` otherwise).\n\n**Each channel is optional and patched independently.** Omitting `email_enabled` leaves it as-is - muting push must not silently re-enable email just because the client did not restate it. At least one of the three must be present.\n\nChannels: `push_enabled`, `in_app_enabled`, `email_enabled`.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4523,7 +4852,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"preferences\": [\n    {\n      \"pref_type\": \"event_created\",\n      \"push_enabled\": true,\n      \"in_app_enabled\": true\n    },\n    {\n      \"group_id\": \"{{groupId}}\",\n      \"pref_type\": \"message\",\n      \"push_enabled\": false,\n      \"in_app_enabled\": true\n    }\n  ]\n}",
+              "raw": "{\n  \"preferences\": [\n    {\n      \"pref_type\": \"event_created\",\n      \"email_enabled\": false\n    },\n    {\n      \"group_id\": \"{{groupId}}\",\n      \"pref_type\": \"message_reply\",\n      \"push_enabled\": false,\n      \"in_app_enabled\": true,\n      \"email_enabled\": false\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4533,7 +4862,8 @@
           },
           "response": []
         }
-      ]
+      ],
+      "description": "In-app notifications, the unread badge, and per-channel delivery preferences.\n\n**Delivery** is handled by a single dispatcher across three channels - in-app (a row plus a live `notification` socket event to `user:{id}`), email (BullMQ, and only for the low-frequency types), and push (FCM).\n\nPreference resolution is most-specific-wins: a row scoped to the group, else the account-wide row (`group_id = null`), else defaults (all channels on).\n\n**Which types are emailed** - `message` and `dm_received` are deliberately excluded; one email per chat message is what makes a product's email unreadable. Emailable: `event_created`, `event_reminder`, `event_cancelled`, `message_reply`, `application_approved`, `application_rejected`, `group_approved`, `group_rejected`, `group_announcement`, `invite_received`.\n\n`message_reply` fires only when someone replies to **your** message - not on every message in the room."
     },
     {
       "name": "Reports",
@@ -4886,7 +5216,7 @@
                 }
               ]
             },
-            "description": "List all groups (admin view). Requires platform.admin permission.\n\nQuery params:\n- `page`, `limit`: offset pagination\n- `status`: `active` | `suspended` | `deleted`\n- `search`: free-text search on name/description",
+            "description": "List all groups (admin view). Requires platform.admin permission.\n\nQuery params:\n- `page`, `limit`: offset pagination\n- `status`: `active` | `suspended` | `deleted`\n- `search`: free-text search on name/description\n\nAlso accepts `?review_status=pending|approved|rejected`.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4899,6 +5229,136 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "List Pending Groups (Review Queue)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/groups/pending?review_status=pending",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "groups",
+                "pending"
+              ],
+              "query": [
+                {
+                  "key": "review_status",
+                  "value": "pending",
+                  "description": "pending | approved | rejected. Defaults to pending."
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Match on name or slug.",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "The group moderation queue.\n\nNew groups go live for their organiser immediately but stay **out of Explore** until approved here.\n\n**Ordered oldest first.** The queue is a FIFO - the \"usually within 24 hours\" promise shown to organisers is only keepable if the longest-waiting group is reviewed first.\n\nEach row inlines the creator's verification state (`phoneVerified`, `emailVerified`, `idVerificationStatus`, `bio`, `groupsCreated`) because \"is this a real organiser?\" is the actual question a reviewer is answering; it should not need a second lookup."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Pending groups retrieved.\",\n  \"data\": [\n    {\n      \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n      \"name\": \"Ibadan Runners Club\",\n      \"slug\": \"ibadan-runners-club\",\n      \"category\": \"Sports & Fitness\",\n      \"description\": \"A friendly running club that meets every Sunday morning at the stadium gate for a 10K.\",\n      \"coverImageUrl\": \"https://cdn.example.com/cover.jpg\",\n      \"city\": \"Ibadan\",\n      \"state\": \"Oyo\",\n      \"memberCount\": 1,\n      \"createdAt\": \"2026-08-05T09:00:00.000Z\",\n      \"creator\": {\n        \"id\": \"11111111-2222-3333-4444-555555555555\",\n        \"displayName\": \"Tunde A.\",\n        \"email\": \"tunde@example.com\",\n        \"bio\": \"Runner and coach in Ibadan.\",\n        \"phoneVerified\": true,\n        \"emailVerified\": true,\n        \"idVerificationStatus\": \"unsubmitted\",\n        \"groupsCreated\": 2\n      }\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 20,\n    \"total\": 1\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Review Group (Approve / Reject)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approve\",\n  \"notes\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/groups/{{groupId}}/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "groups",
+                "{{groupId}}",
+                "review"
+              ]
+            },
+            "description": "Approve or reject a group for Explore.\n\n**Rejecting requires `notes`** (`400` without them) - the organiser is shown them verbatim in their publishing checklist and in the rejection email.\n\n**Approving a group with no cover image fails with `422`** rather than leaving it approved-but-still-invisible with no explanation.\n\nRejection does **not** delete or suspend anything. The group keeps working for the people already in it; it is simply unlisted. That is the point of letting groups go live immediately - review gates discovery, not existence.\n\nEither decision notifies the organiser in-app and by email (`group_approved` / `group_rejected`)."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Group review recorded.\",\n  \"data\": {\n    \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"name\": \"Ibadan Runners Club\",\n    \"reviewStatus\": \"approved\",\n    \"reviewedAt\": \"2026-08-05T12:00:00.000Z\",\n    \"reviewNotes\": null,\n    \"isVerified\": false,\n    \"isDiscoverable\": true,\n    \"coverImageUrl\": \"https://cdn.example.com/cover.jpg\",\n    \"memberCount\": 1\n  }\n}"
+            },
+            {
+              "name": "400 Bad Request",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"A rejection must include notes - the organiser is shown them verbatim.\",\n  \"data\": null\n}"
+            },
+            {
+              "name": "422 Unprocessable Entity",
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"This group has no cover image and cannot be published yet.\",\n  \"data\": null\n}"
+            }
+          ]
         },
         {
           "name": "Update Group",

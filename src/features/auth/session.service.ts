@@ -9,6 +9,10 @@ const Keys = {
     presence: (userId: string) => `presence:${userId}`,
     invite: (token: string) => `invite:${token}`,
     kycEvent: (eventId: string) => `kyc:event:${eventId}`,
+    // Keyed by userId, not by phone number: the number lives encrypted on the user row
+    // and a plaintext number in a Redis key would defeat that.
+    phoneVerify: (userId: string) => `verify:phone:${userId}`,
+    phoneResend: (userId: string) => `verify:phone:cooldown:${userId}`,
 };
 
 // ─── TTL constants (seconds) ──────────────────────────────────────────────────
@@ -20,6 +24,8 @@ const TTL = {
     PRESENCE: 90,                // 90 seconds (heartbeat refreshes)
     INVITE: 5 * 60,             // 5 minutes
     KYC_EVENT: 24 * 60 * 60,   // 24 hours
+    PHONE_VERIFY: 10 * 60,      // 10 minutes
+    PHONE_RESEND: 60,           // 60 seconds between sends
 };
 
 const MAX_FAILED_ATTEMPTS = 5;
@@ -53,6 +59,30 @@ export class SessionService {
 
     static async deleteForgotPasswordOTP(email: string): Promise<void> {
         await redis.del(Keys.forgotPassword(email));
+    }
+
+    // ── Phone verification OTP ──────────────────────────────────────────────────
+
+    static async setPhoneVerificationOTP(userId: string, otp: string): Promise<void> {
+        await redis.setex(Keys.phoneVerify(userId), TTL.PHONE_VERIFY, otp);
+    }
+
+    static async getPhoneVerificationOTP(userId: string): Promise<string | null> {
+        return redis.get(Keys.phoneVerify(userId));
+    }
+
+    static async deletePhoneVerificationOTP(userId: string): Promise<void> {
+        await redis.del(Keys.phoneVerify(userId));
+    }
+
+    /**
+     * Returns true when the caller is allowed to trigger another SMS. SET NX means the
+     * first caller inside the window wins and everyone after it is told to wait, which
+     * keeps a retry loop from burning through SMS credit.
+     */
+    static async claimPhoneOtpSend(userId: string): Promise<boolean> {
+        const result = await redis.set(Keys.phoneResend(userId), '1', 'EX', TTL.PHONE_RESEND, 'NX');
+        return result === 'OK';
     }
 
     // ── Failed login tracking ───────────────────────────────────────────────────

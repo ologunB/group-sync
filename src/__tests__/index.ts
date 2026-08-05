@@ -151,6 +151,43 @@ async function setVerified(userId: string): Promise<void> {
     assert(status === 200, `setVerified failed for ${userId}: HTTP ${status}`);
 }
 
+/**
+ * Tier 1 of the verification ladder — joining a group, applying, accepting an invite
+ * and RSVPing all require a verified phone. Shortcuts the SMS round-trip.
+ */
+async function setPhoneVerified(userId: string): Promise<void> {
+    const { status } = await patch(`/test/verify-phone/${userId}`, {});
+    assert(status === 200, `setPhoneVerified failed for ${userId}: HTTP ${status}`);
+}
+
+/**
+ * Tier 2 — creating a group additionally requires a bio on the organiser's profile.
+ */
+async function setOrganiserBio(token: string): Promise<void> {
+    const { status } = await patch('/users/me', { bio: 'Integration test organiser.' }, token);
+    assert(status === 200, `setOrganiserBio failed: HTTP ${status}`);
+}
+
+/**
+ * Back-dates a user's groups so the 3-per-7-days creation quota starts fresh.
+ * The suite deliberately creates more groups than a real account is allowed to.
+ */
+async function resetGroupQuota(userId: string): Promise<void> {
+    const { status } = await post(`/test/reset-group-quota/${userId}`, {});
+    assert(status === 200, `resetGroupQuota failed for ${userId}: HTTP ${status}`);
+}
+
+/** Moves a group through the review queue so it shows up in Explore. */
+async function approveGroup(groupId: string): Promise<void> {
+    const { status } = await patch(`/test/approve-group/${groupId}`, {});
+    assert(status === 200, `approveGroup failed for ${groupId}: HTTP ${status}`);
+}
+
+// Group descriptions must be 40–500 characters, so every fixture shares one that clears
+// the floor rather than each call site inventing its own.
+const VALID_DESCRIPTION =
+    'A group created by the integration suite to exercise the API end to end.';
+
 function makeAdminToken(userId: string): string {
     return EncryptionUtil.generateJWT(
         { userId, role: 'platform_admin', sessionId: 'test-admin-session', permissions: ['platform.admin'] },
@@ -596,6 +633,14 @@ async function runFeaturesSuite(): Promise<void> {
         await setVerified(outsiderId);
     });
 
+    await test('satisfy the verification ladder for all actors', async () => {
+        // Tier 1 for everyone (join / apply / RSVP), tier 2 for the creator (bio).
+        await setPhoneVerified(creatorId);
+        await setPhoneVerified(memberId);
+        await setPhoneVerified(outsiderId);
+        await setOrganiserBio(creatorToken);
+    });
+
     await test('re-login all actors to get fresh tokens reflecting DB change', async () => {
         const { status: cs, data: cd } = await post('/auth/login', { email: CREATOR_EMAIL,  password: CREATOR_PASS  });
         const { status: ms, data: md } = await post('/auth/login', { email: MEMBER_EMAIL,   password: MEMBER_PASS   });
@@ -916,11 +961,31 @@ async function runFeaturesSuite(): Promise<void> {
         assertStatus(status, 401);
     });
 
-    // idVerificationStatus check is temporarily disabled in auth middleware
-    await test('POST /groups with unverified user returns 201 (verification disabled)', async () => {
+    // Tier 2 replaced the (still-disabled) ID gate: an account with no verified phone
+    // and no bio cannot create a group, whatever its idVerificationStatus says.
+    await test('POST /groups without a verified phone returns 403', async () => {
         const { token } = await registerAndLogin(`unverf${ts}@test.io`, 'Unverf123!', 'Unverified');
-        const { status } = await post('/groups', { name: `Unverf Group ${ts}`, category: 'Tech' }, token);
-        assertStatus(status, 201);
+        const { status } = await post(
+            '/groups',
+            { name: `Unverf Group ${ts}`, category: 'Tech', description: VALID_DESCRIPTION },
+            token,
+        );
+        assertStatus(status, 403);
+    });
+
+    await test('POST /groups with a verified phone but no bio returns 403', async () => {
+        const u = await registerAndLogin(`nobio${ts}@test.io`, 'NoBio123!', 'No Bio');
+        await setPhoneVerified(u.userId);
+        const { status, data } = await post(
+            '/groups',
+            { name: `NoBio Group ${ts}`, category: 'Tech', description: VALID_DESCRIPTION },
+            u.token,
+        );
+        assertStatus(status, 403);
+        assert(
+            String(data.message).toLowerCase().includes('bio'),
+            `error should name the missing bio, got: ${data.message}`,
+        );
     });
 
     await test('POST /groups missing name returns 422', async () => {
@@ -934,9 +999,10 @@ async function runFeaturesSuite(): Promise<void> {
     });
 
     await test('POST /groups creates open group (201)', async () => {
+        await resetGroupQuota(creatorId);
         const { status, data } = await post(
             '/groups',
-            { name: `OpenGroup ${ts}`, category: 'Technology', description: 'An open group for integration testing', membership_type: 'open' },
+            { name: `OpenGroup ${ts}`, category: 'Technology', description: VALID_DESCRIPTION, membership_type: 'open', cover_image_url: 'https://cdn.example.com/cover.jpg' },
             creatorToken,
         );
         assertStatus(status, 201);
@@ -951,9 +1017,10 @@ async function runFeaturesSuite(): Promise<void> {
     });
 
     await test('POST /groups creates application group (201)', async () => {
+        await resetGroupQuota(creatorId);
         const { status, data } = await post(
             '/groups',
-            { name: `AppGroup ${ts}`, category: 'Lifestyle', description: 'Application-based group for testing', membership_type: 'application' },
+            { name: `AppGroup ${ts}`, category: 'Lifestyle', description: VALID_DESCRIPTION, membership_type: 'application', cover_image_url: 'https://cdn.example.com/cover.jpg' },
             creatorToken,
         );
         assertStatus(status, 201);
@@ -964,13 +1031,14 @@ async function runFeaturesSuite(): Promise<void> {
     });
 
     await test('POST /groups with all optional fields creates group (201)', async () => {
+        await resetGroupQuota(creatorId);
         const { status, data } = await post(
             '/groups',
             {
                 name: `FullGroup ${ts}`,
                 category: 'Technology',
                 subcategory: 'Web Development',
-                description: 'A fully detailed group',
+                description: VALID_DESCRIPTION,
                 city: 'Lagos',
                 state: 'Lagos State',
                 country: 'NG',
@@ -1038,9 +1106,10 @@ async function runFeaturesSuite(): Promise<void> {
     });
 
     await test('POST /groups creates invite_only group and disables discoverability (201)', async () => {
+        await resetGroupQuota(creatorId);
         const { status, data } = await post(
             '/groups',
-            { name: `InviteGroup ${ts}`, category: 'Sports', membership_type: 'invite_only' },
+            { name: `InviteGroup ${ts}`, category: 'Sports', description: VALID_DESCRIPTION, membership_type: 'invite_only' },
             creatorToken,
         );
         assertStatus(status, 201);
@@ -1048,6 +1117,13 @@ async function runFeaturesSuite(): Promise<void> {
         assert(group.isDiscoverable === false, `invite_only group should not be discoverable: ${group.isDiscoverable}`);
         inviteGroupId   = group.id   as string;
         inviteGroupSlug = group.slug as string;
+    });
+
+    await test('approve the fixture groups so they reach Explore', async () => {
+        // Groups are created 'pending' and stay out of Explore until reviewed. The
+        // discovery assertions below are about filtering, not about the review queue.
+        await approveGroup(openGroupId);
+        await approveGroup(appGroupId);
     });
 
     await test('GET /groups returns paginated list (200)', async () => {
@@ -2203,9 +2279,39 @@ async function runFeaturesSuite(): Promise<void> {
         assertStatus(status, 201);
     });
 
-    await test('POST /events/:id/rsvp again returns 409 (duplicate)', async () => {
-        const { status } = await post(`/events/${eventId}/rsvp`, { status: 'going' }, memberToken);
-        assertStatus(status, 409);
+    // POST is an idempotent upsert now, not a create. The client updates the RSVP
+    // optimistically and disables the button on tap, so a retry has to land on the same
+    // state instead of a 409 that would force the UI to un-press an already-correct button.
+    await test('POST /events/:id/rsvp again is idempotent, not 409', async () => {
+        const { status, data } = await post(`/events/${eventId}/rsvp`, { status: 'going' }, memberToken);
+        assert(status === 200 || status === 201, `a repeated RSVP must not error, got ${status}`);
+        const d = data.data as Record<string, unknown>;
+        assert(d.status === 'going', `status should be unchanged, got ${d.status}`);
+    });
+
+    await test('re-sending the same RSVP does not double the headcount', async () => {
+        const { data } = await get(`/events/${eventId}`, memberToken);
+        const d = data.data as Record<string, unknown>;
+        assert(d.rsvpCount === 1, `rsvpCount drifted to ${d.rsvpCount}`);
+    });
+
+    await test('POST /events/:id/rsvp transitions an existing RSVP instead of rejecting it', async () => {
+        const { status, data } = await post(`/events/${eventId}/rsvp`, { status: 'not_going' }, memberToken);
+        assert(status === 200 || status === 201, `expected success, got ${status}`);
+        const d = data.data as Record<string, unknown>;
+        assert(d.status === 'not_going', `expected "not_going" (the Unavailable option), got ${d.status}`);
+    });
+
+    await test('switching away from "going" releases the headcount', async () => {
+        const { data } = await get(`/events/${eventId}`, memberToken);
+        const d = data.data as Record<string, unknown>;
+        assert(d.rsvpCount === 0, `expected 0 after switching to not_going, got ${d.rsvpCount}`);
+    });
+
+    await test('RSVPing requires a verified phone (tier 1)', async () => {
+        const u = await registerAndLogin(`norsvp${ts}@test.io`, 'NoRsvp123!', 'No Phone');
+        const { status } = await post(`/events/${eventId}/rsvp`, { status: 'going' }, u.token);
+        assertStatus(status, 403);
     });
 
     await test('PATCH /events/:id/rsvp updates RSVP status (200)', async () => {
@@ -2239,6 +2345,152 @@ async function runFeaturesSuite(): Promise<void> {
     await test('DELETE /events/:id/rsvp cancels RSVP (200)', async () => {
         const { status } = await del(`/events/${eventId}/rsvp`, memberToken);
         assertStatus(status, 200);
+    });
+
+    // ── Venue & calendar ──────────────────────────────────────────────────
+
+    let venueEventId = '';
+
+    await test('POST /groups/:id/events accepts venue_city/venue_state and returns venueArea', async () => {
+        const { status, data } = await post(
+            `/groups/${openGroupId}/events`,
+            {
+                title: `Venue Event ${ts}`,
+                description: 'Meet at the gate.',
+                venue_city: 'Ibadan',
+                venue_state: 'Oyo',
+                starts_at: new Date(Date.now() + 48 * 3_600_000).toISOString(),
+                visibility: 'public',
+            },
+            creatorToken,
+        );
+        assertStatus(status, 201);
+        const d = data.data as Record<string, unknown>;
+        venueEventId = d.id as string;
+        assert(d.venueArea === 'Ibadan, Oyo', `venueArea was "${d.venueArea}"`);
+    });
+
+    await test('event payload carries .ics and Google Calendar links', async () => {
+        const { data } = await get(`/events/${venueEventId}`, memberToken);
+        const cal = (data.data as Record<string, any>).calendar;
+        assert(Boolean(cal), 'calendar block missing from the event payload');
+        assert(String(cal.ics).endsWith('/calendar.ics'), `ics link looks wrong: ${cal.ics}`);
+        assert(
+            String(cal.google).startsWith('https://calendar.google.com/'),
+            `google link looks wrong: ${cal.google}`,
+        );
+    });
+
+    await test('setting an exact venue_address requires a verified ID (tier 3)', async () => {
+        // The creator is ID-verified from setup, so use an organiser who is not.
+        const organiser = await registerAndLogin(`tier3${ts}@test.io`, 'Tier3Pass1!', 'Tier Three');
+        await setPhoneVerified(organiser.userId);
+        await setOrganiserBio(organiser.token);
+        await resetGroupQuota(organiser.userId);
+
+        const groupRes = await post(
+            '/groups',
+            {
+                name: `Tier3 Group ${ts}`,
+                category: 'Community',
+                description: VALID_DESCRIPTION,
+                cover_image_url: 'https://cdn.example.com/cover.jpg',
+            },
+            organiser.token,
+        );
+        assertStatus(groupRes.status, 201);
+        const gid = (groupRes.data.data as Record<string, unknown>).id as string;
+
+        const { status } = await post(
+            `/groups/${gid}/events`,
+            {
+                title: `Address Event ${ts}`,
+                venue_city: 'Ibadan',
+                venue_state: 'Oyo',
+                venue_address: '12 Awolowo Road, Bodija',
+                starts_at: new Date(Date.now() + 72 * 3_600_000).toISOString(),
+            },
+            organiser.token,
+        );
+        assertStatus(status, 403);
+    });
+
+    let addressEventId = '';
+
+    await test('an ID-verified organiser may publish an exact address', async () => {
+        const { status, data } = await post(
+            `/groups/${openGroupId}/events`,
+            {
+                title: `Address Event ${ts}`,
+                venue_city: 'Ibadan',
+                venue_state: 'Oyo',
+                venue_address: '12 Awolowo Road, Bodija',
+                starts_at: new Date(Date.now() + 72 * 3_600_000).toISOString(),
+                visibility: 'public',
+            },
+            creatorToken,
+        );
+        assertStatus(status, 201);
+        const d = data.data as Record<string, unknown>;
+        addressEventId = d.id as string;
+        assert(d.venueAddress === '12 Awolowo Road, Bodija', 'the organiser should see the address');
+        assert(d.canSeeExactAddress === true, 'canSeeExactAddress should be true for the organiser');
+    });
+
+    await test('a member sees the exact address', async () => {
+        const { status, data } = await get(`/events/${addressEventId}`, memberToken);
+        assertStatus(status, 200);
+        const d = data.data as Record<string, unknown>;
+        assert(d.venueAddress === '12 Awolowo Road, Bodija', 'members should see the address');
+    });
+
+    await test('a non-member sees the area label but not the exact address', async () => {
+        const { status, data } = await get(`/events/${addressEventId}`, outsiderToken);
+        assertStatus(status, 200);
+        const d = data.data as Record<string, unknown>;
+        assert(d.venueArea === 'Ibadan, Oyo', 'the public area label should still be present');
+        assert(
+            !('venueAddress' in d),
+            'venueAddress must be omitted entirely, not nulled — a null tells a stranger it exists',
+        );
+        assert(d.canSeeExactAddress === false, 'canSeeExactAddress should be false');
+    });
+
+    await test('GET /events/:id/calendar.ics returns a text/calendar attachment', async () => {
+        const res = await fetch(`${BASE}/events/${venueEventId}/calendar.ics`, {
+            headers: { Authorization: `Bearer ${memberToken}` },
+        });
+        assertStatus(res.status, 200);
+        assert(
+            (res.headers.get('content-type') ?? '').includes('text/calendar'),
+            `content-type was ${res.headers.get('content-type')}`,
+        );
+        assert(
+            (res.headers.get('content-disposition') ?? '').includes('attachment'),
+            'the .ics should be served as an attachment',
+        );
+        const body = await res.text();
+        assert(body.startsWith('BEGIN:VCALENDAR'), 'body is not an iCalendar document');
+        assert(body.includes('SUMMARY:'), 'SUMMARY line missing');
+    });
+
+    await test('the .ics of a private event 404s for a non-member', async () => {
+        const priv = await post(
+            `/groups/${openGroupId}/events`,
+            {
+                title: `Private Event ${ts}`,
+                starts_at: new Date(Date.now() + 96 * 3_600_000).toISOString(),
+                visibility: 'private',
+            },
+            creatorToken,
+        );
+        assertStatus(priv.status, 201);
+        const pid = (priv.data.data as Record<string, unknown>).id as string;
+
+        const res = await fetch(`${BASE}/events/${pid}/calendar.ics`, {
+            headers: { Authorization: `Bearer ${outsiderToken}` },
+        });
+        assertStatus(res.status, 404);
     });
 
     await test('DELETE /events/:id as non-admin returns 403', async () => {
@@ -2296,6 +2548,92 @@ async function runFeaturesSuite(): Promise<void> {
         assert(typeof d.count === 'number', 'Expected count');
     });
 
+    await test('GET /notifications/unread-count returns a number (200)', async () => {
+        const { status, data } = await get('/notifications/unread-count', memberToken);
+        assertStatus(status, 200);
+        const d = data.data as Record<string, unknown>;
+        assert(typeof d.unread_count === 'number', 'Expected unread_count to be a number');
+    });
+
+    // Before this batch the fan-out job only logged its payload — no notification row
+    // was ever written, which is why the counter and the notifications page were always
+    // empty. These two tests are the regression guard for that.
+    await test('creating an event actually notifies group members', async () => {
+        const before = await get('/notifications/unread-count', memberToken);
+        const beforeCount = ((before.data.data as Record<string, unknown>).unread_count as number);
+
+        const created = await post(
+            `/groups/${openGroupId}/events`,
+            {
+                title: `Notified Event ${ts}`,
+                venue_city: 'Ibadan',
+                venue_state: 'Oyo',
+                starts_at: new Date(Date.now() + 120 * 3_600_000).toISOString(),
+                visibility: 'public',
+            },
+            creatorToken,
+        );
+        assertStatus(created.status, 201);
+
+        // The fan-out is awaited inside the request, but the write and this read are
+        // separate round-trips — give it a beat.
+        await new Promise((r) => setTimeout(r, 800));
+
+        const after = await get('/notifications/unread-count', memberToken);
+        const afterCount = ((after.data.data as Record<string, unknown>).unread_count as number);
+        assert(
+            afterCount > beforeCount,
+            `unread count did not rise (${beforeCount} → ${afterCount}) — the fan-out wrote nothing`,
+        );
+    });
+
+    await test('the event notification lands in the list with a usable reference', async () => {
+        const { status, data } = await get('/notifications?limit=50', memberToken);
+        assertStatus(status, 200);
+        const list = (data.data as Record<string, any>).data as Record<string, unknown>[];
+        const created = list.find((n) => n.type === 'event_created');
+        assert(Boolean(created), 'no event_created notification found');
+        assert(created!.referenceType === 'event', `referenceType was ${created!.referenceType}`);
+        assert(Boolean(created!.referenceId), 'referenceId should point at the event');
+    });
+
+    await test('the organiser is not notified about their own event', async () => {
+        const { data } = await get('/notifications?limit=50', creatorToken);
+        const list = (data.data as Record<string, any>).data as Record<string, unknown>[];
+        const own = list.filter(
+            (n) => n.type === 'event_created' && String(n.title).includes(`Notified Event`),
+        );
+        assert(own.length === 0, 'the actor must be excluded from their own fan-out');
+    });
+
+    await test('an approved application notifies the applicant in-app', async () => {
+        // The approval email already worked; the in-app notification did not exist.
+        const applicant = await registerAndLogin(`applicant${ts}@test.io`, 'Applies123!', 'Applicant');
+        await setPhoneVerified(applicant.userId);
+
+        const applied = await post(`/groups/${appGroupId}/apply`, { form_responses: {} }, applicant.token);
+        assertStatus(applied.status, 201);
+
+        const list = await get(`/groups/${appGroupId}/applications?status=pending`, creatorToken);
+        assertStatus(list.status, 200);
+        const pending = extractList(list.data.data).find(
+            (a) => (a as Record<string, unknown>).userId === applicant.userId,
+        ) as Record<string, unknown>;
+        assert(Boolean(pending), 'the application was not found');
+
+        const review = await patch(`/applications/${pending.id}`, { action: 'approve' }, creatorToken);
+        assertStatus(review.status, 200);
+
+        await new Promise((r) => setTimeout(r, 800));
+
+        const notes = await get('/notifications?limit=50', applicant.token);
+        const noteList = (notes.data.data as Record<string, any>).data as Record<string, unknown>[];
+        assert(
+            noteList.some((n) => n.type === 'application_approved'),
+            'the applicant received no in-app approval notification',
+        );
+    });
+
     await test('GET /notifications/preferences returns array (200)', async () => {
         const { status, data } = await get('/notifications/preferences', creatorToken);
         assertStatus(status, 200);
@@ -2310,6 +2648,33 @@ async function runFeaturesSuite(): Promise<void> {
         );
         assertStatus(status, 200);
         assert(Array.isArray(data.data), 'Expected array of preferences');
+    });
+
+    await test('a partial channel update leaves the other channels alone', async () => {
+        // Muting email must not silently re-enable in-app just because the client
+        // did not restate it.
+        const { status, data } = await patch(
+            '/notifications/preferences',
+            { preferences: [{ pref_type: 'event_created', email_enabled: false }] },
+            creatorToken,
+        );
+        assertStatus(status, 200);
+        const pref = (data.data as Record<string, unknown>[]).find(
+            (p) => p.prefType === 'event_created' && p.groupId === null,
+        );
+        assert(Boolean(pref), 'preference row missing');
+        assert(pref!.emailEnabled === false, 'email should now be off');
+        assert(pref!.pushEnabled === false, 'push should have kept its previous value');
+        assert(pref!.inAppEnabled === true, 'in-app should have kept its previous value');
+    });
+
+    await test('an unknown pref_type is rejected', async () => {
+        const { status } = await patch(
+            '/notifications/preferences',
+            { preferences: [{ pref_type: 'not_a_real_type', email_enabled: false }] },
+            creatorToken,
+        );
+        assert(status >= 400 && status < 500, `Expected 4xx, got ${status}`);
     });
 
     await test('DELETE /notifications/:id removes notification (200)', async () => {
@@ -3543,9 +3908,442 @@ async function runFeaturesSuite(): Promise<void> {
         assertStatus(status, 404);
     });
 
-    // ── 17. Group Deletion ─────────────────────────────────────────────────────
+    // ── 17. Reference catalogues & onboarding ─────────────────────────────────
 
-    section('17. Group Deletion');
+    section('17. Reference catalogues & onboarding');
+
+    await test('GET /reference/onboarding works without a token', async () => {
+        // These populate the signup form, which runs before the user has one.
+        const { status, data } = await get('/reference/onboarding');
+        assertStatus(status, 200);
+        const d = data.data as Record<string, any>;
+        assert(Array.isArray(d.interests), 'interests must be an array');
+        assert(Array.isArray(d.states), 'states must be an array');
+        assert(d.states.length === 37, `expected 36 states + FCT, got ${d.states.length}`);
+    });
+
+    await test('GET /reference/interests returns grouped multi-select options', async () => {
+        const { status, data } = await get('/reference/interests');
+        assertStatus(status, 200);
+        const d = data.data as Record<string, any>;
+        assert(d.interests.length > 0, 'catalogue should not be empty');
+        assert(d.groups.length > 0, 'groups should not be empty');
+        const first = d.interests[0];
+        assert('value' in first && 'label' in first && 'group' in first, 'option shape is wrong');
+    });
+
+    await test('GET /reference/states lists cities per state', async () => {
+        const { status, data } = await get('/reference/states');
+        assertStatus(status, 200);
+        const oyo = (data.data as Record<string, any>[]).find((st) => st.state === 'Oyo');
+        assert(Boolean(oyo), 'Oyo missing from the catalogue');
+        assert(oyo!.cities.includes('Ibadan'), 'Ibadan missing from Oyo');
+    });
+
+    let onboardEmail = `onboard${ts}@test.io`;
+    let onboardToken = '';
+
+    await test('POST /auth/register accepts city, state and interests', async () => {
+        const { status } = await post('/auth/register', {
+            email: onboardEmail,
+            password: 'Onboard123!',
+            display_name: 'Onboarded User',
+            city: 'Ibadan',
+            state: 'Oyo',
+            interests: ['Running', 'BOOKS', 'running'],
+        });
+        assertStatus(status, 201);
+
+        const otp = await getOtp('verify:email', onboardEmail);
+        const verify = await post('/auth/verify-email', { email: onboardEmail, otp });
+        assertStatus(verify.status, 200);
+        onboardToken = ((verify.data.data as any).tokens as any).accessToken;
+    });
+
+    await test('the onboarding fields come back on GET /users/me', async () => {
+        const { status, data } = await get('/users/me', onboardToken);
+        assertStatus(status, 200);
+        const d = data.data as Record<string, unknown>;
+        assert(d.city === 'Ibadan', `city was ${d.city}`);
+        assert(d.state === 'Oyo', `state was ${d.state}`);
+    });
+
+    await test('interests are lowercased and deduplicated on write', async () => {
+        const { data } = await get('/users/me', onboardToken);
+        const interests = (data.data as Record<string, any>).interests as string[];
+        assert(interests.includes('running'), `expected "running" in ${JSON.stringify(interests)}`);
+        assert(interests.includes('books'), `expected "books" in ${JSON.stringify(interests)}`);
+        assert(
+            interests.filter((i) => i === 'running').length === 1,
+            '"Running" and "running" should collapse to a single tag',
+        );
+    });
+
+    await test('phoneVerifiedAt is exposed to self so the client knows to prompt', async () => {
+        const { data } = await get('/users/me', onboardToken);
+        const d = data.data as Record<string, unknown>;
+        assert('phoneVerifiedAt' in d, 'phoneVerifiedAt missing from /users/me');
+        assert(d.phoneVerifiedAt === null, 'a fresh account must not be phone-verified');
+    });
+
+    // ── 18. Phone verification (tier 1) ───────────────────────────────────────
+
+    section('18. Phone verification');
+
+    let phoneUserId = '';
+    let phoneToken  = '';
+
+    await test('POST /auth/phone/send-otp with no number on file returns 400', async () => {
+        const u = await registerAndLogin(`phoneotp${ts}@test.io`, 'PhoneOtp123!', 'Phone Tester');
+        phoneUserId = u.userId;
+        phoneToken  = u.token;
+        const { status } = await post('/auth/phone/send-otp', {}, phoneToken);
+        assertStatus(status, 400);
+    });
+
+    await test('POST /auth/phone/send-otp with a number stores it and sends a code', async () => {
+        const { status } = await post(
+            '/auth/phone/send-otp',
+            { phone: `+23480${String(ts).slice(-8)}` },
+            phoneToken,
+        );
+        assertStatus(status, 200);
+    });
+
+    await test('a second send inside the 60s cooldown returns 429', async () => {
+        const { status } = await post('/auth/phone/send-otp', {}, phoneToken);
+        assertStatus(status, 429);
+    });
+
+    await test('a wrong OTP is rejected with 400', async () => {
+        const { status } = await post('/auth/phone/verify', { otp: '000000' }, phoneToken);
+        assertStatus(status, 400);
+    });
+
+    await test('the correct OTP verifies the phone (200)', async () => {
+        const otpRes = await get(`/test/phone-otp/${phoneUserId}`);
+        assertStatus(otpRes.status, 200, 'the phone OTP should be in Redis');
+        const otp = (otpRes.data.data as Record<string, unknown>).otp as string;
+
+        const { status, data } = await post('/auth/phone/verify', { otp }, phoneToken);
+        assertStatus(status, 200);
+        assert((data.data as Record<string, unknown>).phoneVerified === true, 'phoneVerified should be true');
+    });
+
+    await test('/users/me now reports a phone verification timestamp', async () => {
+        const { data } = await get('/users/me', phoneToken);
+        assert((data.data as Record<string, unknown>).phoneVerifiedAt !== null, 'phoneVerifiedAt should be set');
+    });
+
+    await test('joining a group without a verified phone returns 403 (tier 1)', async () => {
+        const u = await registerAndLogin(`nojoin${ts}@test.io`, 'NoJoin123!', 'No Phone Join');
+        const { status } = await post(`/groups/${openGroupId}/join`, {}, u.token);
+        assertStatus(status, 403);
+    });
+
+    // ── 19. Group description rules ───────────────────────────────────────────
+
+    section('19. Group description rules');
+
+    await test('a description under 40 characters is rejected', async () => {
+        const { status } = await post(
+            '/groups',
+            { name: `Short ${ts}`, category: 'Community', description: 'Too short.' },
+            creatorToken,
+        );
+        assert(status >= 400 && status < 500, `Expected 4xx, got ${status}`);
+    });
+
+    await test('a description over 500 characters is rejected', async () => {
+        const { status } = await post(
+            '/groups',
+            { name: `Long ${ts}`, category: 'Community', description: 'A'.repeat(501) },
+            creatorToken,
+        );
+        assert(status >= 400 && status < 500, `Expected 4xx, got ${status}`);
+    });
+
+    await test('a whitespace-only description is rejected despite clearing the length floor', async () => {
+        const { status } = await post(
+            '/groups',
+            { name: `Blank ${ts}`, category: 'Community', description: ' '.repeat(60) },
+            creatorToken,
+        );
+        assert(status >= 400 && status < 500, `Expected 4xx, got ${status}`);
+    });
+
+    await test('a missing description is rejected on create', async () => {
+        const { status } = await post(
+            '/groups',
+            { name: `NoDesc ${ts}`, category: 'Community' },
+            creatorToken,
+        );
+        assert(status >= 400 && status < 500, `Expected 4xx, got ${status}`);
+    });
+
+    // ── 20. Review queue & Explore visibility ─────────────────────────────────
+
+    section('20. Review queue');
+
+    let pendingGroupId   = '';
+    let pendingGroupSlug = '';
+    let pendingGroupName = '';
+    let platformAdminToken = '';
+
+    await test('a new group starts in review and is not published', async () => {
+        await resetGroupQuota(creatorId);
+        pendingGroupName = `Pending Club ${ts}`;
+        const { status, data } = await post(
+            '/groups',
+            {
+                name: pendingGroupName,
+                category: 'Community',
+                description: VALID_DESCRIPTION,
+                cover_image_url: 'https://cdn.example.com/cover.jpg',
+            },
+            creatorToken,
+        );
+        assertStatus(status, 201);
+        const g = data.data as Record<string, unknown>;
+        pendingGroupId   = g.id   as string;
+        pendingGroupSlug = g.slug as string;
+        assert(g.reviewStatus === 'pending', `expected "pending", got "${g.reviewStatus}"`);
+        assert(g.isPublished === false, 'a group awaiting review must not be published');
+    });
+
+    await test('the organiser is shown an "under review" publishing checklist', async () => {
+        const { status, data } = await get(`/groups/${pendingGroupSlug}`, creatorToken);
+        assertStatus(status, 200);
+        const checklist = (data.data as Record<string, any>).publishingChecklist;
+        assert(Boolean(checklist), 'publishingChecklist missing for the organiser');
+        assert(checklist.reviewStatus === 'pending', 'checklist should report pending');
+        assert(
+            String(checklist.reviewMessage).includes('24 hours'),
+            `expected the "usually within 24 hours" copy, got: ${checklist.reviewMessage}`,
+        );
+    });
+
+    await test('a non-member does not receive the checklist', async () => {
+        const { status, data } = await get(`/groups/${pendingGroupSlug}`, outsiderToken);
+        assertStatus(status, 200);
+        assert(
+            (data.data as Record<string, unknown>).publishingChecklist === null,
+            'the checklist is admin-only',
+        );
+    });
+
+    await test('a pending group is hidden from Explore', async () => {
+        const { status, data } = await get(`/groups?q=${encodeURIComponent(pendingGroupName)}`);
+        assertStatus(status, 200);
+        const found = (data.data as Record<string, unknown>[]).some((g) => g.id === pendingGroupId);
+        assert(!found, 'a group awaiting review must not appear in Explore');
+    });
+
+    await test('its own members still find it in the list', async () => {
+        const { status, data } = await get(
+            `/groups?q=${encodeURIComponent(pendingGroupName)}`,
+            creatorToken,
+        );
+        assertStatus(status, 200);
+        const found = (data.data as Record<string, unknown>[]).some((g) => g.id === pendingGroupId);
+        assert(found, 'the organiser should still see their own pending group');
+    });
+
+    await test('an approved group with no cover image stays out of Explore', async () => {
+        await resetGroupQuota(creatorId);
+        const name = `NoCover Club ${ts}`;
+        const created = await post(
+            '/groups',
+            { name, category: 'Community', description: VALID_DESCRIPTION },
+            creatorToken,
+        );
+        assertStatus(created.status, 201);
+        const gid = (created.data.data as Record<string, unknown>).id as string;
+        await approveGroup(gid);
+
+        const { status, data } = await get(`/groups?q=${encodeURIComponent(name)}`);
+        assertStatus(status, 200);
+        const found = (data.data as Record<string, unknown>[]).some((g) => g.id === gid);
+        assert(!found, 'no cover image means no Explore listing');
+    });
+
+    await test('GET /admin/groups/pending lists the queue with the creator\'s verification state', async () => {
+        platformAdminToken = makeAdminToken(creatorId);
+        const { status, data } = await get('/admin/groups/pending?limit=100', platformAdminToken);
+        assertStatus(status, 200);
+        const row = (data.data as Record<string, any>[]).find((g) => g.id === pendingGroupId);
+        assert(Boolean(row), 'the pending group is not in the queue');
+        assert('name' in row! && 'description' in row!, 'name/description missing');
+        assert(Boolean(row!.creator), 'creator block missing');
+        assert(row!.creator.phoneVerified === true, 'creator phone-verified flag should be true');
+        assert(typeof row!.creator.groupsCreated === 'number', 'groupsCreated missing');
+    });
+
+    await test('rejecting without notes is refused — the organiser is shown them verbatim', async () => {
+        const { status } = await patch(
+            `/admin/groups/${pendingGroupId}/review`,
+            { decision: 'reject' },
+            platformAdminToken,
+        );
+        assertStatus(status, 400);
+    });
+
+    await test('approving a group with no cover is refused with 422', async () => {
+        await resetGroupQuota(creatorId);
+        const created = await post(
+            '/groups',
+            { name: `NoCover2 Club ${ts}`, category: 'Community', description: VALID_DESCRIPTION },
+            creatorToken,
+        );
+        assertStatus(created.status, 201);
+        const gid = (created.data.data as Record<string, unknown>).id as string;
+
+        const { status } = await patch(
+            `/admin/groups/${gid}/review`,
+            { decision: 'approve' },
+            platformAdminToken,
+        );
+        assertStatus(status, 422);
+    });
+
+    await test('approving records the reviewer and publishes the group', async () => {
+        const { status, data } = await patch(
+            `/admin/groups/${pendingGroupId}/review`,
+            { decision: 'approve' },
+            platformAdminToken,
+        );
+        assertStatus(status, 200);
+        const g = data.data as Record<string, unknown>;
+        assert(g.reviewStatus === 'approved', `got ${g.reviewStatus}`);
+        assert(Boolean(g.reviewedAt), 'reviewedAt should be set');
+    });
+
+    await test('the approved group now appears in Explore', async () => {
+        const { status, data } = await get(`/groups?q=${encodeURIComponent(pendingGroupName)}`);
+        assertStatus(status, 200);
+        const row = (data.data as Record<string, any>[]).find((g) => g.id === pendingGroupId);
+        assert(Boolean(row), 'an approved group with a cover should be discoverable');
+        assert(row!.isPublished === true, 'isPublished should be true');
+    });
+
+    // ── 21. Group creation quota ──────────────────────────────────────────────
+
+    section('21. Group creation quota');
+
+    await test('the 4th group inside the 7-day window is rejected with 429', async () => {
+        const quotaUser = await registerAndLogin(`quota${ts}@test.io`, 'Quota123!', 'Quota User');
+        await setPhoneVerified(quotaUser.userId);
+        await setOrganiserBio(quotaUser.token);
+
+        for (let i = 1; i <= 3; i++) {
+            const res = await post(
+                '/groups',
+                {
+                    name: `Quota ${i} ${ts}`,
+                    category: 'Community',
+                    description: VALID_DESCRIPTION,
+                    cover_image_url: 'https://cdn.example.com/cover.jpg',
+                },
+                quotaUser.token,
+            );
+            assertStatus(res.status, 201, `group ${i} of 3 should be allowed`);
+        }
+
+        const fourth = await post(
+            '/groups',
+            {
+                name: `Quota 4 ${ts}`,
+                category: 'Community',
+                description: VALID_DESCRIPTION,
+                cover_image_url: 'https://cdn.example.com/cover.jpg',
+            },
+            quotaUser.token,
+        );
+        assertStatus(fourth.status, 429);
+        assert(
+            String(fourth.data.message).includes('3'),
+            `the error should state the limit, got: ${fourth.data.message}`,
+        );
+    });
+
+    await test('back-dating the earlier groups restores the allowance', async () => {
+        // Proves the window is a rolling one rather than a lifetime cap.
+        const quotaUser2 = await registerAndLogin(`quota2${ts}@test.io`, 'Quota123!', 'Quota User 2');
+        await setPhoneVerified(quotaUser2.userId);
+        await setOrganiserBio(quotaUser2.token);
+
+        for (let i = 1; i <= 3; i++) {
+            await post(
+                '/groups',
+                {
+                    name: `Roll ${i} ${ts}`,
+                    category: 'Community',
+                    description: VALID_DESCRIPTION,
+                    cover_image_url: 'https://cdn.example.com/cover.jpg',
+                },
+                quotaUser2.token,
+            );
+        }
+
+        await resetGroupQuota(quotaUser2.userId);
+
+        const next = await post(
+            '/groups',
+            {
+                name: `Roll 4 ${ts}`,
+                category: 'Community',
+                description: VALID_DESCRIPTION,
+                cover_image_url: 'https://cdn.example.com/cover.jpg',
+            },
+            quotaUser2.token,
+        );
+        assertStatus(next.status, 201);
+    });
+
+    // ── 22. "Active this month" ───────────────────────────────────────────────
+
+    section('22. "Active this month"');
+
+    await test('a group with an upcoming event is flagged active', async () => {
+        // openGroupId has had several events created against it above.
+        const { status, data } = await get(`/groups/${openGroupSlug}`);
+        assertStatus(status, 200);
+        const g = (data.data as Record<string, any>).group;
+        assert(g.isActiveThisMonth === true, 'a group with a scheduled event should be active this month');
+    });
+
+    await test('a group with no events is not flagged active', async () => {
+        await resetGroupQuota(creatorId);
+        const created = await post(
+            '/groups',
+            {
+                name: `Quiet Club ${ts}`,
+                category: 'Community',
+                description: VALID_DESCRIPTION,
+                cover_image_url: 'https://cdn.example.com/cover.jpg',
+            },
+            creatorToken,
+        );
+        assertStatus(created.status, 201);
+        const slug = (created.data.data as Record<string, unknown>).slug as string;
+
+        const { status, data } = await get(`/groups/${slug}`);
+        assertStatus(status, 200);
+        const g = (data.data as Record<string, any>).group;
+        assert(g.isActiveThisMonth === false, 'a group with no events must not be flagged active');
+    });
+
+    await test('the Explore listing computes the flag too', async () => {
+        const { status, data } = await get(`/groups?q=${encodeURIComponent(`OpenGroup ${ts}`)}`);
+        assertStatus(status, 200);
+        const row = (data.data as Record<string, any>[]).find((g) => g.id === openGroupId);
+        assert(Boolean(row), 'the open group was not found in Explore');
+        assert(row!.isActiveThisMonth === true, 'the badge must be computed in the list query as well');
+    });
+
+    // ── 23. Group Deletion ────────────────────────────────────────────────────
+
+    section('23. Group Deletion');
 
     // Re-login to get fresh tokens — the suite can exceed the 15-min JWT TTL
     await test('refresh tokens before deletion tests', async () => {
@@ -3584,9 +4382,9 @@ async function runFeaturesSuite(): Promise<void> {
         assertStatus(status, 404);
     });
 
-    // ── 18. Account Deletion ───────────────────────────────────────────────────
+    // ── 24. Account Deletion ───────────────────────────────────────────────────
 
-    section('18. Account Deletion');
+    section('24. Account Deletion');
 
     await test('DELETE /users/me without auth returns 401', async () => {
         const { status } = await del('/users/me');

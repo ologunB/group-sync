@@ -18,6 +18,8 @@ exports.LogActions = {
     AUTH_RESEND_VERIFICATION: 'auth.resend_verification',
     AUTH_SUBMIT_ID_VERIFICATION: 'auth.submit_id_verification',
     AUTH_KYC_WEBHOOK: 'auth.kyc_webhook',
+    AUTH_SEND_PHONE_OTP: 'auth.send_phone_otp',
+    AUTH_VERIFY_PHONE: 'auth.verify_phone',
     // Users
     USER_UPDATE_PROFILE: 'user.update_profile',
     USER_DELETE_ACCOUNT: 'user.delete_account',
@@ -57,6 +59,7 @@ exports.LogActions = {
     ADMIN_USER_UPDATE: 'admin.user_update',
     ADMIN_USER_VERIFY_ID: 'admin.user_verify_id',
     ADMIN_GROUP_UPDATE: 'admin.group_update',
+    ADMIN_GROUP_REVIEW: 'admin.group_review',
     ADMIN_REPORT_RESOLVE: 'admin.report_resolve',
     // Messages
     MESSAGE_SEND: 'message.send',

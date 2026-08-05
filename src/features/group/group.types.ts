@@ -52,6 +52,15 @@ export interface UpdateGroupDTO {
     founding_date?: string;
 }
 
+// Group descriptions carry the whole pitch on a discovery card, so they are held to a
+// real length. Enforced in the validator; the constants live here so the review queue
+// and the docs quote the same numbers.
+export const GROUP_DESCRIPTION_MIN = 40;
+export const GROUP_DESCRIPTION_MAX = 500;
+
+export const GROUP_REVIEW_STATUSES = ['pending', 'approved', 'rejected'] as const;
+export type GroupReviewStatus = (typeof GROUP_REVIEW_STATUSES)[number];
+
 export interface ListGroupsQuery {
     q?: string;
     category?: string;
@@ -96,6 +105,7 @@ export const groupPublicSelect = {
     isDiscoverable: true,
     memberCount: true,
     status: true,
+    reviewStatus: true,
     createdAt: true,
     updatedAt: true,
     createdBy: true,
@@ -106,8 +116,36 @@ export const groupAdminSelect = {
     deletedAt: true,
 } satisfies Prisma.GroupSelect;
 
-export type GroupPublic = Prisma.GroupGetPayload<{ select: typeof groupPublicSelect }>;
+type GroupRow = Prisma.GroupGetPayload<{ select: typeof groupPublicSelect }>;
+
+/**
+ * What a group looks like on the wire.
+ *
+ * `isActiveThisMonth` replaces the old "NEW" badge: a group is active when it has an
+ * event starting inside the activity window (30 days by default), which is a claim
+ * about the group actually doing something rather than about its signup date.
+ *
+ * `isPublished` answers "would a stranger find this in Explore?" — it folds together
+ * review approval, the cover-image requirement, discoverability and status, so the
+ * organiser's dashboard does not have to re-derive the rule.
+ */
+export interface GroupPublic extends GroupRow {
+    isActiveThisMonth?: boolean;
+    isPublished?: boolean;
+}
+
 export type GroupAdmin  = Prisma.GroupGetPayload<{ select: typeof groupAdminSelect }>;
+
+/** Everything blocking a group from appearing in Explore, shown to its organisers. */
+export interface PublishingChecklist {
+    reviewStatus: GroupReviewStatus;
+    reviewMessage: string | null;
+    hasCoverImage: boolean;
+    isDiscoverable: boolean;
+    isPublished: boolean;
+    /** Human-readable list of what is still outstanding. Empty when published. */
+    blockers: string[];
+}
 
 // ─── Member list item ─────────────────────────────────────────────────────────
 
@@ -148,4 +186,6 @@ export interface GroupProfileResult {
         status: string | null;
         joinedAt: Date | null;
     } | null;
+    /** Only populated for the group's admins — nobody else needs to see the blockers. */
+    publishingChecklist: PublishingChecklist | null;
 }

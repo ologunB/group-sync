@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>New Reply</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f7;font-family:'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:40px 16px;">
+  <tr><td align="center">
+    <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
+
+      <!-- Header -->
+      <tr>
+        <td align="center" style="background:#4F46E5;border-radius:12px 12px 0 0;padding:32px 40px;">
+          <span style="font-size:26px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">GroupSync</span>
+        </td>
+      </tr>
+
+      <!-- Body.
+           Deliberately does not include the message text: chat content belongs in the app,
+           not in an inbox that may be shared or synced elsewhere. -->
+      <tr>
+        <td style="background:#ffffff;padding:40px;border-radius:0 0 12px 12px;">
+          <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#111827;">{{data.senderName}} replied to you</p>
+          <p style="margin:0 0 28px;font-size:15px;color:#6B7280;line-height:1.6;">
+            Hi {{data.displayName}}, you have a new reply in <strong>{{data.groupName}}</strong>.
+          </p>
+
+          <a href="{{data.groupUrl}}" style="display:inline-block;background:#4F46E5;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">
+            Read the reply →
+          </a>
+        </td>
+      </tr>
+
+      <!-- Footer -->
+      <tr>
+        <td align="center" style="padding:24px 0 0;">
+          <p style="margin:0 0 6px;font-size:12px;color:#9CA3AF;">
+            Only direct replies to your messages are emailed — never every message in the group.
+            Turn these off in your notification settings.
+          </p>
+          <p style="margin:0;font-size:12px;color:#9CA3AF;">© {{currentYear}} GroupSync. All rights reserved.</p>
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>

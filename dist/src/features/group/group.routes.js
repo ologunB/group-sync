@@ -3,13 +3,16 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const group_controller_1 = require("./group.controller");
 const auth_middleware_1 = require("../../shared/middleware/auth.middleware");
+const verification_middleware_1 = require("../../shared/middleware/verification.middleware");
 const validators_1 = require("../../shared/utils/validators");
 const upload_middleware_1 = require("../../shared/middleware/upload.middleware");
 const group_validator_1 = require("./group.validator");
 const router = (0, express_1.Router)();
 const controller = new group_controller_1.GroupController();
-// ─── POST /groups — verified users only ───────────────────────────────────────
-router.post('/', auth_middleware_1.authenticateVerified, (0, validators_1.validateRequest)(group_validator_1.createGroupValidator), controller.createGroup);
+// ─── POST /groups — tier 2 (email + phone verified, bio present) ──────────────
+// The manual-approval half of tier 2 is the review queue: the group is created here
+// and stays out of Explore until a platform admin approves it.
+router.post('/', verification_middleware_1.authenticateOrganiser, (0, validators_1.validateRequest)(group_validator_1.createGroupValidator), controller.createGroup);
 // ─── GET /groups — public, optional auth (affects invite-only visibility) ─────
 router.get('/', (req, _res, next) => {
     const authHeader = req.headers.authorization;

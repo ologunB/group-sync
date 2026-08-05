@@ -2,9 +2,28 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.memberSearchValidator = exports.groupSlugParamValidator = exports.groupIdParamValidator = exports.listGroupsValidator = exports.updateGroupValidator = exports.createGroupValidator = void 0;
 const express_validator_1 = require("express-validator");
+const group_types_1 = require("./group.types");
 const MEMBERSHIP_TYPES = ['open', 'application', 'invite_only'];
 const FEE_FREQUENCIES = ['one_time', 'monthly', 'yearly'];
 const SORT_OPTIONS = ['relevance', 'distance', 'newest', 'most_members'];
+/**
+ * Description rules, shared by create and update.
+ *
+ * The length bounds are measured after trimming, and a separate check requires at least
+ * one non-whitespace character — a 40-character run of spaces would otherwise satisfy
+ * `isLength` on the untrimmed value and produce a blank card in Explore.
+ */
+const descriptionRules = (chain) => chain
+    .isString().withMessage('Description must be a string')
+    .trim()
+    .custom((value) => {
+    if (!value.replace(/\s/g, '').length) {
+        throw new Error('Description cannot be only whitespace');
+    }
+    return true;
+})
+    .isLength({ min: group_types_1.GROUP_DESCRIPTION_MIN, max: group_types_1.GROUP_DESCRIPTION_MAX })
+    .withMessage(`Description must be between ${group_types_1.GROUP_DESCRIPTION_MIN} and ${group_types_1.GROUP_DESCRIPTION_MAX} characters`);
 // ─── Create group ─────────────────────────────────────────────────────────────
 exports.createGroupValidator = [
     (0, express_validator_1.body)('name')
@@ -22,10 +41,7 @@ exports.createGroupValidator = [
         .isString().withMessage('Subcategory must be a string')
         .trim()
         .isLength({ max: 80 }).withMessage('Subcategory must not exceed 80 characters'),
-    (0, express_validator_1.body)('description')
-        .optional({ nullable: true, checkFalsy: true })
-        .isString().withMessage('Description must be a string')
-        .trim(),
+    descriptionRules((0, express_validator_1.body)('description').exists({ checkFalsy: true }).withMessage('Description is required')),
     (0, express_validator_1.body)('city')
         .optional({ nullable: true, checkFalsy: true })
         .isString().withMessage('City must be a string')
@@ -103,10 +119,7 @@ exports.updateGroupValidator = [
         .isString().withMessage('Subcategory must be a string')
         .trim()
         .isLength({ max: 80 }).withMessage('Subcategory must not exceed 80 characters'),
-    (0, express_validator_1.body)('description')
-        .optional({ nullable: true, checkFalsy: true })
-        .isString().withMessage('Description must be a string')
-        .trim(),
+    descriptionRules((0, express_validator_1.body)('description').optional({ nullable: true, checkFalsy: true })),
     (0, express_validator_1.body)('city')
         .optional({ nullable: true, checkFalsy: true })
         .isString().withMessage('City must be a string')

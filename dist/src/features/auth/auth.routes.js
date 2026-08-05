@@ -22,6 +22,10 @@ router.post('/kyc-webhook', controller.handleKycWebhook);
 // ─── Authenticated routes ──────────────────────────────────────────────────────
 router.post('/logout', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(auth_validator_1.logoutValidator), controller.logout);
 router.post('/change-password', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(auth_validator_1.changePasswordValidator), controller.changePassword);
+// Phone verification (tier 1). Plain `authenticate` — an unverified account is exactly
+// who needs to reach these.
+router.post('/phone/send-otp', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(auth_validator_1.sendPhoneOtpValidator), controller.sendPhoneOtp);
+router.post('/phone/verify', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(auth_validator_1.verifyPhoneOtpValidator), controller.verifyPhoneOtp);
 // verify-id uses authenticate (not authenticateVerified) — unverified users must submit this
 router.post('/verify-id', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(auth_validator_1.submitIdVerificationValidator), controller.submitIdVerification);
 exports.default = router;

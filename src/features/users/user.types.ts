@@ -46,6 +46,7 @@ export const selfProfileSelect = {
     country: true,
     interests: true,
     emailVerifiedAt: true,
+    phoneVerifiedAt: true,      // returned to self only — drives the verification prompts
     idVerificationStatus: true, // returned to self only
     status: true,
     lastLoginAt: true,

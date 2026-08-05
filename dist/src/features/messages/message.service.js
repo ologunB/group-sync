@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.messageService = exports.MessageService = void 0;
+exports.notifyOnReply = notifyOnReply;
 const http_status_codes_1 = require("http-status-codes");
 const crypto_1 = require("crypto");
 const connection_1 = require("../../database/connection");
@@ -11,6 +12,8 @@ const audit_logger_1 = require("../../shared/utils/audit.logger");
 const socket_service_1 = require("../../shared/socket/socket.service");
 const socket_events_1 = require("../../shared/socket/socket.events");
 const storage_service_1 = require("../../shared/storage/storage.service");
+const app_config_1 = require("../../shared/config/app.config");
+const notification_dispatcher_1 = require("../notifications/notification.dispatcher");
 const message_types_1 = require("./message.types");
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 async function requireActiveMember(groupId, userId) {
@@ -30,6 +33,68 @@ async function requireGroupAdmin(groupId, userId) {
     });
     if (!m || m.status !== 'active' || !['super_admin', 'admin'].includes(m.role)) {
         throw new error_middleware_1.ApiError(response_constants_1.Messages.FORBIDDEN, http_status_codes_1.StatusCodes.FORBIDDEN);
+    }
+}
+/**
+ * Notifies the author of a message that someone replied to it.
+ *
+ * Scoped to direct replies rather than every message in the group. Notifying the whole
+ * room on every message is what makes a chat product's notifications worthless — the
+ * signal that matters is "someone answered *you*". `message_reply` is in
+ * NOTIFICATION_EMAIL_TYPES, so this is also the one chat event that can reach the inbox,
+ * and the recipient can turn that off per group.
+ *
+ * Never throws: a chat message must not fail because a notification did.
+ */
+async function notifyOnReply(messageId, groupId, replyToId, senderId) {
+    if (!replyToId)
+        return;
+    try {
+        const [parent, sender, group] = await Promise.all([
+            connection_1.prisma.message.findUnique({
+                where: { id: replyToId },
+                select: { senderId: true, groupId: true, isDeleted: true },
+            }),
+            connection_1.prisma.user.findUnique({ where: { id: senderId }, select: { displayName: true } }),
+            connection_1.prisma.group.findUnique({ where: { id: groupId }, select: { name: true } }),
+        ]);
+        // Nothing to send when: the parent is gone or deleted, it belongs to another group,
+        // its author's account was removed (senderId nulls out), or you replied to yourself.
+        if (!parent || parent.isDeleted || parent.groupId !== groupId)
+            return;
+        if (!parent.senderId || parent.senderId === senderId)
+            return;
+        const recipientId = parent.senderId;
+        // Still a member? Someone who left should not get pinged about the old room.
+        const stillMember = await connection_1.prisma.membership.findUnique({
+            where: { userId_groupId: { userId: recipientId, groupId } },
+            select: { status: true },
+        });
+        if (stillMember?.status !== 'active')
+            return;
+        const senderName = sender?.displayName ?? 'Someone';
+        const groupName = group?.name ?? 'your group';
+        await notification_dispatcher_1.NotificationDispatcher.dispatch({
+            userIds: [recipientId],
+            groupId,
+            type: 'message_reply',
+            title: `${senderName} replied to you in ${groupName}`,
+            body: `You have a new reply in ${groupName}.`,
+            referenceType: 'message',
+            referenceId: messageId,
+            email: {
+                subject: `${senderName} replied to you in ${groupName}`,
+                template: 'message_reply',
+                data: {
+                    senderName,
+                    groupName,
+                    groupUrl: `${app_config_1.config.server.clientUrl}/groups/${groupId}/chat`,
+                },
+            },
+        });
+    }
+    catch (error) {
+        asLogger_1.asLogger.error('MessageService.notifyOnReply error:', error);
     }
 }
 // ─── MessageService ───────────────────────────────────────────────────────────
@@ -152,6 +217,7 @@ class MessageService {
                 select: message_types_1.messageSelect,
             });
             socket_service_1.SocketService.emitToRoom(`group:${groupId}`, socket_events_1.SocketEvents.NEW_MESSAGE, { message });
+            await notifyOnReply(message.id, groupId, dto.reply_to_id, actor.userId);
             audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.MESSAGE_SEND, audit_logger_1.ResourceTypes.MESSAGE, message.id, 1, { groupId });
             return message;
         }

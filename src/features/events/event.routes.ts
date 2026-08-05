@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../../shared/middleware/auth.middleware';
 import { authorizeGroupRole } from '../../shared/middleware/auth.middleware';
+import { authenticateContactVerified } from '../../shared/middleware/verification.middleware';
 import { validateRequest } from '../../shared/utils/validators';
 import { eventController } from './event.controller';
 import {
@@ -41,6 +42,15 @@ router.get(
     eventController.listNearbyEvents,
 );
 
+// Returns a text/calendar file rather than the JSON envelope — calendar clients follow
+// this URL directly. Visibility rules match GET /events/:id.
+router.get(
+    '/events/:id/calendar.ics',
+    authenticate,
+    validateRequest(eventIdParamValidator),
+    eventController.downloadCalendar,
+);
+
 router.get(
     '/events/:id',
     authenticate,
@@ -62,17 +72,17 @@ router.delete(
     eventController.deleteEvent,
 );
 
-// RSVP routes
+// RSVP routes — attending an event is tier 1 (email + phone verified)
 router.post(
     '/events/:id/rsvp',
-    authenticate,
+    authenticateContactVerified,
     validateRequest([...eventIdParamValidator, ...rsvpValidator]),
     eventController.rsvp,
 );
 
 router.patch(
     '/events/:id/rsvp',
-    authenticate,
+    authenticateContactVerified,
     validateRequest([...eventIdParamValidator, ...rsvpValidator]),
     eventController.updateRsvp,
 );

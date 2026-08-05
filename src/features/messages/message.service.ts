@@ -9,6 +9,8 @@ import { TokenPayload } from '../../shared/types/common.types';
 import { SocketService } from '../../shared/socket/socket.service';
 import { SocketEvents } from '../../shared/socket/socket.events';
 import { StorageService } from '../../shared/storage/storage.service';
+import { config } from '../../shared/config/app.config';
+import { NotificationDispatcher } from '../notifications/notification.dispatcher';
 import {
     SendMessageDTO,
     VotePollDTO,
@@ -38,6 +40,75 @@ async function requireGroupAdmin(groupId: string, userId: string): Promise<void>
     });
     if (!m || m.status !== 'active' || !['super_admin', 'admin'].includes(m.role)) {
         throw new ApiError(Messages.FORBIDDEN, StatusCodes.FORBIDDEN);
+    }
+}
+
+/**
+ * Notifies the author of a message that someone replied to it.
+ *
+ * Scoped to direct replies rather than every message in the group. Notifying the whole
+ * room on every message is what makes a chat product's notifications worthless — the
+ * signal that matters is "someone answered *you*". `message_reply` is in
+ * NOTIFICATION_EMAIL_TYPES, so this is also the one chat event that can reach the inbox,
+ * and the recipient can turn that off per group.
+ *
+ * Never throws: a chat message must not fail because a notification did.
+ */
+export async function notifyOnReply(
+    messageId: string,
+    groupId: string,
+    replyToId: string | undefined,
+    senderId: string,
+): Promise<void> {
+    if (!replyToId) return;
+
+    try {
+        const [parent, sender, group] = await Promise.all([
+            prisma.message.findUnique({
+                where: { id: replyToId },
+                select: { senderId: true, groupId: true, isDeleted: true },
+            }),
+            prisma.user.findUnique({ where: { id: senderId }, select: { displayName: true } }),
+            prisma.group.findUnique({ where: { id: groupId }, select: { name: true } }),
+        ]);
+
+        // Nothing to send when: the parent is gone or deleted, it belongs to another group,
+        // its author's account was removed (senderId nulls out), or you replied to yourself.
+        if (!parent || parent.isDeleted || parent.groupId !== groupId) return;
+        if (!parent.senderId || parent.senderId === senderId) return;
+
+        const recipientId = parent.senderId;
+
+        // Still a member? Someone who left should not get pinged about the old room.
+        const stillMember = await prisma.membership.findUnique({
+            where: { userId_groupId: { userId: recipientId, groupId } },
+            select: { status: true },
+        });
+        if (stillMember?.status !== 'active') return;
+
+        const senderName = sender?.displayName ?? 'Someone';
+        const groupName = group?.name ?? 'your group';
+
+        await NotificationDispatcher.dispatch({
+            userIds: [recipientId],
+            groupId,
+            type: 'message_reply',
+            title: `${senderName} replied to you in ${groupName}`,
+            body: `You have a new reply in ${groupName}.`,
+            referenceType: 'message',
+            referenceId: messageId,
+            email: {
+                subject: `${senderName} replied to you in ${groupName}`,
+                template: 'message_reply',
+                data: {
+                    senderName,
+                    groupName,
+                    groupUrl: `${config.server.clientUrl}/groups/${groupId}/chat`,
+                },
+            },
+        });
+    } catch (error) {
+        asLogger.error('MessageService.notifyOnReply error:', error);
     }
 }
 
@@ -182,6 +253,9 @@ export class MessageService {
             });
 
             SocketService.emitToRoom(`group:${groupId}`, SocketEvents.NEW_MESSAGE, { message });
+
+            await notifyOnReply(message.id, groupId, dto.reply_to_id, actor.userId);
+
             AuditLogger.log(actor, LogActions.MESSAGE_SEND, ResourceTypes.MESSAGE, message.id, 1, { groupId });
 
             return message;

@@ -15,6 +15,9 @@ model User {
   location             Unsupported("geometry(Point, 4326)")?
   interests            String[]                              @default([]) @db.Text
   emailVerifiedAt      DateTime?                             @map("email_verified_at") @db.Timestamptz
+  // Tier 1 of the verification ladder (see agent.md §26). Browsing is open to anyone;
+  // joining groups and attending events require email + phone.
+  phoneVerifiedAt      DateTime?                             @map("phone_verified_at") @db.Timestamptz
   idVerificationStatus String                                @default("unsubmitted") @map("id_verification_status") @db.VarChar(20)
   idDocumentUrl        String?                               @map("id_document_url")
   idDocumentIv         String?                               @map("id_document_iv")
@@ -55,6 +58,8 @@ model User {
   feedComments         GroupPostComment[]        @relation("CommentAuthor")
   feedPostReactions    GroupPostReaction[]       @relation("PostReactor")
   feedCommentReactions GroupPostCommentReaction[] @relation("CommentReactor")
+
+  groupsReviewed       Group[]                   @relation("GroupReviewer")
 
   @@index([role],   map: "idx_users_role")
   @@index([status], map: "idx_users_status")

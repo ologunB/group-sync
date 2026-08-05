@@ -13,6 +13,7 @@ export type JobName =
     | 'kyc-document-cleanup'
     | 'storage-cleanup'
     | 'expire-invite-links'
+    | 'event-reminders'
     | 'notify-group-members'
     | 'process-group-announcement'
     | 'notify-platform-admin';
@@ -256,10 +257,23 @@ export class AgendaManager {
                 break;
             }
 
+            case 'event-reminders': {
+                // Hourly sweep: notifies RSVP holders 24 hours before an event starts.
+                // Imported lazily — EventService pulls in AgendaManager, so a top-level
+                // import here would close a cycle.
+                const { eventService } = await import('./features/events/event.service');
+                const { eventsReminded } = await eventService.sendUpcomingReminders();
+                asLogger.info(`event-reminders: reminded ${eventsReminded} event(s)`);
+                break;
+            }
+
             case 'notify-group-members': {
-                // Fan-out: individual push/in-app notifications per member
-                // Implemented in notifications module
-                asLogger.info('notify-group-members job received', { groupId: job.data.groupId });
+                // Retained for jobs already sitting in the queue from before delivery moved
+                // into NotificationDispatcher — services now call the dispatcher directly
+                // rather than round-tripping through BullMQ. Nothing enqueues this any more.
+                asLogger.warn('notify-group-members: legacy job drained, no action taken', {
+                    groupId: job.data.groupId,
+                });
                 break;
             }
 
@@ -290,6 +304,19 @@ export class AgendaManager {
             {
                 repeat: { pattern: '0 * * * *' },
                 jobId: 'cron:expire-invite-links', // stable ID prevents duplicates
+                removeOnComplete: true,
+                removeOnFail: 5,
+            },
+        );
+
+        // Sweep for events starting in ~24 hours, every hour on the half hour so it does
+        // not contend with the invite-link expiry job.
+        await AgendaManager.queue.add(
+            'event-reminders',
+            {},
+            {
+                repeat: { pattern: '30 * * * *' },
+                jobId: 'cron:event-reminders',
                 removeOnComplete: true,
                 removeOnFail: 5,
             },

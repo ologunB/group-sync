@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.adminChangeRoleValidator = exports.adminAuditLogsValidator = exports.adminListReportsValidator = exports.adminListGroupsValidator = exports.adminListUsersValidator = exports.adminResolveReportValidator = exports.adminUpdateGroupValidator = exports.adminVerifyIdValidator = exports.adminUpdateUserValidator = exports.reportIdParamValidator = exports.groupIdParamValidator = exports.userIdParamValidator = void 0;
+exports.adminChangeRoleValidator = exports.adminAuditLogsValidator = exports.adminListReportsValidator = exports.adminReviewGroupValidator = exports.adminListGroupsValidator = exports.adminListUsersValidator = exports.adminResolveReportValidator = exports.adminUpdateGroupValidator = exports.adminVerifyIdValidator = exports.adminUpdateUserValidator = exports.reportIdParamValidator = exports.groupIdParamValidator = exports.userIdParamValidator = void 0;
 const express_validator_1 = require("express-validator");
 exports.userIdParamValidator = [
     (0, express_validator_1.param)('id').isUUID().withMessage('User ID must be a valid UUID'),
@@ -48,6 +48,22 @@ exports.adminListGroupsValidator = [
     (0, express_validator_1.query)('limit').optional().isInt({ min: 1, max: 100 }).withMessage('limit must be between 1 and 100'),
     (0, express_validator_1.query)('status').optional().isString(),
     (0, express_validator_1.query)('search').optional().isString(),
+    (0, express_validator_1.query)('review_status')
+        .optional()
+        .isIn(['pending', 'approved', 'rejected'])
+        .withMessage('review_status must be pending, approved, or rejected'),
+];
+exports.adminReviewGroupValidator = [
+    (0, express_validator_1.body)('decision')
+        .exists().withMessage('decision is required')
+        .isIn(['approve', 'reject']).withMessage('decision must be approve or reject'),
+    // Required in practice when rejecting — enforced in the service, which is where the
+    // decision value and the notes can be checked against each other.
+    (0, express_validator_1.body)('notes')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('notes must be a string')
+        .trim()
+        .isLength({ max: 1000 }).withMessage('notes must be 1000 characters or fewer'),
 ];
 exports.adminListReportsValidator = [
     (0, express_validator_1.query)('page').optional().isInt({ min: 1 }).withMessage('page must be a positive integer'),

@@ -2,9 +2,9 @@ import { Router } from 'express';
 import { GroupController } from './group.controller';
 import {
     authenticate,
-    authenticateVerified,
     authorizeGroupRole,
 } from '../../shared/middleware/auth.middleware';
+import { authenticateOrganiser } from '../../shared/middleware/verification.middleware';
 import { validateRequest } from '../../shared/utils/validators';
 import { uploadImage } from '../../shared/middleware/upload.middleware';
 import {
@@ -20,10 +20,12 @@ import { Request, Response, NextFunction } from 'express';
 const router = Router();
 const controller = new GroupController();
 
-// ─── POST /groups — verified users only ───────────────────────────────────────
+// ─── POST /groups — tier 2 (email + phone verified, bio present) ──────────────
+// The manual-approval half of tier 2 is the review queue: the group is created here
+// and stays out of Explore until a platform admin approves it.
 router.post(
     '/',
-    authenticateVerified,
+    authenticateOrganiser,
     validateRequest(createGroupValidator),
     controller.createGroup,
 );

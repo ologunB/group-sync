@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GroupSync — Google Sign-In test</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 16px; min-height: 100vh;
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: #f4f4f7; color: #111827;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.3px; }
+  .sub { color: #6B7280; font-size: 14px; margin: 0 0 28px; }
+  .card {
+    background: #fff; border: 1px solid #E5E7EB; border-radius: 12px;
+    padding: 24px; margin-bottom: 20px;
+  }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px;
+             color: #6B7280; margin: 0 0 16px; font-weight: 600; }
+  label { display: block; font-size: 13px; font-weight: 600; margin: 0 0 6px; }
+  input, select {
+    width: 100%; padding: 10px 12px; font-size: 14px; font-family: inherit;
+    border: 1px solid #D1D5DB; border-radius: 8px; background: #fff; color: inherit;
+  }
+  .field { margin-bottom: 16px; }
+  .hint { font-size: 12px; color: #6B7280; margin: 6px 0 0; }
+  button {
+    font: inherit; font-weight: 600; padding: 10px 20px; border-radius: 8px;
+    border: 1px solid #4F46E5; background: #4F46E5; color: #fff; cursor: pointer;
+  }
+  button.secondary { background: #fff; color: #4F46E5; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  pre {
+    background: #0F172A; color: #E2E8F0; padding: 16px; border-radius: 8px;
+    overflow-x: auto; font-size: 12.5px; line-height: 1.5; margin: 0;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .status { font-size: 13px; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; display: none; }
+  .status.show { display: block; }
+  .status.ok   { background: #F0FDF4; border: 1px solid #22C55E; color: #15803D; }
+  .status.err  { background: #FEF2F2; border: 1px solid #EF4444; color: #B91C1C; }
+  .status.info { background: #EFF6FF; border: 1px solid #3B82F6; color: #1D4ED8; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  code { background: #F3F4F6; padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #0B1120; color: #E5E7EB; }
+    .card { background: #111827; border-color: #1F2937; }
+    input, select { background: #0B1120; border-color: #374151; color: #E5E7EB; }
+    code { background: #1F2937; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Google Sign-In test</h1>
+  <p class="sub">
+    Gets a real Google ID token in the browser and posts it to
+    <code>POST /api/v1/auth/social</code>. Dev-only page — it is not served when
+    <code>NODE_ENV=production</code>.
+  </p>
+
+  <!-- ── Setup ───────────────────────────────────────────────────────────── -->
+  <div class="card">
+    <h2>1 · Setup</h2>
+
+    <div class="field">
+      <label for="clientId">Google OAuth Client ID</label>
+      <input id="clientId" placeholder="1234567890-abcdef.apps.googleusercontent.com" />
+      <p class="hint">
+        Must be a <strong>Web application</strong> client, and this page's origin
+        (<span id="origin"></span>) must be listed under
+        <em>Authorised JavaScript origins</em> in the Google Cloud console.
+        It also has to match the server's <code>GOOGLE_CLIENT_ID</code>, or the
+        backend will reject the token's audience.
+      </p>
+    </div>
+
+    <div class="field">
+      <label for="apiBase">API base URL</label>
+      <input id="apiBase" value="/api/v1" />
+      <p class="hint">Leave as-is when this page is served by the API itself. Use a full URL to point at another environment.</p>
+    </div>
+
+    <button id="init">Load Google button</button>
+  </div>
+
+  <!-- ── Sign in ─────────────────────────────────────────────────────────── -->
+  <div class="card">
+    <h2>2 · Sign in with Google</h2>
+    <div id="gsiButton"></div>
+    <p class="hint" id="gsiHint">Enter a client ID above and press “Load Google button”.</p>
+  </div>
+
+  <!-- ── Exchange ────────────────────────────────────────────────────────── -->
+  <div class="card">
+    <h2>3 · Exchange with GroupSync</h2>
+    <div id="status" class="status"></div>
+
+    <div class="field">
+      <label for="idToken">Google ID token (JWT)</label>
+      <input id="idToken" placeholder="Populated automatically after signing in" />
+      <p class="hint">You can also paste a token captured elsewhere.</p>
+    </div>
+
+    <div class="row">
+      <button id="exchange" disabled>POST /auth/social</button>
+      <button id="decode" class="secondary" disabled>Decode token payload</button>
+      <button id="copyToken" class="secondary" disabled>Copy token</button>
+    </div>
+  </div>
+
+  <!-- ── Result ──────────────────────────────────────────────────────────── -->
+  <div class="card">
+    <h2>4 · Response</h2>
+    <pre id="output">Nothing yet.</pre>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const out = $('output');
+  const statusEl = $('status');
+
+  $('origin').textContent = window.location.origin;
+
+  // Remember the client ID between reloads — retyping it on every test is the main
+  // friction in this flow.
+  const SAVED_KEY = 'groupsync.dev.googleClientId';
+  const savedId = localStorage.getItem(SAVED_KEY);
+  if (savedId) $('clientId').value = savedId;
+
+  // ?client_id=... wins over the saved value, so a link can carry the config.
+  const paramId = new URLSearchParams(window.location.search).get('client_id');
+  if (paramId) $('clientId').value = paramId;
+
+  function setStatus(kind, message) {
+    statusEl.className = 'status show ' + kind;
+    statusEl.textContent = message;
+  }
+
+  function show(value) {
+    out.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  }
+
+  function setTokenButtons(enabled) {
+    $('exchange').disabled = !enabled;
+    $('decode').disabled = !enabled;
+    $('copyToken').disabled = !enabled;
+  }
+
+  // ── Load the Google Identity Services button ─────────────────────────────
+  $('init').addEventListener('click', function () {
+    const clientId = $('clientId').value.trim();
+
+    if (!clientId) {
+      setStatus('err', 'Enter your Google OAuth client ID first.');
+      return;
+    }
+    if (!window.google || !google.accounts || !google.accounts.id) {
+      setStatus('err', 'Google Identity Services script has not loaded yet. Wait a moment and retry.');
+      return;
+    }
+
+    localStorage.setItem(SAVED_KEY, clientId);
+
+    try {
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: onCredential,
+        // Off deliberately: auto-select silently reuses the last account and makes it
+        // hard to test a second one.
+        auto_select: false,
+      });
+
+      $('gsiButton').innerHTML = '';
+      google.accounts.id.renderButton($('gsiButton'), {
+        theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular',
+      });
+
+      $('gsiHint').textContent = 'Click the button above to sign in.';
+      setStatus('info', 'Google button loaded. Sign in to get an ID token.');
+    } catch (err) {
+      setStatus('err', 'Failed to initialise Google Sign-In: ' + err.message);
+    }
+  });
+
+  // ── Google hands back the credential (an ID token JWT) ───────────────────
+  function onCredential(response) {
+    $('idToken').value = response.credential;
+    setTokenButtons(true);
+    setStatus('ok', 'Got a Google ID token. Now exchange it with the API.');
+    show(decodeJwt(response.credential) || response.credential);
+  }
+
+  // ── Exchange the Google token for GroupSync tokens ───────────────────────
+  $('exchange').addEventListener('click', async function () {
+    const token = $('idToken').value.trim();
+    const base = $('apiBase').value.trim().replace(/\/$/, '');
+
+    if (!token) {
+      setStatus('err', 'No ID token to send.');
+      return;
+    }
+
+    setStatus('info', 'POST ' + base + '/auth/social …');
+    this.disabled = true;
+
+    try {
+      const res = await fetch(base + '/auth/social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'google', token: token }),
+      });
+
+      const body = await res.json().catch(() => ({ raw: 'non-JSON response' }));
+      show({ status: res.status, body: body });
+
+      if (res.ok) {
+        const isNew = body && body.data && body.data.isNewUser;
+        setStatus('ok', res.status + ' — signed in' + (isNew ? ' (new account created)' : ''));
+
+        // Stash the access token so the other dev tooling on this origin can use it.
+        if (body && body.data && body.data.tokens) {
+          localStorage.setItem('groupsync.dev.accessToken', body.data.tokens.accessToken);
+          localStorage.setItem('groupsync.dev.refreshToken', body.data.tokens.refreshToken);
+        }
+      } else {
+        setStatus('err', res.status + ' — ' + ((body && body.message) || 'request failed'));
+      }
+    } catch (err) {
+      setStatus('err', 'Network error: ' + err.message);
+      show(String(err));
+    } finally {
+      this.disabled = false;
+    }
+  });
+
+  // ── Local helpers ────────────────────────────────────────────────────────
+  $('decode').addEventListener('click', function () {
+    const decoded = decodeJwt($('idToken').value.trim());
+    show(decoded || 'Could not decode — is this a JWT?');
+  });
+
+  $('copyToken').addEventListener('click', async function () {
+    await navigator.clipboard.writeText($('idToken').value.trim());
+    setStatus('ok', 'Token copied to clipboard.');
+  });
+
+  $('idToken').addEventListener('input', function () {
+    setTokenButtons(Boolean(this.value.trim()));
+  });
+
+  /**
+   * Decodes a JWT payload for display only — this does not verify the signature.
+   * The server does that; here it just shows you which account you signed in as.
+   */
+  function decodeJwt(token) {
+    try {
+      const payload = token.split('.')[1];
+      const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+      return JSON.parse(decodeURIComponent(escape(json)));
+    } catch (_) {
+      return null;
+    }
+  }
+})();
+</script>
+</body>
+</html>

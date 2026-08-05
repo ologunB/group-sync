@@ -21,6 +21,23 @@ exports.createEventValidator = [
         .optional()
         .isString().withMessage('location_name must be a string')
         .isLength({ max: 255 }).withMessage('location_name must be 255 characters or fewer'),
+    // Public area label. Shown on every event card so people can judge distance.
+    (0, express_validator_1.body)('venue_city')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('venue_city must be a string')
+        .trim()
+        .isLength({ max: 100 }).withMessage('venue_city must be 100 characters or fewer'),
+    (0, express_validator_1.body)('venue_state')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('venue_state must be a string')
+        .trim()
+        .isLength({ max: 100 }).withMessage('venue_state must be 100 characters or fewer'),
+    // Exact street address — members only, and gated on a verified ID in the service.
+    (0, express_validator_1.body)('venue_address')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('venue_address must be a string')
+        .trim()
+        .isLength({ min: 5, max: 500 }).withMessage('venue_address must be between 5 and 500 characters'),
     (0, express_validator_1.body)('lat')
         .optional()
         .isFloat({ min: -90, max: 90 }).withMessage('lat must be a valid latitude'),
@@ -64,6 +81,23 @@ exports.updateEventValidator = [
     (0, express_validator_1.body)('location_name')
         .optional()
         .isString().withMessage('location_name must be a string'),
+    // Public area label. Shown on every event card so people can judge distance.
+    (0, express_validator_1.body)('venue_city')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('venue_city must be a string')
+        .trim()
+        .isLength({ max: 100 }).withMessage('venue_city must be 100 characters or fewer'),
+    (0, express_validator_1.body)('venue_state')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('venue_state must be a string')
+        .trim()
+        .isLength({ max: 100 }).withMessage('venue_state must be 100 characters or fewer'),
+    // Exact street address — members only, and gated on a verified ID in the service.
+    (0, express_validator_1.body)('venue_address')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('venue_address must be a string')
+        .trim()
+        .isLength({ min: 5, max: 500 }).withMessage('venue_address must be between 5 and 500 characters'),
     (0, express_validator_1.body)('lat')
         .optional()
         .isFloat({ min: -90, max: 90 }).withMessage('lat must be a valid latitude'),

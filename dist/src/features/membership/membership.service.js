@@ -10,8 +10,8 @@ const error_middleware_1 = require("../../shared/middleware/error.middleware");
 const response_constants_1 = require("../../shared/utils/response.constants");
 const asLogger_1 = require("../../shared/utils/asLogger");
 const audit_logger_1 = require("../../shared/utils/audit.logger");
-const agenda_1 = require("../../agenda");
 const app_config_1 = require("../../shared/config/app.config");
+const notification_dispatcher_1 = require("../notifications/notification.dispatcher");
 // ─── Role hierarchy for permission checks ─────────────────────────────────────
 const ROLE_RANK = {
     super_admin: 4,
@@ -64,17 +64,17 @@ class MembershipService {
                 data: { userId: actor.userId, groupId, role: 'member', status: 'active' },
             });
             // Notify group admins
-            const admins = await connection_1.prisma.membership.findMany({
-                where: { groupId, role: { in: ['super_admin', 'admin'] }, status: 'active' },
-                select: { userId: true },
+            const joiner = await connection_1.prisma.user.findUnique({
+                where: { id: actor.userId },
+                select: { displayName: true },
             });
-            await agenda_1.AgendaManager.runNow('notify-group-members', {
-                groupId,
-                groupName: group.name,
+            await notification_dispatcher_1.NotificationDispatcher.dispatchToGroup(groupId, {
                 type: 'member_joined',
-                memberIds: admins.map((a) => a.userId),
-                data: { newMemberId: actor.userId },
-            });
+                title: `New member in ${group.name}`,
+                body: `${joiner?.displayName ?? 'Someone'} joined the group.`,
+                referenceType: 'group',
+                referenceId: groupId,
+            }, { roles: ['super_admin', 'admin'], excludeUserIds: [actor.userId] });
             audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_JOIN, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 1, { groupName: group.name });
         }
         catch (error) {
@@ -155,17 +155,17 @@ class MembershipService {
                 select: { id: true, status: true },
             });
             // Notify group admins
-            const admins = await connection_1.prisma.membership.findMany({
-                where: { groupId, role: { in: ['super_admin', 'admin'] }, status: 'active' },
-                select: { userId: true },
+            const applicant = await connection_1.prisma.user.findUnique({
+                where: { id: actor.userId },
+                select: { displayName: true },
             });
-            await agenda_1.AgendaManager.runNow('notify-group-members', {
-                groupId,
-                groupName: group.name,
+            await notification_dispatcher_1.NotificationDispatcher.dispatchToGroup(groupId, {
                 type: 'application_submitted',
-                memberIds: admins.map((a) => a.userId),
-                data: { applicantId: actor.userId, applicationId: application.id },
-            });
+                title: `New application for ${group.name}`,
+                body: `${applicant?.displayName ?? 'Someone'} applied to join.`,
+                referenceType: 'application',
+                referenceId: application.id,
+            }, { roles: ['super_admin', 'admin'] });
             audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_APPLY, audit_logger_1.ResourceTypes.APPLICATION, application.id, 1, { groupId, groupName: group.name });
             return { applicationId: application.id, status: application.status };
         }
@@ -316,15 +316,21 @@ class MembershipService {
                         },
                     });
                 });
-                // Notify applicant
-                await agenda_1.AgendaManager.sendEmail({
-                    to: application.user.email,
-                    subject: `Your application to ${application.group.name} was approved`,
-                    template: 'application_approved',
-                    data: {
-                        displayName: application.user.displayName,
-                        groupName: application.group.name,
-                        clientUrl: app_config_1.config.server.clientUrl,
+                // Notify the applicant. Routed through the dispatcher rather than emailing
+                // directly so the approval also lands in the notifications list and the
+                // unread counter — the email alone was invisible in-app.
+                await notification_dispatcher_1.NotificationDispatcher.dispatch({
+                    userIds: [application.userId],
+                    groupId: application.groupId,
+                    type: 'application_approved',
+                    title: `You're in — ${application.group.name}`,
+                    body: `Your application to join ${application.group.name} was approved.`,
+                    referenceType: 'group',
+                    referenceId: application.groupId,
+                    email: {
+                        subject: `Your application to ${application.group.name} was approved`,
+                        template: 'application_approved',
+                        data: { groupName: application.group.name },
                     },
                 });
             }
@@ -339,15 +345,21 @@ class MembershipService {
                         reviewedAt: new Date(),
                     },
                 });
-                await agenda_1.AgendaManager.sendEmail({
-                    to: application.user.email,
-                    subject: `Your application to ${application.group.name} was not approved`,
-                    template: 'application_rejected',
-                    data: {
-                        displayName: application.user.displayName,
-                        groupName: application.group.name,
-                        rejectionReason: dto.rejection_reason ?? 'No reason provided.',
-                        clientUrl: app_config_1.config.server.clientUrl,
+                await notification_dispatcher_1.NotificationDispatcher.dispatch({
+                    userIds: [application.userId],
+                    groupId: application.groupId,
+                    type: 'application_rejected',
+                    title: `Update on your application to ${application.group.name}`,
+                    body: dto.rejection_reason?.trim() ?? 'Your application was not approved.',
+                    referenceType: 'group',
+                    referenceId: application.groupId,
+                    email: {
+                        subject: `Your application to ${application.group.name} was not approved`,
+                        template: 'application_rejected',
+                        data: {
+                            groupName: application.group.name,
+                            rejectionReason: dto.rejection_reason ?? 'No reason provided.',
+                        },
                     },
                 });
             }
@@ -503,11 +515,17 @@ class MembershipService {
                 socket_service_1.SocketService.kickFromRoom(targetUserId, groupId);
             }
             // Notify the affected member
-            await agenda_1.AgendaManager.runNow('notify-group-members', {
+            await notification_dispatcher_1.NotificationDispatcher.dispatch({
+                userIds: [targetUserId],
                 groupId,
                 type: 'membership_updated',
-                memberIds: [targetUserId],
-                data: { role: dto.role, status: dto.status, updatedBy: actor.userId },
+                title: 'Your membership was updated',
+                body: [
+                    dto.role ? `Your role is now ${dto.role}.` : null,
+                    dto.status ? `Your status is now ${dto.status}.` : null,
+                ].filter(Boolean).join(' '),
+                referenceType: 'group',
+                referenceId: groupId,
             });
             audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_MEMBER_UPDATE, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 1, { targetUserId, role: dto.role, status: dto.status });
         }
@@ -558,11 +576,14 @@ class MembershipService {
             // Force-remove from socket room
             socket_service_1.SocketService.kickFromRoom(targetUserId, groupId);
             // Notify removed member
-            await agenda_1.AgendaManager.runNow('notify-group-members', {
+            await notification_dispatcher_1.NotificationDispatcher.dispatch({
+                userIds: [targetUserId],
                 groupId,
                 type: 'membership_updated',
-                memberIds: [targetUserId],
-                data: { action: 'removed', removedBy: actor.userId },
+                title: 'You were removed from a group',
+                body: 'You are no longer a member of this group.',
+                referenceType: 'group',
+                referenceId: groupId,
             });
             audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.GROUP_MEMBER_REMOVE, audit_logger_1.ResourceTypes.MEMBERSHIP, groupId, 1, { targetUserId });
         }

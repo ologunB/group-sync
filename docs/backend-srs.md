@@ -59,6 +59,8 @@ CREATE TABLE users (
     country                 VARCHAR(100) DEFAULT 'NG',
     location                GEOMETRY(Point, 4326),         -- PostGIS: (lng, lat)
     interests               TEXT[] DEFAULT '{}',           -- interest tags
+    email_verified_at       TIMESTAMPTZ,                   -- tier 1a
+    phone_verified_at       TIMESTAMPTZ,                   -- tier 1b (phone OTP)
     id_verification_status  VARCHAR(20) NOT NULL DEFAULT 'unsubmitted'
                                 CHECK (id_verification_status IN ('unsubmitted','pending','verified','rejected')),
     id_document_url         TEXT,                          -- encrypted S3 key, deleted after verification
@@ -167,6 +169,13 @@ CREATE TABLE groups (
     created_by                  UUID NOT NULL REFERENCES users(id),
     status                      VARCHAR(20) NOT NULL DEFAULT 'active'
                                     CHECK (status IN ('active','suspended','deleted')),
+    -- Moderation queue. A new group is usable by its organiser immediately but stays
+    -- out of Explore until approved. Rejection unlists; it does not suspend or delete.
+    review_status               VARCHAR(20) NOT NULL DEFAULT 'pending'
+                                    CHECK (review_status IN ('pending','approved','rejected')),
+    reviewed_by                 UUID REFERENCES users(id) ON DELETE SET NULL,
+    reviewed_at                 TIMESTAMPTZ,
+    review_notes                TEXT,                           -- shown to the organiser verbatim
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at                  TIMESTAMPTZ
@@ -177,6 +186,7 @@ CREATE INDEX idx_groups_category ON groups (category) WHERE deleted_at IS NULL;
 CREATE INDEX idx_groups_slug ON groups (slug);
 CREATE INDEX idx_groups_status ON groups (status, is_discoverable);
 CREATE INDEX idx_groups_created_by ON groups (created_by);
+CREATE INDEX idx_groups_review_status ON groups (review_status, created_at);
 
 -- Full-text search
 ALTER TABLE groups ADD COLUMN fts_vector TSVECTOR
@@ -355,6 +365,12 @@ CREATE TABLE events (
     title           VARCHAR(200) NOT NULL,
     description     TEXT,
     location_name   VARCHAR(255),
+    -- Venue is split by audience. venue_city/venue_state form the public "Ibadan, Oyo"
+    -- label anyone may use to judge distance; venue_address is the exact street address
+    -- and is only serialised for active members and going/maybe RSVP holders.
+    venue_city      VARCHAR(100),
+    venue_state     VARCHAR(100),
+    venue_address   TEXT,
     location_point  GEOMETRY(Point, 4326),
     starts_at       TIMESTAMPTZ NOT NULL,
     ends_at         TIMESTAMPTZ,
@@ -420,9 +436,12 @@ CREATE TABLE notifications (
     user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     type            VARCHAR(50) NOT NULL
                         CHECK (type IN (
-                            'message','application_submitted','application_approved','application_rejected',
-                            'member_joined','event_created','group_announcement','dm_received',
-                            'invite_received','membership_updated','system'
+                            'message','message_reply',
+                            'application_submitted','application_approved','application_rejected',
+                            'member_joined',
+                            'event_created','event_reminder','event_cancelled','event_updated',
+                            'group_announcement','group_approved','group_rejected','group_deleted',
+                            'dm_received','invite_received','membership_updated','system'
                         )),
     title           VARCHAR(200) NOT NULL,
     body            TEXT,
@@ -441,6 +460,7 @@ CREATE TABLE notification_preferences (
     pref_type               VARCHAR(50) NOT NULL,  -- matches notification type
     push_enabled            BOOLEAN NOT NULL DEFAULT TRUE,
     in_app_enabled          BOOLEAN NOT NULL DEFAULT TRUE,
+    email_enabled           BOOLEAN NOT NULL DEFAULT TRUE,  -- only applies to the low-frequency types
 
     UNIQUE (user_id, group_id, pref_type)
 );
@@ -519,6 +539,9 @@ CREATE INDEX idx_audit_action ON audit_logs (action);
 | Rate limit counters | `rl:{ip}:{route}` | varies |
 | KYC webhook idempotency | `kyc:event:{eventId}` | 24 hr |
 | Invite link cache | `invite:{token}` | 5 min |
+| Phone verification OTP | `verify:phone:{userId}` | 10 min |
+| Phone OTP resend lock | `verify:phone:cooldown:{userId}` | 60 sec |
+| Event reminder sent marker | `event:reminded:{eventId}` | 48 hr |
 
 ---
 
@@ -545,14 +568,45 @@ CREATE INDEX idx_audit_action ON audit_logs (action);
 | POST | `/auth/change-password` | ✓ | Change password (requires old password) |
 | POST | `/auth/verify-email` | — | Verify email with OTP code |
 | POST | `/auth/resend-verification` | — | Resend email verification OTP |
+| POST | `/auth/phone/send-otp` | ✓ `[unverified-ok]` | Send (or re-send) a phone verification code |
+| POST | `/auth/phone/verify` | ✓ `[unverified-ok]` | Confirm the code — sets `phone_verified_at` |
 | POST | `/auth/verify-id` | ✓ `[unverified-ok]` | Submit ID document for KYC review |
 | POST | `/auth/kyc-webhook` | internal | Webhook from KYC provider (signed) |
 
 **POST `/auth/register`**
 ```
-Body: { email, password, display_name, phone? }
-Returns: { user: { id, email, display_name }, tokens: { accessToken, refreshToken, expiresIn } }
+Body: { email, password, display_name, phone?, city?, state?, country?, interests? }
+Returns: { user: { id, email, display_name, ... } }        -- tokens are issued by verify-email
 Side effects: Send email verification OTP via BullMQ
+Rules:
+  - city / state are captured at signup so the home feed opens on the user's own city
+    rather than a nationwide list nobody can act on
+  - interests: array of up to 30 tags, lowercased and deduplicated before storing.
+    Canonical values come from GET /reference/interests
+```
+
+**POST `/auth/phone/send-otp`**
+```
+Body: { phone? }
+Returns: { phoneVerified: false }
+Rules:
+  - Supplying `phone` sets or replaces the number on the account and clears any prior
+    verification — a new number has not been proven
+  - Omitting it re-sends to the number already on file; 400 if there is none, 409 if
+    it is already verified
+  - Phone uniqueness is enforced across accounts (409)
+  - 60-second resend cooldown per user, SET NX in Redis → 429
+  - Delivered via SmsService. SMS_PROVIDER=log (default) writes the code to the
+    application log instead of sending it
+```
+
+**POST `/auth/phone/verify`**
+```
+Body: { otp }
+Returns: { phoneVerified: true, phoneVerifiedAt }
+Rules:
+  - Sets users.phone_verified_at, which unlocks tier 1 (join / apply / RSVP)
+  - Consumes the OTP on success
 ```
 
 **POST `/auth/login`**
@@ -569,13 +623,24 @@ Rules:
 
 **POST `/auth/social`**
 ```
-Body: { provider: 'google'|'apple', token, mode: 'login'|'register' }
+Body: { provider: 'google'|'apple', token, display_name? }
 Returns: { user, tokens, isNewUser: boolean }
 Rules:
-  - Verify token with provider SDK
+  - google: ID token verified against GOOGLE_CLIENT_ID via google-auth-library
+  - apple:  ID token verified against Apple's JWKS (https://appleid.apple.com/auth/keys).
+            Signature, issuer and audience are all checked — an unverified decode would
+            let anyone mint an identity by hand-writing a JWT. Keys are cached 24h with a
+            forced refetch on an unknown `kid` (the normal path right after Apple rotates).
+            Audience is matched against APPLE_CLIENT_ID (comma-separated: Apple issues a
+            different `aud` per surface). Unset → 501.
+  - display_name is Apple-only: Apple returns the user's name to the client on the FIRST
+    authorisation and never again, and never inside the identity token, so the client has
+    to forward it or the account keeps a placeholder name forever. Ignored for Google.
   - If user exists via provider_id → login
   - If email exists but no provider link → link the provider to existing account
   - If new → create user + provider record
+  - When the provider asserts email_verified, email_verified_at is set (or backfilled on
+    an existing unverified account). Re-challenging with our own OTP would be pure friction.
 ```
 
 **POST `/auth/verify-id`**
@@ -650,10 +715,19 @@ Body: { name, category, subcategory?, description, city, state, country,
         membership_fee_frequency?, how_to_join_content?, rules?, cover_image_url?, logo_url? }
 Returns: { group }
 Rules:
+  - Requires tier 2: email + phone verified, and a non-empty bio on the organiser
+  - description is REQUIRED, 40–500 characters after trimming, with at least one
+    non-whitespace character
+  - Max 3 groups per user per rolling 7 days (429 beyond that). Counted from the groups
+    table, not Redis, so a cache flush does not hand out a fresh allowance; soft-deleted
+    groups still count
   - Auto-generate slug from name: slugify(name) + collision suffix if needed
   - Creator is automatically added as super_admin in memberships table (inside transaction)
   - membership_type defaults to 'open'
   - is_discoverable = FALSE when membership_type = 'invite_only'
+  - review_status = 'pending'. The group works immediately for its organiser and members
+    but is excluded from Explore until approved (§ 4.12). The organiser is notified
+    "Under review — usually within 24 hours"; platform admins are notified too
 ```
 
 **GET `/groups`**
@@ -672,9 +746,21 @@ Query params:
 Returns: { data: Group[], pagination: { page, limit, total } }
 Rules:
   - Exclude groups with status != 'active' or deleted_at IS NOT NULL
-  - Exclude invite_only groups (is_discoverable = FALSE) unless caller is a member
+  - EXPLORE PUBLISH RULE — a group is listed only when ALL of:
+        is_discoverable = TRUE
+        review_status   = 'approved'
+        cover_image_url IS NOT NULL      (a group with no cover renders as an empty card)
+        status          = 'active'
+    Members always see their own groups regardless, so an organiser can find a group
+    that is still pending review.
   - Distance sort requires lat+lng
   - Relevance sort: full-text rank + recency weighted score
+
+Each row also carries:
+  isPublished        boolean — the rule above, so a client need not re-derive it
+  isActiveThisMonth  boolean — the group has a non-cancelled event starting within
+                     GROUP_ACTIVITY_WINDOW_DAYS (30) of now. This replaced the "NEW"
+                     badge: a claim about what the group is doing, not when it signed up.
 ```
 
 **GET `/groups/:slug`**
@@ -682,10 +768,18 @@ Rules:
 Returns: public group profile including:
   { id, name, slug, category, subcategory, description, cover_image_url, logo_url,
     city, state, country, membership_type, membership_fee, how_to_join_content, rules,
-    is_verified, member_count, founding_date, created_at,
-    caller_membership_status? (if authenticated) }
+    is_verified, member_count, founding_date, created_at, review_status,
+    isPublished, isActiveThisMonth }
+  plus:
+    caller_membership_status   (if authenticated)
+    publishing_checklist       (GROUP ADMINS ONLY — null for everyone else)
 Rules:
   - If invite_only and caller is not a member → 404
+  - A pending group is still reachable by slug — review gates Explore, not access.
+    Anyone with the link can see it.
+  - publishingChecklist = { reviewStatus, reviewMessage, hasCoverImage, isDiscoverable,
+    isPublished, blockers[] } — every reason the group is not in Explore, in plain words.
+    review_notes reach the organiser only through here.
 ```
 
 **GET `/groups/:id/members`**
@@ -843,6 +937,7 @@ Rules:
 | GET | `/groups/:id/events` | ✓ member (public preview: non-member) | List events. `?visibility=public\|private` |
 | GET | `/events/near` | ✓ | Discover public events near a point (cross-group) |
 | GET | `/events/:id` | ✓ member | Get event details |
+| GET | `/events/:id/calendar.ics` | ✓ | Download an iCalendar file |
 | PATCH | `/events/:id` | ✓ admin | Update event |
 | DELETE | `/events/:id` | ✓ admin | Cancel/delete event |
 | POST | `/events/:id/rsvp` | ✓ member | RSVP to event |
@@ -852,12 +947,65 @@ Rules:
 
 **POST `/groups/:id/events`**
 ```
-Body: { title, description?, location_name?, lat?, lng?, starts_at, ends_at?, rsvp_limit?,
-        visibility? }
+Body: { title, description?, location_name?,
+        venue_city?, venue_state?, venue_address?,
+        lat?, lng?, starts_at, ends_at?, rsvp_limit?, visibility? }
 Rules:
   - starts_at must be in the future
   - visibility: 'public' | 'private', defaults to 'private'
-  - Notify all group members: 'event_created' (queued via BullMQ)
+  - venue_address requires tier 3 (id_verification_status = 'verified') on create AND
+    update — publishing a street address means real people show up at a real place
+  - Notify all group members: 'event_created', excluding the organiser, in-app + email
+```
+
+**Event venue**
+```
+venue_city + venue_state   PUBLIC. Serialised as `venueArea` — "Ibadan, Oyo". Present on
+                           every event payload including list and /events/near responses,
+                           so a card can show a location without a second call.
+venue_address              Exact street address. Serialised ONLY for:
+                             - active members of the group, or
+                             - anyone holding a 'going' or 'maybe' RSVP
+                           The RSVP clause matters: a public event can be RSVP'd by a
+                           non-member, and telling someone they are attending while
+                           hiding where it is makes the RSVP useless. 'not_going' does
+                           not qualify — that person opted out.
+
+For callers who may not see it, `venueAddress` is OMITTED from the payload entirely
+rather than set to null: a null would tell a stranger the field exists but is hidden,
+and "no address set" vs "address withheld" is not theirs to learn.
+
+Every event also carries:
+  canSeeExactAddress  boolean — so the client knows which of the two it received
+  calendar            { ics: "/api/v1/events/{id}/calendar.ics", google: "https://…" }
+```
+
+**GET `/events/:id/calendar.ics`**
+```
+Returns: text/calendar; charset=utf-8, Content-Disposition: attachment
+Rules:
+  - The ONLY endpoint that does not use the JSON response envelope — calendar clients
+    follow this URL directly and would choke on JSON
+  - Same visibility rules as GET /events/:id. A private event returns 404 for a
+    non-member; the file must not become a side door
+  - LOCATION carries the exact address for those allowed to see it, the area label
+    otherwise, so the .ics stays useful without leaking the street
+  - RFC 5545 compliant: CRLF endings, TEXT escaping, 75-octet line folding. An event
+    with no ends_at is treated as two hours long.
+```
+
+**Event reminders (24 hours out)**
+```
+Driven by the hourly `event-reminders` cron, which sweeps events starting in 23–25h and
+notifies every going/maybe RSVP holder in-app and by email, WITH the venue address.
+
+A sweep rather than a per-event delayed job: a delayed job scheduled at creation time
+would still fire after the event was cancelled or moved, and would need cancelling and
+rescheduling on every edit. Sweeping reads current state every time, so a cancelled or
+rescheduled event simply falls out of the window.
+
+The window overlaps the hourly cadence deliberately; a Redis `event:reminded:{id}`
+SET NX marker (48h TTL) makes the send exactly-once per event.
 ```
 
 **GET `/events/near`**
@@ -898,11 +1046,17 @@ Only group admins can set visibility, via POST/PATCH.
 
 **POST `/events/:id/rsvp`**
 ```
-Body: { status: 'going'|'maybe'|'not_going' }
+Body: { status: 'going'|'maybe'|'not_going' }      -- 'not_going' is "Unavailable / Can't make it"
 Rules:
-  - Upsert on (event_id, user_id) unique constraint
-  - If rsvp_limit set and status = 'going': check rsvp_count < rsvp_limit
-  - Update event.rsvp_count accordingly (trigger or application-level)
+  - Requires tier 1 (email + phone verified) — attending an event is a tier 1 capability
+  - IDEMPOTENT. Upserts on (event_id, user_id):
+      * same status as before  → no-op, returns the existing RSVP (not a 409)
+      * different status       → transitions it, adjusts rsvp_count by the delta
+    This exists because the client updates optimistically and disables the button the
+    instant it is tapped. A 409 on retry — a double tap, a flaky network, a resumed
+    request — would force the UI to roll back a button that was already correct.
+  - If rsvp_limit is set and the transition is INTO 'going': check rsvp_count < rsvp_limit
+  - rsvp_count is maintained in application code inside a transaction, not by a trigger
 ```
 
 ---
@@ -953,16 +1107,57 @@ Rules:
 **GET `/notifications`**
 ```
 Query: cursor?, limit (default 20), unread_only?: boolean
-Returns: { data: Notification[], unread_count: number, next_cursor? }
+Returns: { data: Notification[], unread_count: number, next_cursor?, has_more }
+```
+
+**GET `/notifications/unread-count`**
+```
+Returns: { unread_count: number }
+Why separate: the badge is polled on every app resume and does not need the page of
+rows that GET /notifications returns alongside its own unread_count.
 ```
 
 **PATCH `/notifications/preferences`**
 ```
-Body: { preferences: [{ group_id?: UUID, pref_type: string, push_enabled: boolean, in_app_enabled: boolean }] }
+Body: { preferences: [{ group_id?: UUID, pref_type: string,
+                        push_enabled?: boolean, in_app_enabled?: boolean, email_enabled?: boolean }] }
 Rules:
   - Upsert on (user_id, group_id, pref_type)
   - group_id = NULL sets the global default for that pref_type
+  - pref_type must be a known notification type (400 otherwise)
+  - Each channel is OPTIONAL and patched independently. Omitting email_enabled must not
+    silently re-enable email just because the client only meant to mute push. At least
+    one of the three must be present.
 ```
+
+### Delivery
+
+All three channels are fanned out by `NotificationDispatcher`. Nothing writes to the
+`notifications` table directly.
+
+```
+in-app  a notifications row + a live `notification` socket event to `user:{id}`
+email   queued through BullMQ, and ONLY for the types below
+push    queued for FCM
+```
+
+Preference resolution is most-specific-wins: a row scoped to the group, else the
+account-wide row (`group_id IS NULL`), else defaults (all channels on). Resolved for the
+whole recipient set in one query, so a 500-member group is still two round-trips.
+
+**Which types are emailed.** `message` and `dm_received` are deliberately excluded — one
+email per chat message is what makes a product's email unreadable, and in-app plus push
+already cover it.
+
+| Type | Trigger |
+|---|---|
+| `event_created` | A new event was posted in a group you're in |
+| `event_reminder` | An event you RSVP'd to starts in 24 hours — includes the venue address |
+| `event_cancelled` | An event you RSVP'd to was cancelled |
+| `message_reply` | Someone replied to **your** message in a group chat (not every message in the room) |
+| `application_approved` / `application_rejected` | Your group application was reviewed |
+| `group_approved` / `group_rejected` | Your group cleared or failed review |
+| `group_announcement`, `invite_received` | — |
 
 ---
 
@@ -1011,19 +1206,91 @@ Rules:
 | PATCH | `/admin/users/:id` | Update user status (suspend/ban/unban) |
 | GET | `/admin/users/:id/verification` | View submitted ID document |
 | PATCH | `/admin/users/:id/verification` | Approve or reject ID verification |
-| GET | `/admin/groups` | List all groups |
+| GET | `/admin/groups` | List all groups (`?review_status=` supported) |
+| GET | `/admin/groups/pending` | The group review queue |
+| PATCH | `/admin/groups/:id/review` | Approve or reject a group for Explore |
 | PATCH | `/admin/groups/:id` | Verify group, suspend, restore |
 | GET | `/admin/reports` | List open reports |
 | PATCH | `/admin/reports/:id` | Resolve or dismiss report |
 | GET | `/admin/audit-logs` | Query audit log |
 
+**GET `/admin/groups/pending`**
+```
+Query: page, limit, search?, review_status? (default 'pending')
+Returns: { data: PendingGroupItem[], pagination }
+  PendingGroupItem = { id, name, slug, category, description, coverImageUrl, city, state,
+                       memberCount, createdAt,
+                       creator: { id, displayName, email, bio,
+                                  phoneVerified, emailVerified, idVerificationStatus,
+                                  groupsCreated } }
+Rules:
+  - Ordered OLDEST FIRST. The queue is a FIFO — the "usually within 24 hours" promise is
+    only keepable if the longest-waiting group is reviewed first.
+  - The creator's verification state is inlined because "is this a real organiser?" is the
+    actual question a reviewer is answering; it should not need a second lookup.
+```
+
+**PATCH `/admin/groups/:id/review`**
+```
+Body: { decision: 'approve' | 'reject', notes? }
+Rules:
+  - Rejecting REQUIRES notes — the organiser is shown them verbatim
+  - Approving a group with no cover_image_url fails with 422 rather than leaving it
+    approved-but-still-invisible with no explanation
+  - Sets review_status, reviewed_by, reviewed_at, review_notes
+  - Notifies the organiser in-app and by email (group_approved / group_rejected)
+  - Rejection does NOT delete or suspend anything. The group keeps working for the people
+    already in it; it is simply unlisted. That is the point of letting groups go live
+    immediately — review gates discovery, not existence.
+```
+
+---
+
+### 4.12 Reference Catalogues
+
+> No auth. These populate the signup form, which runs before the user has a token.
+> Static product configuration, not user data.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/reference/onboarding` | Everything the signup form needs, in one round-trip |
+| GET | `/reference/interests` | `{ interests: [{ value, label, group }], groups: string[] }` |
+| GET | `/reference/states` | 36 Nigerian states + FCT, each with its main cities |
+| GET | `/reference/categories` | Group category options |
+
+Held in code rather than the database: they change at the pace of product decisions, not
+user actions, and shipping them as data would mean a seeder, a migration and an admin CRUD
+surface for a list edited twice a year.
+
+Interest `value`s are already normalised (lowercase, no whitespace) to match what the write
+path stores — if they diverged, a stored tag would never equal the option the user picked.
+`city` and `state` stay free text, so anything missing can still be typed in.
+
 ---
 
 ## 5. Business Logic Rules
 
-### 5.1 ID Verification
+### 5.1 Verification Ladder
 
-- Users with `id_verification_status != 'verified'` can: register, browse groups, view public profiles. They CANNOT: join/apply to groups, send messages, create groups, or send DMs.
+Capability is bought in rungs, so friction only lands on the users asking for the riskier
+thing. This replaced the old all-or-nothing ID gate, which blocked browsing-adjacent
+actions behind a KYC flow most users will never need.
+
+| Tier | Requirement | Unlocks | Guard |
+|---|---|---|---|
+| 0 | none | Browse groups and public events, view profiles | `authenticate` |
+| 1 | email verified **+ phone OTP** | Join public groups, apply, accept invites, RSVP to events | `authenticateContactVerified` |
+| 2 | tier 1 + a non-empty `bio`, then **platform admin review of the group** | Create a group | `authenticateOrganiser` + § 4.11 review queue |
+| 3 | tier 2 + `id_verification_status = 'verified'` (NIN / BVN / passport / other accepted document) | Host an event at a **physical street address** | `hasVerifiedId()` inside `EventService` |
+
+Every tier also re-checks account health (not deleted, suspended or banned) before its own
+rule. Tier 3 is enforced in the service rather than as route middleware because it only
+applies when the request actually carries `venue_address` — an event with only a city and
+state needs no ID.
+
+### 5.1b ID Verification mechanics
+
+- Users with `id_verification_status != 'verified'` can do everything up to tier 2.
 - ID document URL is encrypted with AES-256 (key from env). After manual/automated verification decision, `id_document_url` and `id_document_iv` are set to NULL (document deleted from S3 as well — queued via BullMQ `storage.cleanup` job).
 - KYC webhook endpoint (`POST /auth/kyc-webhook`) must verify provider signature (HMAC). Store event idempotency key in Redis (`kyc:event:{eventId}`, 24hr TTL) to prevent duplicate processing.
 
@@ -1096,7 +1363,8 @@ type JobName =
     | 'kyc-document-cleanup'
     | 'storage-cleanup'
     | 'expire-invite-links'
-    | 'notify-group-members'        // fan-out notifications to large groups
+    | 'event-reminders'             // hourly sweep: 24h-out reminders to RSVP holders
+    | 'notify-group-members'        // LEGACY drain only — delivery moved to NotificationDispatcher
     | 'process-group-announcement'
 ```
 
@@ -1107,8 +1375,9 @@ type JobName =
 | `kyc-review-request` | ID document submitted | On-demand |
 | `kyc-document-cleanup` | Verification decision made | On-demand |
 | `storage-cleanup` | File replaced/deleted | On-demand |
-| `expire-invite-links` | Cron | Every hour |
-| `notify-group-members` | Announcement, event created | On-demand (fan-out) |
+| `expire-invite-links` | Cron `0 * * * *` | Every hour |
+| `event-reminders` | Cron `30 * * * *` | Every hour (offset so it does not contend with the invite job) |
+| `notify-group-members` | — | Nothing enqueues it. Services call `NotificationDispatcher` directly; the handler stays only to drain jobs queued before the change. |
 
 ---
 
@@ -1153,6 +1422,12 @@ type JobName =
 | `application_rejected.html` | Group application rejected |
 | `invite.html` | Invited to join a group |
 | `announcement.html` | Group announcement |
+| `event_created.html` | New event posted in a group you're in |
+| `event_reminder.html` | 24 hours before an event you RSVP'd to — includes the venue |
+| `event_cancelled.html` | An event you RSVP'd to was cancelled |
+| `message_reply.html` | Someone replied to your message in a group chat |
+| `group_approved.html` | Your group cleared review and is live in Explore |
+| `group_rejected.html` | Your group was not approved — carries the reviewer's notes |
 
 All templates use `{{data.fieldName}}` interpolation and reside in `templates/emails/`.
 
@@ -1200,6 +1475,22 @@ KYC_WEBHOOK_SECRET=      # for HMAC verification
 
 # Firebase (Push Notifications)
 FCM_SERVER_KEY=
+
+# OAuth
+GOOGLE_CLIENT_ID=       # Web application client ID; the ID-token flow needs no client secret
+APPLE_CLIENT_ID=        # Comma-separated — Apple issues a different `aud` per surface.
+                        # Unset → POST /auth/social with provider=apple returns 501.
+
+# SMS (phone verification OTP)
+SMS_PROVIDER=log        # 'log' writes the code to the application log instead of sending it
+SMS_API_KEY=
+SMS_SENDER_ID=GroupSync
+SMS_BASE_URL=https://api.ng.termii.com
+
+# Group limits
+GROUP_CREATE_MAX_PER_WINDOW=3    # groups per user per window
+GROUP_CREATE_WINDOW_DAYS=7
+GROUP_ACTIVITY_WINDOW_DAYS=30    # "Active this month" lookback
 
 # Frontend
 CORS_ORIGIN=http://localhost:3000,https://groupsync.app

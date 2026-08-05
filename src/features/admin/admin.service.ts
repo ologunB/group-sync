@@ -6,6 +6,8 @@ import { Messages } from '../../shared/utils/response.constants';
 import { asLogger } from '../../shared/utils/asLogger';
 import { AuditLogger, LogActions, ResourceTypes } from '../../shared/utils/audit.logger';
 import { TokenPayload, PaginationMeta } from '../../shared/types/common.types';
+import { config } from '../../shared/config/app.config';
+import { NotificationDispatcher } from '../notifications/notification.dispatcher';
 import {
     AdminListUsersQuery,
     AdminUpdateUserDTO,
@@ -16,9 +18,12 @@ import {
     AdminResolveReportDTO,
     AdminListAuditLogsQuery,
     AdminChangeRoleDTO,
+    AdminReviewGroupDTO,
+    PendingGroupItem,
     PlatformStats,
     adminUserSelect,
     adminGroupSelect,
+    adminPendingGroupSelect,
     adminReportSelect,
     adminAuditSelect,
 } from './admin.types';
@@ -145,6 +150,7 @@ export class AdminService {
 
             const where: Prisma.GroupWhereInput = {};
             if (q.status) where.status = q.status;
+            if (q.review_status) where.reviewStatus = q.review_status;
             if (q.search) {
                 where.OR = [
                     { name: { contains: q.search, mode: 'insensitive' } },
@@ -186,6 +192,177 @@ export class AdminService {
             AuditLogger.log(actor, LogActions.ADMIN_GROUP_UPDATE, ResourceTypes.GROUP, groupId, 0, { error });
             if (error instanceof ApiError) throw error;
             asLogger.error('AdminService.updateGroup error:', error);
+            throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ── Group review queue ────────────────────────────────────────────────────
+
+    async listPendingGroups(
+        q: AdminListGroupsQuery,
+    ): Promise<{ data: PendingGroupItem[]; pagination: PaginationMeta }> {
+        try {
+            const page = Math.max(q.page ?? 1, 1);
+            const limit = Math.min(q.limit ?? 20, 100);
+            const skip = (page - 1) * limit;
+
+            const where: Prisma.GroupWhereInput = {
+                reviewStatus: q.review_status ?? 'pending',
+                deletedAt: null,
+            };
+
+            if (q.search) {
+                where.OR = [
+                    { name: { contains: q.search, mode: 'insensitive' } },
+                    { slug: { contains: q.search, mode: 'insensitive' } },
+                ];
+            }
+
+            const [rows, total] = await Promise.all([
+                prisma.group.findMany({
+                    where,
+                    select: adminPendingGroupSelect,
+                    skip,
+                    take: limit,
+                    // Oldest first — the queue is a FIFO, and the "usually within 24 hours"
+                    // promise is only keepable if the longest-waiting group is reviewed first.
+                    orderBy: { createdAt: 'asc' },
+                }),
+                prisma.group.count({ where }),
+            ]);
+
+            const data: PendingGroupItem[] = rows.map((group) => ({
+                id: group.id,
+                name: group.name,
+                slug: group.slug,
+                category: group.category,
+                description: group.description,
+                coverImageUrl: group.coverImageUrl,
+                city: group.city,
+                state: group.state,
+                memberCount: group.memberCount,
+                createdAt: group.createdAt,
+                creator: group.creator
+                    ? {
+                        id: group.creator.id,
+                        displayName: group.creator.displayName,
+                        email: group.creator.email,
+                        bio: group.creator.bio,
+                        // Booleans rather than timestamps: the reviewer needs a yes/no, and
+                        // the timestamp is a verification detail they have no use for.
+                        phoneVerified: Boolean(group.creator.phoneVerifiedAt),
+                        emailVerified: Boolean(group.creator.emailVerifiedAt),
+                        idVerificationStatus: group.creator.idVerificationStatus,
+                        groupsCreated: group.creator._count.groupsCreated,
+                    }
+                    : null,
+            }));
+
+            return { data, pagination: { page, limit, total } };
+        } catch (error) {
+            if (error instanceof ApiError) throw error;
+            asLogger.error('AdminService.listPendingGroups error:', error);
+            throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Approves or rejects a group for Explore.
+     *
+     * Rejection does not delete or suspend anything: the group keeps working for the
+     * people already in it, it simply stays unlisted. That is the whole point of letting
+     * groups go live immediately — the review gates discovery, not existence.
+     */
+    async reviewGroup(
+        groupId: string,
+        dto: AdminReviewGroupDTO,
+        actor: TokenPayload,
+    ): Promise<unknown> {
+        try {
+            const group = await prisma.group.findUnique({
+                where: { id: groupId },
+                select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    reviewStatus: true,
+                    coverImageUrl: true,
+                    createdBy: true,
+                    deletedAt: true,
+                },
+            });
+
+            if (!group || group.deletedAt) {
+                throw new ApiError(Messages.RESOURCE_NOT_FOUND('Group'), StatusCodes.NOT_FOUND);
+            }
+
+            // Approving a group with no cover would leave it approved but still unlisted,
+            // and the organiser would have no idea why. Fail loudly instead.
+            if (dto.decision === 'approve' && !group.coverImageUrl) {
+                throw new ApiError(
+                    'This group has no cover image and cannot be published yet.',
+                    StatusCodes.UNPROCESSABLE_ENTITY,
+                );
+            }
+
+            if (dto.decision === 'reject' && !dto.notes?.trim()) {
+                throw new ApiError(
+                    'A rejection must include notes — the organiser is shown them verbatim.',
+                    StatusCodes.BAD_REQUEST,
+                );
+            }
+
+            const reviewStatus = dto.decision === 'approve' ? 'approved' : 'rejected';
+
+            const updated = await prisma.group.update({
+                where: { id: groupId },
+                data: {
+                    reviewStatus,
+                    reviewedBy: actor.userId,
+                    reviewedAt: new Date(),
+                    reviewNotes: dto.notes?.trim() ?? null,
+                },
+                select: adminGroupSelect,
+            });
+
+            if (group.createdBy) {
+                const groupUrl = `${config.server.clientUrl}/groups/${group.slug}`;
+
+                await NotificationDispatcher.dispatch({
+                    userIds: [group.createdBy],
+                    groupId,
+                    type: reviewStatus === 'approved' ? 'group_approved' : 'group_rejected',
+                    title:
+                        reviewStatus === 'approved'
+                            ? `${group.name} is now live in Explore`
+                            : `${group.name} was not approved for Explore`,
+                    body: dto.notes?.trim() ?? undefined,
+                    referenceType: 'group',
+                    referenceId: groupId,
+                    email: {
+                        subject:
+                            reviewStatus === 'approved'
+                                ? `${group.name} is live on GroupSync`
+                                : `Update on ${group.name}`,
+                        template: reviewStatus === 'approved' ? 'group_approved' : 'group_rejected',
+                        data: {
+                            groupName: group.name,
+                            groupUrl,
+                            reviewNotes: dto.notes?.trim() ?? 'No additional notes were provided.',
+                        },
+                    },
+                });
+            }
+
+            AuditLogger.log(actor, LogActions.ADMIN_GROUP_REVIEW, ResourceTypes.GROUP, groupId, 1, {
+                decision: dto.decision,
+            });
+
+            return updated;
+        } catch (error) {
+            AuditLogger.log(actor, LogActions.ADMIN_GROUP_REVIEW, ResourceTypes.GROUP, groupId, 0, { error });
+            if (error instanceof ApiError) throw error;
+            asLogger.error('AdminService.reviewGroup error:', error);
             throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }

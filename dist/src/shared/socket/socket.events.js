@@ -30,6 +30,8 @@ exports.SocketEvents = {
     DM_REACTION_REMOVED: 'dm_reaction_removed',
     // ── Polls — server → client ───────────────────────────────────────────────
     POLL_VOTE_UPDATED: 'poll_vote_updated',
+    // ── Notifications — server → client (personal room `user:{id}`) ───────────
+    NOTIFICATION_CREATED: 'notification',
     // ── Errors ────────────────────────────────────────────────────────────────
     ERROR: 'chat_error',
 };

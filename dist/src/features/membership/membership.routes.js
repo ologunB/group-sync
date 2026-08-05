@@ -3,15 +3,16 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const membership_controller_1 = require("./membership.controller");
 const auth_middleware_1 = require("../../shared/middleware/auth.middleware");
+const verification_middleware_1 = require("../../shared/middleware/verification.middleware");
 const validators_1 = require("../../shared/utils/validators");
 const membership_validator_1 = require("./membership.validator");
 const router = (0, express_1.Router)();
 const controller = new membership_controller_1.MembershipController();
 // ─── Group membership actions ─────────────────────────────────────────────────
-// Join open group — verified users only
-router.post('/:id/join', auth_middleware_1.authenticateVerified, (0, validators_1.validateRequest)(membership_validator_1.groupIdParamValidator), controller.joinGroup);
-// Apply to application-based group — verified users only
-router.post('/:id/apply', auth_middleware_1.authenticateVerified, (0, validators_1.validateRequest)(membership_validator_1.groupIdParamValidator), (0, validators_1.validateRequest)(membership_validator_1.applyToGroupValidator), controller.applyToGroup);
+// Join open group — tier 1 (email + phone verified)
+router.post('/:id/join', verification_middleware_1.authenticateContactVerified, (0, validators_1.validateRequest)(membership_validator_1.groupIdParamValidator), controller.joinGroup);
+// Apply to application-based group — tier 1 (email + phone verified)
+router.post('/:id/apply', verification_middleware_1.authenticateContactVerified, (0, validators_1.validateRequest)(membership_validator_1.groupIdParamValidator), (0, validators_1.validateRequest)(membership_validator_1.applyToGroupValidator), controller.applyToGroup);
 // Leave a group — any authenticated member
 router.delete('/:id/leave', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(membership_validator_1.groupIdParamValidator), controller.leaveGroup);
 // ─── Application management ───────────────────────────────────────────────────
@@ -39,7 +40,7 @@ router.post('/:id/invite', auth_middleware_1.authenticate, (0, validators_1.vali
 router.get('/:id/invites', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(membership_validator_1.groupIdParamValidator), (0, auth_middleware_1.authorizeGroupRole)('super_admin', 'admin'), controller.getInviteLinks);
 // Revoke invite link — admin only (auth checked inside service for group ownership)
 router.delete('/invites/:id', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(membership_validator_1.inviteIdParamValidator), controller.revokeInviteLink);
-// Accept invite — verified users only
-router.post('/invites/:token/accept', auth_middleware_1.authenticateVerified, (0, validators_1.validateRequest)(membership_validator_1.inviteTokenParamValidator), controller.acceptInvite);
+// Accept invite — tier 1 (email + phone verified)
+router.post('/invites/:token/accept', verification_middleware_1.authenticateContactVerified, (0, validators_1.validateRequest)(membership_validator_1.inviteTokenParamValidator), controller.acceptInvite);
 exports.default = router;
 //# sourceMappingURL=membership.routes.js.map

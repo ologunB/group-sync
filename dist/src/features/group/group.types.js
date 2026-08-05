@@ -1,6 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.groupAdminSelect = exports.groupPublicSelect = void 0;
+exports.groupAdminSelect = exports.groupPublicSelect = exports.GROUP_REVIEW_STATUSES = exports.GROUP_DESCRIPTION_MAX = exports.GROUP_DESCRIPTION_MIN = void 0;
+// Group descriptions carry the whole pitch on a discovery card, so they are held to a
+// real length. Enforced in the validator; the constants live here so the review queue
+// and the docs quote the same numbers.
+exports.GROUP_DESCRIPTION_MIN = 40;
+exports.GROUP_DESCRIPTION_MAX = 500;
+exports.GROUP_REVIEW_STATUSES = ['pending', 'approved', 'rejected'];
 // ─── Prisma select shapes ─────────────────────────────────────────────────────
 exports.groupPublicSelect = {
     id: true,
@@ -25,6 +31,7 @@ exports.groupPublicSelect = {
     isDiscoverable: true,
     memberCount: true,
     status: true,
+    reviewStatus: true,
     createdAt: true,
     updatedAt: true,
     createdBy: true,

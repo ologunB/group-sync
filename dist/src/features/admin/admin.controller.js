@@ -55,9 +55,36 @@ class AdminController {
                 limit: req.query.limit ? parseInt(req.query.limit, 10) : undefined,
                 status: req.query.status,
                 search: req.query.search,
+                review_status: req.query.review_status,
             };
             const result = await admin_service_1.adminService.listGroups(q);
             response_helper_1.ResponseHelper.success(res, result.data, 'Groups retrieved.', 200, result.pagination);
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    // GET /admin/groups/pending — the review queue.
+    listPendingGroups = async (req, res, next) => {
+        try {
+            const q = {
+                page: req.query.page ? parseInt(req.query.page, 10) : undefined,
+                limit: req.query.limit ? parseInt(req.query.limit, 10) : undefined,
+                search: req.query.search,
+                review_status: req.query.review_status,
+            };
+            const result = await admin_service_1.adminService.listPendingGroups(q);
+            response_helper_1.ResponseHelper.success(res, result.data, 'Pending groups retrieved.', 200, result.pagination);
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    // PATCH /admin/groups/:id/review
+    reviewGroup = async (req, res, next) => {
+        try {
+            const group = await admin_service_1.adminService.reviewGroup(req.params.id, req.body, req.user);
+            response_helper_1.ResponseHelper.success(res, group, 'Group review recorded.');
         }
         catch (error) {
             next(error);

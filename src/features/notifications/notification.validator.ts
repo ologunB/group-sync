@@ -1,4 +1,5 @@
 import { body, param, query } from 'express-validator';
+import { NOTIFICATION_TYPES } from './notification.types';
 
 export const notificationIdParamValidator = [
     param('id').isUUID().withMessage('Notification ID must be a valid UUID'),
@@ -21,13 +22,34 @@ export const updatePreferencesValidator = [
 
     body('preferences.*.pref_type')
         .exists().withMessage('pref_type is required')
-        .isString().withMessage('pref_type must be a string'),
+        .isIn(NOTIFICATION_TYPES)
+        .withMessage(`pref_type must be one of: ${NOTIFICATION_TYPES.join(', ')}`),
 
+    // All three channels are optional so a client can mute one without having to
+    // restate the other two — the service patches only what it is sent.
     body('preferences.*.push_enabled')
-        .exists().withMessage('push_enabled is required')
+        .optional()
         .isBoolean().withMessage('push_enabled must be a boolean'),
 
     body('preferences.*.in_app_enabled')
-        .exists().withMessage('in_app_enabled is required')
+        .optional()
         .isBoolean().withMessage('in_app_enabled must be a boolean'),
+
+    body('preferences.*.email_enabled')
+        .optional()
+        .isBoolean().withMessage('email_enabled must be a boolean'),
+
+    body('preferences.*')
+        .custom((pref: Record<string, unknown>) => {
+            if (
+                pref.push_enabled === undefined &&
+                pref.in_app_enabled === undefined &&
+                pref.email_enabled === undefined
+            ) {
+                throw new Error(
+                    'Each preference must set at least one of: push_enabled, in_app_enabled, email_enabled',
+                );
+            }
+            return true;
+        }),
 ];

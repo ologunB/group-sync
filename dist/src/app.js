@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.App = void 0;
 const express_1 = __importDefault(require("express"));
 const http_1 = __importDefault(require("http"));
+const path_1 = __importDefault(require("path"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const compression_1 = __importDefault(require("compression"));
 const security_middleware_1 = require("./shared/middleware/security.middleware");
@@ -29,6 +30,7 @@ const admin_routes_1 = __importDefault(require("./features/admin/admin.routes"))
 const message_routes_1 = __importDefault(require("./features/messages/message.routes"));
 const dm_routes_1 = __importDefault(require("./features/dm/dm.routes"));
 const feed_routes_1 = __importDefault(require("./features/feed/feed.routes"));
+const reference_routes_1 = __importDefault(require("./features/reference/reference.routes"));
 const test_routes_1 = __importDefault(require("./shared/utils/test.routes"));
 const socket_service_1 = require("./shared/socket/socket.service");
 class App {
@@ -65,8 +67,14 @@ class App {
                 timestamp: new Date().toISOString(),
             });
         });
+        // Dev-only static tooling (Google Sign-In test harness). Never mounted in
+        // production — it is a debugging surface, not part of the product.
+        if (!app_config_1.config.server.isProduction) {
+            this.app.use('/dev', express_1.default.static(path_1.default.join(process.cwd(), 'public', 'dev')));
+        }
         // REST routes are only mounted when mode is 'api' or 'both'
         if (serviceMode === 'api' || serviceMode === 'both') {
+            this.app.use(`${apiPrefix}/reference`, reference_routes_1.default);
             this.app.use(`${apiPrefix}/auth`, auth_routes_1.default);
             this.app.use(`${apiPrefix}/users`, user_routes_1.default);
             this.app.use(`${apiPrefix}/groups`, group_routes_1.default);

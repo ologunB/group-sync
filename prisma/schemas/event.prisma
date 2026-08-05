@@ -7,6 +7,12 @@ model Event {
   title        String                                @db.VarChar(200)
   description  String?
   locationName String?                               @map("location_name") @db.VarChar(255)
+  // Venue is split by audience. venueCity/venueState render the public "Ibadan, Oyo"
+  // area label anyone can use to judge distance; venueAddress is the exact street
+  // address and is only ever serialised for active members of the group.
+  venueCity    String?                               @map("venue_city") @db.VarChar(100)
+  venueState   String?                               @map("venue_state") @db.VarChar(100)
+  venueAddress String?                               @map("venue_address")
   locationPoint Unsupported("geometry(Point, 4326)")? @map("location_point")
   startsAt     DateTime                              @map("starts_at") @db.Timestamptz
   endsAt       DateTime?                             @map("ends_at") @db.Timestamptz

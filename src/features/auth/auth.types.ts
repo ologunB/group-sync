@@ -15,6 +15,12 @@ export interface RegisterDTO {
     password: string;
     display_name: string;
     phone?: string;
+    // Collected at signup so the home feed can be filtered to the user's city from the
+    // very first session, rather than showing a nationwide list nobody can act on.
+    city?: string;
+    state?: string;
+    country?: string;
+    interests?: string[];
 }
 
 export interface LoginDTO {
@@ -25,6 +31,21 @@ export interface LoginDTO {
 export interface SocialLoginDTO {
     provider: 'google' | 'apple';
     token: string;
+    /**
+     * Apple only. Apple returns the user's name to the client on the *first* authorisation
+     * and never again, and never inside the identity token — so the client has to forward
+     * it or the account is stuck with a placeholder name forever.
+     */
+    display_name?: string;
+}
+
+export interface SendPhoneOtpDTO {
+    /** Optional: sets or replaces the phone number before sending the code. */
+    phone?: string;
+}
+
+export interface VerifyPhoneOtpDTO {
+    otp: string;
 }
 
 export interface LogoutDTO {
@@ -108,6 +129,7 @@ export interface SafeUser {
     country: string | null;
     interests: string[];
     emailVerifiedAt: Date | null;
+    phoneVerifiedAt: Date | null;
     idVerificationStatus: string;
     status: string;
     role: string;
@@ -131,6 +153,7 @@ export const userSafeSelect = {
     country: true,
     interests: true,
     emailVerifiedAt: true,
+    phoneVerifiedAt: true,
     idVerificationStatus: true,
     status: true,
     role: true,

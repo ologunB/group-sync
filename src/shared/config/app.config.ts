@@ -88,5 +88,30 @@ export const config = {
 
     oauth: {
         googleClientId: optional_env('GOOGLE_CLIENT_ID', ''),
+        // Apple issues a different `aud` per surface (iOS bundle ID, web services ID),
+        // so every client that may sign in has to be listed.
+        appleClientIds: optional_env('APPLE_CLIENT_ID', '')
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+    },
+
+    sms: {
+        // 'log' writes the OTP to the application log instead of sending it — the default
+        // so phone verification is exercisable before an SMS contract exists.
+        provider:   optional_env('SMS_PROVIDER', 'log') as 'log' | 'termii',
+        apiKey:     optional_env('SMS_API_KEY', ''),
+        senderId:   optional_env('SMS_SENDER_ID', 'GroupSync'),
+        baseUrl:    optional_env('SMS_BASE_URL', 'https://api.ng.termii.com'),
+    },
+
+    groups: {
+        // Abuse control: a single account may not spin up more than this many groups
+        // inside a rolling 7-day window.
+        maxCreatesPerWindow: parseInt(optional_env('GROUP_CREATE_MAX_PER_WINDOW', '3'), 10),
+        createWindowDays:    parseInt(optional_env('GROUP_CREATE_WINDOW_DAYS', '7'), 10),
+        // "Active this month" badge: a group counts as active if it has run or scheduled
+        // an event whose start time falls inside this many days of now.
+        activityWindowDays:  parseInt(optional_env('GROUP_ACTIVITY_WINDOW_DAYS', '30'), 10),
     },
 } as const;

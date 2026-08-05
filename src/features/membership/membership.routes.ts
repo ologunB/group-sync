@@ -2,9 +2,9 @@ import { Router } from 'express';
 import { MembershipController } from './membership.controller';
 import {
     authenticate,
-    authenticateVerified,
     authorizeGroupRole,
 } from '../../shared/middleware/auth.middleware';
+import { authenticateContactVerified } from '../../shared/middleware/verification.middleware';
 import { validateRequest } from '../../shared/utils/validators';
 import {
     groupIdParamValidator,
@@ -25,18 +25,18 @@ const controller = new MembershipController();
 
 // ─── Group membership actions ─────────────────────────────────────────────────
 
-// Join open group — verified users only
+// Join open group — tier 1 (email + phone verified)
 router.post(
     '/:id/join',
-    authenticateVerified,
+    authenticateContactVerified,
     validateRequest(groupIdParamValidator),
     controller.joinGroup,
 );
 
-// Apply to application-based group — verified users only
+// Apply to application-based group — tier 1 (email + phone verified)
 router.post(
     '/:id/apply',
-    authenticateVerified,
+    authenticateContactVerified,
     validateRequest(groupIdParamValidator),
     validateRequest(applyToGroupValidator),
     controller.applyToGroup,
@@ -148,10 +148,10 @@ router.delete(
     controller.revokeInviteLink,
 );
 
-// Accept invite — verified users only
+// Accept invite — tier 1 (email + phone verified)
 router.post(
     '/invites/:token/accept',
-    authenticateVerified,
+    authenticateContactVerified,
     validateRequest(inviteTokenParamValidator),
     controller.acceptInvite,
 );

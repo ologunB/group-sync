@@ -8,6 +8,7 @@ import { SocketEvents } from './socket.events';
 import { config } from '../config/app.config';
 import { TokenPayload } from '../types/common.types';
 import { messageSelect } from '../../features/messages/message.types';
+import { notifyOnReply } from '../../features/messages/message.service';
 
 // Augment Socket with the authenticated user payload
 interface AuthSocket extends Socket {
@@ -132,6 +133,10 @@ async function handleConnection(socket: AuthSocket, nsp: Namespace): Promise<voi
             });
 
             nsp.to(`group:${group_id}`).emit(SocketEvents.NEW_MESSAGE, { message });
+
+            // Sockets are the primary send path, so the reply notification has to fire here
+            // too — wiring it only into the REST fallback would mean almost none were sent.
+            await notifyOnReply(message.id, group_id, reply_to_id, userId);
         } catch (err) {
             asLogger.error('socket send_message error:', err);
             socket.emit(SocketEvents.ERROR, { message: 'Failed to send message.' });

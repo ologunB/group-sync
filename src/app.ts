@@ -1,5 +1,6 @@
 import express, { Application } from "express";
 import http from "http";
+import path from "path";
 import cookieParser from "cookie-parser";
 import compression from "compression";
 import { securityMiddleware } from "./shared/middleware/security.middleware";
@@ -27,6 +28,7 @@ import adminRoutes from "./features/admin/admin.routes";
 import messageRoutes from "./features/messages/message.routes";
 import dmRoutes from "./features/dm/dm.routes";
 import feedRoutes from "./features/feed/feed.routes";
+import referenceRoutes from "./features/reference/reference.routes";
 import testRoutes from "./shared/utils/test.routes";
 import { SocketService } from "./shared/socket/socket.service";
 
@@ -74,8 +76,15 @@ export class App {
       });
     });
 
+    // Dev-only static tooling (Google Sign-In test harness). Never mounted in
+    // production — it is a debugging surface, not part of the product.
+    if (!config.server.isProduction) {
+      this.app.use('/dev', express.static(path.join(process.cwd(), 'public', 'dev')));
+    }
+
     // REST routes are only mounted when mode is 'api' or 'both'
     if (serviceMode === 'api' || serviceMode === 'both') {
+      this.app.use(`${apiPrefix}/reference`, referenceRoutes);
       this.app.use(`${apiPrefix}/auth`, authRoutes);
       this.app.use(`${apiPrefix}/users`, userRoutes);
       this.app.use(`${apiPrefix}/groups`, groupRoutes);

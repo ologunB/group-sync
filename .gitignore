@@ -9,6 +9,14 @@ dist/
 .env.*
 !.env.example
 
+# ── Provider credential downloads ─────────────────────────────────────────────
+# Google's OAuth JSON download contains a live client_secret. The ID-token flow does
+# not need it (only GOOGLE_CLIENT_ID, which lives in .env), so these files should
+# never reach the repo.
+client_secret*.json
+*.apps.googleusercontent.com.json
+AuthKey_*.p8
+
 # ── Prisma generated client ───────────────────────────────────────────────────
 prisma/generated/
 

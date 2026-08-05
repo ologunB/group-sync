@@ -17,7 +17,10 @@ router.patch('/users/:id/role', (0, auth_middleware_1.authorize)('platform.manag
 router.get('/users/:id/verification', (0, validators_1.validateRequest)(admin_validator_1.userIdParamValidator), admin_controller_1.adminController.getUserVerification);
 router.patch('/users/:id/verification', (0, validators_1.validateRequest)([...admin_validator_1.userIdParamValidator, ...admin_validator_1.adminVerifyIdValidator]), admin_controller_1.adminController.reviewIdVerification);
 // ── Groups ────────────────────────────────────────────────────────────────────
+// '/groups/pending' must precede '/groups/:id' — otherwise ':id' swallows 'pending'.
+router.get('/groups/pending', (0, validators_1.validateRequest)(admin_validator_1.adminListGroupsValidator), admin_controller_1.adminController.listPendingGroups);
 router.get('/groups', (0, validators_1.validateRequest)(admin_validator_1.adminListGroupsValidator), admin_controller_1.adminController.listGroups);
+router.patch('/groups/:id/review', (0, validators_1.validateRequest)([...admin_validator_1.groupIdParamValidator, ...admin_validator_1.adminReviewGroupValidator]), admin_controller_1.adminController.reviewGroup);
 router.patch('/groups/:id', (0, validators_1.validateRequest)([...admin_validator_1.groupIdParamValidator, ...admin_validator_1.adminUpdateGroupValidator]), admin_controller_1.adminController.updateGroup);
 // ── Reports ───────────────────────────────────────────────────────────────────
 router.get('/reports', (0, validators_1.validateRequest)(admin_validator_1.adminListReportsValidator), admin_controller_1.adminController.listReports);

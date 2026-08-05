@@ -9,6 +9,7 @@ const asLogger_1 = require("../utils/asLogger");
 const socket_events_1 = require("./socket.events");
 const app_config_1 = require("../config/app.config");
 const message_types_1 = require("../../features/messages/message.types");
+const message_service_1 = require("../../features/messages/message.service");
 const PRESENCE_TTL = 90; // seconds
 const MSG_RATE_LIMIT = 10;
 const MSG_RATE_WINDOW = 10; // seconds
@@ -111,6 +112,9 @@ async function handleConnection(socket, nsp) {
                 select: message_types_1.messageSelect,
             });
             nsp.to(`group:${group_id}`).emit(socket_events_1.SocketEvents.NEW_MESSAGE, { message });
+            // Sockets are the primary send path, so the reply notification has to fire here
+            // too — wiring it only into the REST fallback would mean almost none were sent.
+            await (0, message_service_1.notifyOnReply)(message.id, group_id, reply_to_id, userId);
         }
         catch (err) {
             asLogger_1.asLogger.error('socket send_message error:', err);

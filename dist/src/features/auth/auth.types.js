@@ -14,6 +14,7 @@ exports.userSafeSelect = {
     country: true,
     interests: true,
     emailVerifiedAt: true,
+    phoneVerifiedAt: true,
     idVerificationStatus: true,
     status: true,
     role: true,

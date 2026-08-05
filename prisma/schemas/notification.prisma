@@ -26,6 +26,9 @@ model NotificationPreference {
   prefType     String   @map("pref_type") @db.VarChar(50)
   pushEnabled  Boolean  @default(true) @map("push_enabled")
   inAppEnabled Boolean  @default(true) @map("in_app_enabled")
+  // Email is opt-out per type. Only the low-frequency types are emailed at all
+  // (see NOTIFICATION_EMAIL_TYPES) — chat messages never trigger one per message.
+  emailEnabled Boolean  @default(true) @map("email_enabled")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
 

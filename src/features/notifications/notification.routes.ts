@@ -10,7 +10,8 @@ import {
 
 const router = Router();
 
-// Preferences routes must be defined before /:id routes to avoid param collision
+// Literal paths must be defined before /:id routes to avoid param collision
+router.get('/unread-count', authenticate, notificationController.unreadCount);
 router.get('/preferences', authenticate, notificationController.getPreferences);
 router.patch('/preferences', authenticate, validateRequest(updatePreferencesValidator), notificationController.updatePreferences);
 

@@ -7,6 +7,8 @@ const error_middleware_1 = require("../../shared/middleware/error.middleware");
 const response_constants_1 = require("../../shared/utils/response.constants");
 const asLogger_1 = require("../../shared/utils/asLogger");
 const audit_logger_1 = require("../../shared/utils/audit.logger");
+const app_config_1 = require("../../shared/config/app.config");
+const notification_dispatcher_1 = require("../notifications/notification.dispatcher");
 const admin_types_1 = require("./admin.types");
 class AdminService {
     // ── Users ─────────────────────────────────────────────────────────────────
@@ -124,6 +126,8 @@ class AdminService {
             const where = {};
             if (q.status)
                 where.status = q.status;
+            if (q.review_status)
+                where.reviewStatus = q.review_status;
             if (q.search) {
                 where.OR = [
                     { name: { contains: q.search, mode: 'insensitive' } },
@@ -164,6 +168,150 @@ class AdminService {
             if (error instanceof error_middleware_1.ApiError)
                 throw error;
             asLogger_1.asLogger.error('AdminService.updateGroup error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    // ── Group review queue ────────────────────────────────────────────────────
+    async listPendingGroups(q) {
+        try {
+            const page = Math.max(q.page ?? 1, 1);
+            const limit = Math.min(q.limit ?? 20, 100);
+            const skip = (page - 1) * limit;
+            const where = {
+                reviewStatus: q.review_status ?? 'pending',
+                deletedAt: null,
+            };
+            if (q.search) {
+                where.OR = [
+                    { name: { contains: q.search, mode: 'insensitive' } },
+                    { slug: { contains: q.search, mode: 'insensitive' } },
+                ];
+            }
+            const [rows, total] = await Promise.all([
+                connection_1.prisma.group.findMany({
+                    where,
+                    select: admin_types_1.adminPendingGroupSelect,
+                    skip,
+                    take: limit,
+                    // Oldest first — the queue is a FIFO, and the "usually within 24 hours"
+                    // promise is only keepable if the longest-waiting group is reviewed first.
+                    orderBy: { createdAt: 'asc' },
+                }),
+                connection_1.prisma.group.count({ where }),
+            ]);
+            const data = rows.map((group) => ({
+                id: group.id,
+                name: group.name,
+                slug: group.slug,
+                category: group.category,
+                description: group.description,
+                coverImageUrl: group.coverImageUrl,
+                city: group.city,
+                state: group.state,
+                memberCount: group.memberCount,
+                createdAt: group.createdAt,
+                creator: group.creator
+                    ? {
+                        id: group.creator.id,
+                        displayName: group.creator.displayName,
+                        email: group.creator.email,
+                        bio: group.creator.bio,
+                        // Booleans rather than timestamps: the reviewer needs a yes/no, and
+                        // the timestamp is a verification detail they have no use for.
+                        phoneVerified: Boolean(group.creator.phoneVerifiedAt),
+                        emailVerified: Boolean(group.creator.emailVerifiedAt),
+                        idVerificationStatus: group.creator.idVerificationStatus,
+                        groupsCreated: group.creator._count.groupsCreated,
+                    }
+                    : null,
+            }));
+            return { data, pagination: { page, limit, total } };
+        }
+        catch (error) {
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('AdminService.listPendingGroups error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    /**
+     * Approves or rejects a group for Explore.
+     *
+     * Rejection does not delete or suspend anything: the group keeps working for the
+     * people already in it, it simply stays unlisted. That is the whole point of letting
+     * groups go live immediately — the review gates discovery, not existence.
+     */
+    async reviewGroup(groupId, dto, actor) {
+        try {
+            const group = await connection_1.prisma.group.findUnique({
+                where: { id: groupId },
+                select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    reviewStatus: true,
+                    coverImageUrl: true,
+                    createdBy: true,
+                    deletedAt: true,
+                },
+            });
+            if (!group || group.deletedAt) {
+                throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('Group'), http_status_codes_1.StatusCodes.NOT_FOUND);
+            }
+            // Approving a group with no cover would leave it approved but still unlisted,
+            // and the organiser would have no idea why. Fail loudly instead.
+            if (dto.decision === 'approve' && !group.coverImageUrl) {
+                throw new error_middleware_1.ApiError('This group has no cover image and cannot be published yet.', http_status_codes_1.StatusCodes.UNPROCESSABLE_ENTITY);
+            }
+            if (dto.decision === 'reject' && !dto.notes?.trim()) {
+                throw new error_middleware_1.ApiError('A rejection must include notes — the organiser is shown them verbatim.', http_status_codes_1.StatusCodes.BAD_REQUEST);
+            }
+            const reviewStatus = dto.decision === 'approve' ? 'approved' : 'rejected';
+            const updated = await connection_1.prisma.group.update({
+                where: { id: groupId },
+                data: {
+                    reviewStatus,
+                    reviewedBy: actor.userId,
+                    reviewedAt: new Date(),
+                    reviewNotes: dto.notes?.trim() ?? null,
+                },
+                select: admin_types_1.adminGroupSelect,
+            });
+            if (group.createdBy) {
+                const groupUrl = `${app_config_1.config.server.clientUrl}/groups/${group.slug}`;
+                await notification_dispatcher_1.NotificationDispatcher.dispatch({
+                    userIds: [group.createdBy],
+                    groupId,
+                    type: reviewStatus === 'approved' ? 'group_approved' : 'group_rejected',
+                    title: reviewStatus === 'approved'
+                        ? `${group.name} is now live in Explore`
+                        : `${group.name} was not approved for Explore`,
+                    body: dto.notes?.trim() ?? undefined,
+                    referenceType: 'group',
+                    referenceId: groupId,
+                    email: {
+                        subject: reviewStatus === 'approved'
+                            ? `${group.name} is live on GroupSync`
+                            : `Update on ${group.name}`,
+                        template: reviewStatus === 'approved' ? 'group_approved' : 'group_rejected',
+                        data: {
+                            groupName: group.name,
+                            groupUrl,
+                            reviewNotes: dto.notes?.trim() ?? 'No additional notes were provided.',
+                        },
+                    },
+                });
+            }
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_GROUP_REVIEW, audit_logger_1.ResourceTypes.GROUP, groupId, 1, {
+                decision: dto.decision,
+            });
+            return updated;
+        }
+        catch (error) {
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_GROUP_REVIEW, audit_logger_1.ResourceTypes.GROUP, groupId, 0, { error });
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('AdminService.reviewGroup error:', error);
             throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }

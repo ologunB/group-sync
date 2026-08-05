@@ -56,6 +56,24 @@ export const adminListGroupsValidator = [
     query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('limit must be between 1 and 100'),
     query('status').optional().isString(),
     query('search').optional().isString(),
+    query('review_status')
+        .optional()
+        .isIn(['pending', 'approved', 'rejected'])
+        .withMessage('review_status must be pending, approved, or rejected'),
+];
+
+export const adminReviewGroupValidator = [
+    body('decision')
+        .exists().withMessage('decision is required')
+        .isIn(['approve', 'reject']).withMessage('decision must be approve or reject'),
+
+    // Required in practice when rejecting — enforced in the service, which is where the
+    // decision value and the notes can be checked against each other.
+    body('notes')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('notes must be a string')
+        .trim()
+        .isLength({ max: 1000 }).withMessage('notes must be 1000 characters or fewer'),
 ];
 
 export const adminListReportsValidator = [

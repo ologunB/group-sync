@@ -26,11 +26,18 @@ model Group {
   memberCount            Int                                   @default(0) @map("member_count")
   createdBy              String?                               @map("created_by") @db.Uuid
   status                 String                                @default("active") @db.VarChar(20) @map("status")
+  // Moderation queue. A new group is usable by its organiser immediately but stays out
+  // of Explore until a platform admin approves it. 'pending' | 'approved' | 'rejected'.
+  reviewStatus           String                                @default("pending") @map("review_status") @db.VarChar(20)
+  reviewedBy             String?                               @map("reviewed_by") @db.Uuid
+  reviewedAt             DateTime?                             @map("reviewed_at") @db.Timestamptz
+  reviewNotes            String?                               @map("review_notes")
   createdAt              DateTime                              @default(now()) @map("created_at") @db.Timestamptz
   updatedAt              DateTime                              @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt              DateTime?                             @map("deleted_at") @db.Timestamptz
 
   creator               User?                    @relation("GroupCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  reviewer              User?                    @relation("GroupReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
   memberships           Membership[]
   applications          Application[]
   inviteLinks           InviteLink[]
@@ -45,6 +52,7 @@ model Group {
   @@index([slug], map: "idx_groups_slug")
   @@index([status, isDiscoverable], map: "idx_groups_status")
   @@index([createdBy], map: "idx_groups_created_by")
+  @@index([reviewStatus, createdAt], map: "idx_groups_review_status")
   @@map("groups")
 }
 

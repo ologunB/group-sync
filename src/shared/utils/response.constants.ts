@@ -35,8 +35,23 @@ export const Messages = {
 
     // Verification gates
     EMAIL_NOT_VERIFIED: 'Please verify your email address before proceeding.',
+    PHONE_NOT_VERIFIED:
+        'Please verify your phone number before proceeding. Add a phone number in your profile and confirm the code we send you.',
+    PHONE_ALREADY_VERIFIED: 'This phone number has already been verified.',
+    PHONE_REQUIRED: 'Add a phone number to your profile before requesting a verification code.',
+    PHONE_VERIFIED: 'Phone number verified successfully.',
+    PHONE_OTP_SENT: 'A verification code has been sent to your phone.',
+    BIO_REQUIRED_FOR_GROUP:
+        'Add a short bio to your profile before creating a group — organisers are shown to prospective members.',
     ID_NOT_VERIFIED:
         'You must complete identity verification to perform this action.',
+    ID_REQUIRED_FOR_PHYSICAL_EVENT:
+        'Hosting an event at a physical address requires a verified ID (NIN, BVN, passport or another accepted document).',
+    GROUP_CREATE_RATE_LIMITED: (max: number, days: number): string =>
+        `You can only create ${max} groups every ${days} days. Please try again later.`,
+    GROUP_UNDER_REVIEW: 'Under review — usually within 24 hours.',
+    GROUP_COVER_REQUIRED:
+        'Add a cover image before your group can appear in Explore.',
     KYC_ALREADY_SUBMITTED:
         'Your identity document has already been submitted for review.',
     KYC_ALREADY_VERIFIED: 'Your identity has already been verified.',

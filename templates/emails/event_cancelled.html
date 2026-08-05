@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Event Cancelled</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f7;font-family:'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:40px 16px;">
+  <tr><td align="center">
+    <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
+
+      <!-- Header -->
+      <tr>
+        <td align="center" style="background:#4F46E5;border-radius:12px 12px 0 0;padding:32px 40px;">
+          <span style="font-size:26px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">GroupSync</span>
+        </td>
+      </tr>
+
+      <!-- Body -->
+      <tr>
+        <td style="background:#ffffff;padding:40px;border-radius:0 0 12px 12px;">
+          <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#111827;">An event was cancelled</p>
+          <p style="margin:0 0 28px;font-size:15px;color:#6B7280;line-height:1.6;">
+            Hi {{data.displayName}}, an event you RSVP'd to is no longer happening.
+          </p>
+
+          <div style="background:#FEF2F2;border:2px solid #EF4444;border-radius:10px;padding:24px;text-align:center;margin-bottom:28px;">
+            <p style="margin:0;font-size:16px;font-weight:700;color:#111827;text-decoration:line-through;">{{data.eventTitle}}</p>
+            <p style="margin:8px 0 0;font-size:13px;color:#B91C1C;">Was scheduled for {{data.startsAt}}</p>
+          </div>
+
+          <p style="margin:0 0 24px;font-size:13px;color:#6B7280;line-height:1.6;">
+            No action is needed — your RSVP has been released. Check the group for upcoming events.
+          </p>
+
+          <a href="{{data.eventUrl}}" style="display:inline-block;background:#4F46E5;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">
+            Open GroupSync →
+          </a>
+        </td>
+      </tr>
+
+      <!-- Footer -->
+      <tr>
+        <td align="center" style="padding:24px 0 0;">
+          <p style="margin:0;font-size:12px;color:#9CA3AF;">© {{currentYear}} GroupSync. All rights reserved.</p>
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>

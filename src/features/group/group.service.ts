@@ -9,6 +9,8 @@ import { TokenPayload } from '../../shared/types/common.types';
 import { StorageService } from '../../shared/storage/storage.service';
 import { AgendaManager } from '../../agenda';
 import { generateUniqueGroupSlug } from '../../shared/utils/slug';
+import { config } from '../../shared/config/app.config';
+import { NotificationDispatcher } from '../notifications/notification.dispatcher';
 import {
     CreateGroupDTO,
     UpdateGroupDTO,
@@ -17,9 +19,62 @@ import {
     GroupStats,
     GroupMemberItem,
     GroupProfileResult,
+    GroupReviewStatus,
     PaginatedResult,
+    PublishingChecklist,
     groupPublicSelect,
 } from './group.types';
+
+/**
+ * A group only reaches Explore once all four hold. Kept in one place because the same
+ * rule is expressed twice: as SQL inside listGroups, and as TypeScript here for the
+ * organiser's checklist. If they drift, organisers get told they are published while
+ * nobody can find them.
+ */
+function isPublished(group: {
+    reviewStatus: string;
+    coverImageUrl: string | null;
+    isDiscoverable: boolean;
+    status: string;
+}): boolean {
+    return (
+        group.reviewStatus === 'approved' &&
+        Boolean(group.coverImageUrl) &&
+        group.isDiscoverable &&
+        group.status === 'active'
+    );
+}
+
+function buildPublishingChecklist(group: {
+    reviewStatus: string;
+    reviewNotes?: string | null;
+    coverImageUrl: string | null;
+    isDiscoverable: boolean;
+    status: string;
+}): PublishingChecklist {
+    const blockers: string[] = [];
+
+    if (group.reviewStatus === 'pending') blockers.push(Messages.GROUP_UNDER_REVIEW);
+    if (group.reviewStatus === 'rejected') {
+        blockers.push(group.reviewNotes?.trim() || 'This group was not approved for Explore.');
+    }
+    if (!group.coverImageUrl) blockers.push(Messages.GROUP_COVER_REQUIRED);
+    // An invite-only group opting out of discovery is a choice, not a blocker, so it is
+    // reported without being framed as something to fix.
+    if (!group.isDiscoverable) blockers.push('This group is invite-only and stays out of Explore by design.');
+
+    return {
+        reviewStatus: group.reviewStatus as GroupReviewStatus,
+        reviewMessage:
+            group.reviewStatus === 'pending'
+                ? Messages.GROUP_UNDER_REVIEW
+                : group.reviewNotes?.trim() ?? null,
+        hasCoverImage: Boolean(group.coverImageUrl),
+        isDiscoverable: group.isDiscoverable,
+        isPublished: isPublished(group),
+        blockers,
+    };
+}
 
 export class GroupService {
     // ── createGroup ─────────────────────────────────────────────────────────────
@@ -29,6 +84,8 @@ export class GroupService {
 
     async createGroup(dto: CreateGroupDTO, actor: TokenPayload): Promise<GroupPublic> {
         try {
+            await this.assertCreateQuota(actor.userId);
+
             const slug = await generateUniqueGroupSlug(dto.name);
 
             // invite_only groups are hidden from discovery
@@ -86,12 +143,16 @@ export class GroupService {
         `;
             }
 
+            // The group is usable immediately; it just isn't in Explore yet. Tell the
+            // organiser that, and put it in front of the platform admins.
+            await this.announceNewGroupForReview(group, actor.userId);
+
             AuditLogger.log(
                 actor, LogActions.GROUP_CREATE, ResourceTypes.GROUP, group.id, 1,
                 { name: group.name, slug: group.slug, membershipType: group.membershipType },
             );
 
-            return group;
+            return { ...group, isActiveThisMonth: false, isPublished: isPublished(group) };
         } catch (error: any) {
             AuditLogger.log(
                 actor, LogActions.GROUP_CREATE, ResourceTypes.GROUP, null, 0,
@@ -101,6 +162,60 @@ export class GroupService {
             asLogger.error('GroupService.createGroup:', error);
             throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    // ── assertCreateQuota ───────────────────────────────────────────────────────
+    // Caps group creation at N per rolling window per account.
+    //
+    // Counted from the groups table rather than a Redis counter on purpose: the limit
+    // exists to stop a burst of throwaway groups, and a Redis flush must not hand
+    // someone a fresh allowance. Soft-deleted groups still count — deleting one is not
+    // a way to buy another attempt.
+
+    private async assertCreateQuota(userId: string): Promise<void> {
+        const { maxCreatesPerWindow, createWindowDays } = config.groups;
+        const windowStart = new Date(Date.now() - createWindowDays * 24 * 60 * 60 * 1000);
+
+        const recentCount = await prisma.group.count({
+            where: { createdBy: userId, createdAt: { gte: windowStart } },
+        });
+
+        if (recentCount >= maxCreatesPerWindow) {
+            throw new ApiError(
+                Messages.GROUP_CREATE_RATE_LIMITED(maxCreatesPerWindow, createWindowDays),
+                StatusCodes.TOO_MANY_REQUESTS,
+            );
+        }
+    }
+
+    // ── announceNewGroupForReview ───────────────────────────────────────────────
+
+    private async announceNewGroupForReview(group: GroupPublic, creatorId: string): Promise<void> {
+        const platformAdmins = await prisma.user.findMany({
+            where: { role: { in: ['admin', 'super_admin'] }, deletedAt: null, status: 'active' },
+            select: { id: true },
+        });
+
+        await Promise.all([
+            NotificationDispatcher.dispatch({
+                userIds: [creatorId],
+                type: 'system',
+                title: `${group.name} is under review`,
+                body: Messages.GROUP_UNDER_REVIEW,
+                referenceType: 'group',
+                referenceId: group.id,
+            }),
+            platformAdmins.length > 0
+                ? NotificationDispatcher.dispatch({
+                    userIds: platformAdmins.map((a) => a.id),
+                    type: 'system',
+                    title: 'New group awaiting review',
+                    body: `${group.name} was submitted and is waiting for approval.`,
+                    referenceType: 'group',
+                    referenceId: group.id,
+                })
+                : Promise.resolve(),
+        ]);
     }
 
     // ── listGroups ──────────────────────────────────────────────────────────────
@@ -117,6 +232,7 @@ export class GroupService {
             const limit = Math.min(50, Math.max(1, query.limit ?? 20));
             const skip  = (page - 1) * limit;
             const sort  = query.sort ?? 'relevance';
+            const activityWindowDays = config.groups.activityWindowDays;
 
             // Use raw SQL to support FTS + PostGIS in one query
             const conditions: Prisma.Sql[] = [
@@ -124,10 +240,21 @@ export class GroupService {
                 Prisma.sql`g.deleted_at IS NULL`,
             ];
 
-            // Invite-only visibility: exclude non-discoverable groups unless caller is a member
+            // Explore eligibility. Three separate rules collapse into one clause:
+            //   is_discoverable   — invite-only groups opt out entirely
+            //   review_status     — new groups are live but stay out of Explore until approved
+            //   cover_image_url   — a group with no cover renders as an empty card
+            // Members always see their own groups here regardless, so an organiser can find
+            // a group that is still pending.
+            const exploreEligible = Prisma.sql`
+          g.is_discoverable = TRUE
+          AND g.review_status = 'approved'
+          AND g.cover_image_url IS NOT NULL
+        `;
+
             if (actorId) {
                 conditions.push(Prisma.sql`
-          (g.is_discoverable = TRUE OR EXISTS (
+          ((${exploreEligible}) OR EXISTS (
             SELECT 1 FROM memberships m
             WHERE m.group_id = g.id
               AND m.user_id = ${actorId}::uuid
@@ -135,7 +262,7 @@ export class GroupService {
           ))
         `);
             } else {
-                conditions.push(Prisma.sql`g.is_discoverable = TRUE`);
+                conditions.push(exploreEligible);
             }
 
             // Full-text search (inline tsvector — no dedicated fts_vector column required)
@@ -237,9 +364,25 @@ export class GroupService {
             g.is_discoverable AS "isDiscoverable",
             g.member_count    AS "memberCount",
             g.status,
+            g.review_status AS "reviewStatus",
             g.created_at AS "createdAt",
             g.updated_at AS "updatedAt",
-            g.created_by AS "createdBy"
+            g.created_by AS "createdBy",
+            (
+              g.is_discoverable = TRUE
+              AND g.review_status = 'approved'
+              AND g.cover_image_url IS NOT NULL
+              AND g.status = 'active'
+            ) AS "isPublished",
+            -- Replaces the old "NEW" badge. A group is active when it has an event
+            -- starting inside the activity window — a claim about what the group is
+            -- doing, not about when it signed up.
+            EXISTS (
+              SELECT 1 FROM events e
+              WHERE e.group_id = g.id
+                AND e.status <> 'cancelled'
+                AND e.starts_at >= NOW() - MAKE_INTERVAL(days => ${activityWindowDays})
+            ) AS "isActiveThisMonth"
           FROM groups g
           ${whereClause}
           ${orderClause}
@@ -272,6 +415,7 @@ export class GroupService {
                 select: {
                     ...groupPublicSelect,
                     deletedAt: true,
+                    reviewNotes: true,
                 },
             });
 
@@ -300,11 +444,32 @@ export class GroupService {
                 }
             }
 
-            // Strip internal field
-            const { deletedAt: _da, ...publicGroup } = group;
+            const activeEventCount = await prisma.event.count({
+                where: {
+                    groupId: group.id,
+                    status: { not: 'cancelled' },
+                    startsAt: {
+                        gte: new Date(
+                            Date.now() - config.groups.activityWindowDays * 24 * 60 * 60 * 1000,
+                        ),
+                    },
+                },
+            });
+
+            // Strip internal fields — reviewNotes is admin-facing copy and only ever
+            // reaches the group's own admins, via the checklist below.
+            const { deletedAt: _da, reviewNotes: _rn, ...publicGroup } = group;
+
+            const isGroupAdmin =
+                callerMembership?.status === 'active' &&
+                ['super_admin', 'admin'].includes(callerMembership.role);
 
             return {
-                group: publicGroup as GroupPublic,
+                group: {
+                    ...(publicGroup as GroupPublic),
+                    isActiveThisMonth: activeEventCount > 0,
+                    isPublished: isPublished(group),
+                },
                 callerMembershipStatus: actorId
                     ? {
                         isMember: !!callerMembership && callerMembership.status === 'active',
@@ -313,6 +478,7 @@ export class GroupService {
                         joinedAt:  callerMembership?.joinedAt ?? null,
                     }
                     : null,
+                publishingChecklist: isGroupAdmin ? buildPublishingChecklist(group) : null,
             };
         } catch (error: any) {
             if (error instanceof ApiError) throw error;
@@ -443,10 +609,12 @@ export class GroupService {
                 throw new ApiError(Messages.RESOURCE_NOT_FOUND('Group'), StatusCodes.NOT_FOUND);
             }
 
-            // Fetch all active members to notify
+            // Read the member list before the soft-delete: dispatchToGroup would still find
+            // the rows afterwards, but capturing them first keeps the recipient set exactly
+            // "who was a member when it was deleted".
             const activeMembers = await prisma.membership.findMany({
                 where: { groupId, status: 'active' },
-                select: { userId: true, user: { select: { email: true, displayName: true } } },
+                select: { userId: true },
             });
 
             // Soft-delete
@@ -459,12 +627,14 @@ export class GroupService {
                 },
             });
 
-            // Notify all members (fan-out via BullMQ)
-            await AgendaManager.runNow('notify-group-members', {
+            await NotificationDispatcher.dispatch({
+                userIds: activeMembers.map((m) => m.userId).filter((id) => id !== actor.userId),
                 groupId,
-                groupName: group.name,
                 type: 'group_deleted',
-                memberIds: activeMembers.map((m) => m.userId),
+                title: `${group.name} was deleted`,
+                body: 'A group you were a member of has been deleted by its owner.',
+                referenceType: 'group',
+                referenceId: groupId,
             });
 
             AuditLogger.log(

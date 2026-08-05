@@ -138,6 +138,28 @@ class AuthController {
             next(error);
         }
     };
+    // ─── POST /auth/phone/send-otp ─────────────────────────────────────────────
+    sendPhoneOtp = async (req, res, next) => {
+        try {
+            const ipAddress = (req.ip ?? req.socket.remoteAddress ?? 'unknown');
+            const result = await authService.sendPhoneOtp(req.body, req.user, ipAddress);
+            response_helper_1.ResponseHelper.success(res, result, response_constants_1.Messages.PHONE_OTP_SENT);
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    // ─── POST /auth/phone/verify ───────────────────────────────────────────────
+    verifyPhoneOtp = async (req, res, next) => {
+        try {
+            const ipAddress = (req.ip ?? req.socket.remoteAddress ?? 'unknown');
+            const result = await authService.verifyPhoneOtp(req.body, req.user, ipAddress);
+            response_helper_1.ResponseHelper.success(res, result, response_constants_1.Messages.PHONE_VERIFIED);
+        }
+        catch (error) {
+            next(error);
+        }
+    };
     // ─── POST /auth/kyc-webhook ────────────────────────────────────────────────
     handleKycWebhook = async (req, res, next) => {
         try {

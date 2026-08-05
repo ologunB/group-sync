@@ -12,6 +12,11 @@ export interface CreateEventDTO {
     title: string;
     description?: string;
     location_name?: string;
+    /** Public — combined with venue_state into the "Ibadan, Oyo" area label. */
+    venue_city?: string;
+    venue_state?: string;
+    /** Members-only. Supplying one requires a verified ID (tier 3). */
+    venue_address?: string;
     lat?: number;
     lng?: number;
     starts_at: string;
@@ -24,6 +29,9 @@ export interface UpdateEventDTO {
     title?: string;
     description?: string;
     location_name?: string;
+    venue_city?: string;
+    venue_state?: string;
+    venue_address?: string;
     lat?: number;
     lng?: number;
     starts_at?: string;
@@ -73,6 +81,11 @@ export interface NearbyEvent {
     title: string;
     description: string | null;
     locationName: string | null;
+    venueCity: string | null;
+    venueState: string | null;
+    /** Derived in the service — nearby results are cross-group, so never the exact address. */
+    venueArea?: string | null;
+    calendar?: EventCalendarLinks;
     startsAt: Date;
     endsAt: Date | null;
     rsvpLimit: number | null;
@@ -94,6 +107,9 @@ export const eventSelect = {
     title: true,
     description: true,
     locationName: true,
+    venueCity: true,
+    venueState: true,
+    venueAddress: true,
     startsAt: true,
     endsAt: true,
     rsvpLimit: true,
@@ -120,5 +136,40 @@ export const rsvpSelect = {
     },
 } as const satisfies Prisma.EventRsvpSelect;
 
-export type EventPublic = Prisma.EventGetPayload<{ select: typeof eventSelect }>;
+type EventRow = Prisma.EventGetPayload<{ select: typeof eventSelect }>;
+
+/**
+ * An event as it goes over the wire.
+ *
+ * `venueAddress` is stripped for anyone who is not an active member of the group — the
+ * exact street address is the one field on an event that is genuinely sensitive, so it
+ * is removed in the service rather than left to callers to remember.
+ *
+ * `venueArea` is the public "Ibadan, Oyo" label. It ships on every event, including
+ * list and nearby responses, so a card can show a location without a second call.
+ */
+export interface EventPublic extends Omit<EventRow, 'venueAddress'> {
+    venueArea: string | null;
+    /** Present only for active members; omitted entirely otherwise. */
+    venueAddress?: string | null;
+    /** True when the caller may see the exact address. */
+    canSeeExactAddress: boolean;
+    calendar: EventCalendarLinks;
+}
+
+export interface EventCalendarLinks {
+    /** Relative API path that streams a .ics file. */
+    ics: string;
+    google: string;
+}
+
+/** Builds the public "City, State" label from whichever venue parts were supplied. */
+export function buildVenueArea(event: {
+    venueCity: string | null;
+    venueState: string | null;
+}): string | null {
+    const parts = [event.venueCity, event.venueState].filter((p): p is string => Boolean(p?.trim()));
+    return parts.length > 0 ? parts.join(', ') : null;
+}
+
 export type RsvpPublic = Prisma.EventRsvpGetPayload<{ select: typeof rsvpSelect }>;

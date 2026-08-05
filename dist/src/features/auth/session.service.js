@@ -10,6 +10,10 @@ const Keys = {
     presence: (userId) => `presence:${userId}`,
     invite: (token) => `invite:${token}`,
     kycEvent: (eventId) => `kyc:event:${eventId}`,
+    // Keyed by userId, not by phone number: the number lives encrypted on the user row
+    // and a plaintext number in a Redis key would defeat that.
+    phoneVerify: (userId) => `verify:phone:${userId}`,
+    phoneResend: (userId) => `verify:phone:cooldown:${userId}`,
 };
 // ─── TTL constants (seconds) ──────────────────────────────────────────────────
 const TTL = {
@@ -19,6 +23,8 @@ const TTL = {
     PRESENCE: 90, // 90 seconds (heartbeat refreshes)
     INVITE: 5 * 60, // 5 minutes
     KYC_EVENT: 24 * 60 * 60, // 24 hours
+    PHONE_VERIFY: 10 * 60, // 10 minutes
+    PHONE_RESEND: 60, // 60 seconds between sends
 };
 const MAX_FAILED_ATTEMPTS = 5;
 // ─── SessionService ───────────────────────────────────────────────────────────
@@ -42,6 +48,25 @@ class SessionService {
     }
     static async deleteForgotPasswordOTP(email) {
         await connection_1.redis.del(Keys.forgotPassword(email));
+    }
+    // ── Phone verification OTP ──────────────────────────────────────────────────
+    static async setPhoneVerificationOTP(userId, otp) {
+        await connection_1.redis.setex(Keys.phoneVerify(userId), TTL.PHONE_VERIFY, otp);
+    }
+    static async getPhoneVerificationOTP(userId) {
+        return connection_1.redis.get(Keys.phoneVerify(userId));
+    }
+    static async deletePhoneVerificationOTP(userId) {
+        await connection_1.redis.del(Keys.phoneVerify(userId));
+    }
+    /**
+     * Returns true when the caller is allowed to trigger another SMS. SET NX means the
+     * first caller inside the window wins and everyone after it is told to wait, which
+     * keeps a retry loop from burning through SMS credit.
+     */
+    static async claimPhoneOtpSend(userId) {
+        const result = await connection_1.redis.set(Keys.phoneResend(userId), '1', 'EX', TTL.PHONE_RESEND, 'NX');
+        return result === 'OK';
     }
     // ── Failed login tracking ───────────────────────────────────────────────────
     static async incrementFailedLogin(userId) {

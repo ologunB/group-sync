@@ -21,11 +21,47 @@ export interface AdminListGroupsQuery {
     limit?: number;
     status?: string;
     search?: string;
+    review_status?: 'pending' | 'approved' | 'rejected';
 }
 
 export interface AdminUpdateGroupDTO {
     status?: 'active' | 'suspended';
     is_verified?: boolean;
+}
+
+export interface AdminReviewGroupDTO {
+    decision: 'approve' | 'reject';
+    /** Shown to the organiser verbatim when rejecting, so it should be actionable. */
+    notes?: string;
+}
+
+/**
+ * A row in the moderation queue. Carries the creator's contact-verification state
+ * alongside the group, because "is this a real organiser?" is the actual question a
+ * reviewer is answering and it should not need a second lookup.
+ */
+export interface PendingGroupItem {
+    id: string;
+    name: string;
+    slug: string;
+    category: string;
+    description: string | null;
+    coverImageUrl: string | null;
+    city: string | null;
+    state: string | null;
+    memberCount: number;
+    createdAt: Date;
+    creator: {
+        id: string;
+        displayName: string;
+        email: string;
+        bio: string | null;
+        phoneVerified: boolean;
+        emailVerified: boolean;
+        idVerificationStatus: string;
+        /** How many groups this account has created, including this one. */
+        groupsCreated: number;
+    } | null;
 }
 
 export interface AdminListReportsQuery {
@@ -103,11 +139,42 @@ export const adminGroupSelect = {
     slug: true,
     category: true,
     status: true,
+    reviewStatus: true,
+    reviewedAt: true,
+    reviewNotes: true,
     isVerified: true,
+    isDiscoverable: true,
+    coverImageUrl: true,
     memberCount: true,
     createdAt: true,
     deletedAt: true,
     creator: { select: { id: true, displayName: true, email: true } },
+} as const satisfies Prisma.GroupSelect;
+
+/** Everything a reviewer needs to judge a pending group in one query. */
+export const adminPendingGroupSelect = {
+    id: true,
+    name: true,
+    slug: true,
+    category: true,
+    description: true,
+    coverImageUrl: true,
+    city: true,
+    state: true,
+    memberCount: true,
+    createdAt: true,
+    creator: {
+        select: {
+            id: true,
+            displayName: true,
+            email: true,
+            bio: true,
+            phoneVerifiedAt: true,
+            emailVerifiedAt: true,
+            idVerificationStatus: true,
+            _count: { select: { groupsCreated: true } },
+        },
+    },
 } as const satisfies Prisma.GroupSelect;
 
 export const adminReportSelect = {

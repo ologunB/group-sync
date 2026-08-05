@@ -26,6 +26,21 @@ class EventController {
             next(error);
         }
     };
+    // GET /events/:id/calendar.ics
+    //
+    // The one endpoint that does not use ResponseHelper: it returns a file, not the JSON
+    // envelope. Calendar clients follow this URL directly and would choke on JSON.
+    downloadCalendar = async (req, res, next) => {
+        try {
+            const { filename, content } = await event_service_1.eventService.getCalendarFile(req.params.id, req.user);
+            res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.send(content);
+        }
+        catch (error) {
+            next(error);
+        }
+    };
     listNearbyEvents = async (req, res, next) => {
         try {
             const result = await event_service_1.eventService.listNearbyEvents({

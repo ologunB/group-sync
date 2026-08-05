@@ -15,7 +15,8 @@
     "db:pull": "prisma db pull --schema=prisma/schemas",
     "db:seed": "tsx src/database/seeders/initial.seeder.ts",
     "start-fresh": "npm install && npm run db:push && npm run db:generate && npm run build",
-    "test": "npx tsx src/__tests__/index.ts"
+    "test": "npx tsx src/__tests__/index.ts",
+    "test:unit": "npx tsx src/__tests__/unit.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",

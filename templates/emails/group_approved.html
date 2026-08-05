@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Group Approved</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f7;font-family:'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:40px 16px;">
+  <tr><td align="center">
+    <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
+
+      <!-- Header -->
+      <tr>
+        <td align="center" style="background:#4F46E5;border-radius:12px 12px 0 0;padding:32px 40px;">
+          <span style="font-size:26px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">GroupSync</span>
+        </td>
+      </tr>
+
+      <!-- Body -->
+      <tr>
+        <td style="background:#ffffff;padding:40px;border-radius:0 0 12px 12px;">
+          <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#111827;">{{data.groupName}} is live</p>
+          <p style="margin:0 0 28px;font-size:15px;color:#6B7280;line-height:1.6;">
+            Hi {{data.displayName}}, your group has been approved and now appears in Explore where people can find and join it.
+          </p>
+
+          <div style="background:#F0FDF4;border:2px solid #22C55E;border-radius:10px;padding:24px;text-align:center;margin-bottom:28px;">
+            <p style="margin:0 0 6px;font-size:28px;">&#x1F389;</p>
+            <p style="margin:0;font-size:15px;font-weight:600;color:#16A34A;">Approved for Explore</p>
+          </div>
+
+          <p style="margin:0 0 24px;font-size:13px;color:#6B7280;line-height:1.6;">
+            Post your first event to earn the "Active this month" badge — groups with upcoming events show up far more often.
+          </p>
+
+          <a href="{{data.groupUrl}}" style="display:inline-block;background:#4F46E5;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">
+            Open your group →
+          </a>
+        </td>
+      </tr>
+
+      <!-- Footer -->
+      <tr>
+        <td align="center" style="padding:24px 0 0;">
+          <p style="margin:0;font-size:12px;color:#9CA3AF;">© {{currentYear}} GroupSync. All rights reserved.</p>
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>

@@ -367,7 +367,8 @@ type JobName =
     | 'kyc-document-cleanup'
     | 'storage-cleanup'
     | 'expire-invite-links'
-    | 'notify-group-members'
+    | 'event-reminders'
+    | 'notify-group-members'          // legacy drain only — see §19, nothing enqueues it
     | 'process-group-announcement';
 
 // Public API:
@@ -385,9 +386,10 @@ AgendaManager.scheduleTask(time, name, data)  // supports 'now', 'in X minutes'
 - Default job options: `{ attempts: 3, backoff: { type: 'exponential', delay: 10_000 }, removeOnComplete: true }`.
 - Queue defaults: `{ removeOnComplete: true, removeOnFail: 20 }`.
 
-### Cron jobs registered in `defaultJobs()`
+### Cron jobs registered in `registerCronJobs()`
 - `expire-invite-links`: every hour `'0 * * * *'`.
-- (Add future crons here in the same format.)
+- `event-reminders`: every hour on the half hour `'30 * * * *'` — sweeps events starting in 23–25h and notifies RSVP holders. Offset from the invite job so they do not contend.
+- (Add future crons here in the same format, each with a stable `jobId` to prevent duplicates.)
 
 ---
 
@@ -547,7 +549,7 @@ AuditLogger.log(
 
 > These are rules unique to this project. Always check here before implementing any feature.
 
-1. **ID verification gate**: Users with `id_verification_status != 'verified'` cannot join groups, apply, create groups, send messages, or send DMs. Use `authenticateVerified` middleware on these routes. ⚠️ **Temporarily disabled** — the check inside `authenticateVerified` is commented out while the KYC flow is being built; all `authenticateVerified` routes currently behave like `authenticate`. Re-enable before going to production.
+1. **Verification ladder** (replaces the old blanket ID gate — see §26 for the full table). Capability is bought in three rungs: tier 1 (email + phone OTP) to join groups and RSVP, tier 2 (tier 1 + bio, then admin review of the group) to create a group, tier 3 (verified ID) to host an event at a physical address. `authenticateVerified` still exists for legacy routes and still has its ID check commented out — prefer `authenticateContactVerified` / `authenticateOrganiser` from `shared/middleware/verification.middleware.ts`.
 
 2. **Role hierarchy**: `super_admin > admin > moderator > member`. An admin cannot modify another admin — only super_admin can. Super admin cannot be removed without ownership transfer.
 
@@ -570,6 +572,20 @@ AuditLogger.log(
 11. **Message soft delete**: Set `is_deleted = true`. Return `{ id, is_deleted: true, content: null }` — never fully remove from DB (audit trail).
 
 12. **Group deletion**: Soft-delete only (`deleted_at`, `status = 'deleted'`). Notify all active members before executing.
+
+13. **Group review queue**: New groups are created with `review_status = 'pending'`. They work immediately for their organiser and members but are **excluded from Explore** until approved. See §27.
+
+14. **Explore publish rule**: a group is listed in `GET /groups` only when `review_status = 'approved'` **and** `cover_image_url IS NOT NULL` **and** `is_discoverable` **and** `status = 'active'`. Written twice — as SQL in `GroupService.listGroups` and as `isPublished()` in the same file for the organiser's checklist. Change both together.
+
+15. **Group creation quota**: max `GROUP_CREATE_MAX_PER_WINDOW` (3) groups per user per `GROUP_CREATE_WINDOW_DAYS` (7). Counted from the `groups` table, not Redis, so a cache flush does not hand out a fresh allowance. Soft-deleted groups still count.
+
+16. **Group description**: required on create, 40–500 characters after trimming, at least one non-whitespace character.
+
+17. **"Active this month"**: `isActiveThisMonth` is true when the group has a non-cancelled event whose `starts_at` falls inside `GROUP_ACTIVITY_WINDOW_DAYS` (30) of now. Computed in SQL for lists, via a count for the profile. This replaced the "NEW" badge.
+
+18. **Event venue split**: `venue_city` + `venue_state` form the public `venueArea` label ("Ibadan, Oyo") shown to everyone. `venue_address` is the exact street address and is **omitted from the payload entirely** — not nulled — for anyone who is not an active member or a going/maybe RSVP holder.
+
+19. **Notification delivery** goes through `NotificationDispatcher` only. Never write to the `notifications` table directly from a feature service, and never email a notification-shaped thing outside it.
 
 ---
 
@@ -654,17 +670,40 @@ git pull → npm install → npm run build (tsc) → pm2 restart {id}
 ## 18. Events
 
 ### Prisma models
-- `Event` → `events` table. Key fields: `groupId`, `createdBy`, `startsAt`, `endsAt`, `rsvpLimit`, `rsvpCount` (denormalized), `status` (`scheduled|cancelled|completed`), `visibility` (`public|private`, defaults to `private`), optional PostGIS `locationPoint`. Reads must gate on `visibility` — non-members see `public` only; see `backend-srs.md § 4.6`.
-- `EventRsvp` → `event_rsvps` table. Unique on `(eventId, userId)`. Status: `going|maybe|not_going`.
+- `Event` → `events` table. Key fields: `groupId`, `createdBy`, `startsAt`, `endsAt`, `rsvpLimit`, `rsvpCount` (denormalized), `status` (`scheduled|cancelled|completed`), `visibility` (`public|private`, defaults to `private`), venue columns (`venueCity`, `venueState`, `venueAddress`), optional PostGIS `locationPoint`. Reads must gate on `visibility` — non-members see `public` only; see `backend-srs.md § 4.6`.
+- `EventRsvp` → `event_rsvps` table. Unique on `(eventId, userId)`. Status: `going|maybe|not_going` — `not_going` is the "Unavailable / Can't make it" option in the UI.
+
+### Venue
+Two audiences, one event:
+
+| Field | Audience | Notes |
+|---|---|---|
+| `venueCity` + `venueState` | everyone | Serialised as `venueArea` — `"Ibadan, Oyo"`. Present on the event card, list responses and `/events/near`. |
+| `venueAddress` | active members **or** going/maybe RSVP holders | The exact street address. Setting one requires tier 3 (verified ID). |
+
+`serializeEvent()` in `event.service.ts` is the single place this is applied. It **deletes** `venueAddress` for callers who may not see it rather than nulling it, so a stranger cannot tell "no address set" from "address withheld". `canSeeExactAddress` is returned so the client knows which it got.
+
+RSVP holders qualify because a public event can be RSVP'd by a non-member, and telling someone they are attending while hiding where it is makes the RSVP useless.
+
+### Calendar export
+Every event payload carries a `calendar` block:
+```json
+{ "ics": "/api/v1/events/{id}/calendar.ics", "google": "https://calendar.google.com/calendar/render?..." }
+```
+`GET /events/:id/calendar.ics` is the **only** endpoint that does not use `ResponseHelper` — it returns `text/calendar` with a `Content-Disposition: attachment` header because calendar clients follow the URL directly. It applies the same visibility rules as `GET /events/:id`; a private event 404s for non-members so the file is not a side door. Generation lives in `shared/utils/calendar.ts` (RFC 5545 escaping + 75-octet line folding).
 
 ### Business rules
 - `starts_at` must be in the future at creation time (enforced in validator).
 - `ends_at` must be after `starts_at` when provided.
 - RSVP limit: if `rsvpLimit` is set and `rsvpCount >= rsvpLimit`, reject new 'going' RSVPs with 422.
 - `rsvpCount` is maintained in application code (not a DB trigger) via `prisma.$transaction([upsert, update])`.
-- Cancelling event: set `status = 'cancelled'` — never hard-delete.
-- On event create: queue `notify-group-members` BullMQ job to fan-out `event_created` notifications.
+- **`POST /events/:id/rsvp` is idempotent.** It upserts. Re-sending the same status is a no-op that returns the existing RSVP; sending a different status transitions it and adjusts `rsvpCount` by the delta. This exists because the client updates optimistically and disables the button on tap — a 409 on retry would force the UI to roll back a button that was already correct.
+- Cancelling event: set `status = 'cancelled'` — never hard-delete. RSVP holders (going/maybe) are notified.
+- Setting `venue_address` requires `id_verification_status = 'verified'` on create **and** update.
+- On event create: `NotificationDispatcher.dispatchToGroup(...'event_created')`, excluding the actor.
+- 24-hour reminders: the hourly `event-reminders` cron calls `EventService.sendUpcomingReminders()`, which sweeps events starting in 23–25h. A sweep rather than a per-event delayed job — a delayed job would still fire for a cancelled or rescheduled event and would need cancelling on every edit. A Redis `event:reminded:{id}` SET NX marker (48h TTL) makes it exactly-once despite the overlapping window.
 - `authorizeGroupRole('super_admin', 'admin')` on create/update/delete/listRsvps.
+- RSVP routes use `authenticateContactVerified` — attending is tier 1.
 
 ### Endpoint table
 | Method | Path | Auth |
@@ -688,10 +727,65 @@ Event routes are mounted at `/api/v1` (not `/api/v1/events`) because the router 
 
 ### Prisma models
 - `Notification` → `notifications` table. Key fields: `userId`, `type`, `title`, `body`, `referenceType`, `referenceId`, `isRead`, `createdAt`.
-- `NotificationPreference` → `notification_preferences` table. Unique on `(userId, groupId, prefType)`. `groupId = null` = global preference.
+- `NotificationPreference` → `notification_preferences` table. Unique on `(userId, groupId, prefType)`. `groupId = null` = global preference. Three independent channel flags: `pushEnabled`, `inAppEnabled`, `emailEnabled`.
+
+### ⚠️ Delivery goes through `NotificationDispatcher` — always
+
+`features/notifications/notification.dispatcher.ts` is the only place a notification is delivered. Feature services build the payload and hand it over; the dispatcher resolves preferences and fans out across three channels.
+
+**Why this exists**: every service used to queue a `notify-group-members` BullMQ job whose worker only logged the payload. No row was ever written to `notifications`, which is why the unread counter and the notifications page were permanently empty. That job is now a drain-only no-op kept for in-flight jobs; nothing enqueues it.
+
+```typescript
+import { NotificationDispatcher } from '../notifications/notification.dispatcher';
+
+// To specific users
+await NotificationDispatcher.dispatch({
+    userIds: [targetUserId],
+    groupId,                    // scopes preference lookup; a per-group mute beats the global default
+    type: 'application_approved',
+    title: "You're in — Ibadan Runners",
+    body: 'Your application was approved.',
+    referenceType: 'group',
+    referenceId: groupId,
+    email: {                    // optional; only sent for types in NOTIFICATION_EMAIL_TYPES
+        subject: 'Your application was approved',
+        template: 'application_approved',
+        data: { groupName },    // displayName + clientUrl are always added
+    },
+});
+
+// To a whole group
+await NotificationDispatcher.dispatchToGroup(groupId, { ...same }, {
+    excludeUserIds: [actor.userId],   // never notify someone about their own action
+    roles: ['super_admin', 'admin'],  // optional: admins only
+});
+```
+
+Rules:
+- **Never throws.** A failed notification must not roll back the action that caused it. Failures are logged.
+- Preference resolution is most-specific-wins: group-scoped row → global row (`group_id IS NULL`) → defaults (all channels on). Resolved for the whole recipient set in one query.
+- In-app delivery also emits `notification` to the recipient's `user:{id}` socket room, so the badge updates live.
 
 ### Notification types
-`message | application_submitted | application_approved | application_rejected | member_joined | event_created | group_announcement | dm_received | invite_received | membership_updated | system`
+`message | message_reply | application_submitted | application_approved | application_rejected | member_joined | event_created | event_reminder | event_cancelled | event_updated | group_announcement | group_approved | group_rejected | group_deleted | dm_received | invite_received | membership_updated | system`
+
+Adding a type means updating **three** places: `NOTIFICATION_TYPES`, the `notifications_type_check` DB constraint (via a migration), and — if it should be emailable — `NOTIFICATION_EMAIL_TYPES`.
+
+### Which types are emailed
+
+`NOTIFICATION_EMAIL_TYPES` in `notification.types.ts` gates it. `message` and `dm_received` are deliberately **excluded**: one email per chat message is what makes a product's email unreadable, and in-app + push already cover it. Emailable:
+
+| Type | Trigger | Template |
+|---|---|---|
+| `event_created` | New event in a group you're in | `event_created.html` |
+| `event_reminder` | 24h before an event you RSVP'd to, with the venue address | `event_reminder.html` |
+| `event_cancelled` | An event you RSVP'd to is cancelled | `event_cancelled.html` |
+| `message_reply` | Someone replied to *your* message in a group chat | `message_reply.html` |
+| `application_approved` / `_rejected` | Your group application was reviewed | `application_approved.html` / `application_rejected.html` |
+| `group_approved` / `group_rejected` | Your group cleared (or failed) review | `group_approved.html` / `group_rejected.html` |
+| `group_announcement`, `invite_received` | — | — |
+
+`message_reply` is scoped to **direct replies to your own message**, not every message in the room — the signal that matters is "someone answered you". Implemented in `notifyOnReply()` in `message.service.ts`, and called from both the REST fallback **and** the socket `send_message` handler (sockets are the primary path; wiring only the REST side would mean almost none fire).
 
 ### Pagination
 Cursor-based — ordered by `createdAt DESC`. Cursor is the `id` of the last item returned. Response shape includes `unread_count` alongside cursor fields.
@@ -713,13 +807,18 @@ await NotificationService.create({
 | Method | Path | Auth |
 |--------|------|------|
 | GET | `/notifications` | Bearer |
+| GET | `/notifications/unread-count` | Bearer |
 | PATCH | `/notifications/read-all` | Bearer |
 | PATCH | `/notifications/:id/read` | Bearer |
 | DELETE | `/notifications/:id` | Bearer |
 | GET | `/notifications/preferences` | Bearer |
 | PATCH | `/notifications/preferences` | Bearer |
 
-**Important**: preferences routes are defined BEFORE `/:id` routes in the router to prevent Express treating `preferences` as an ID param.
+**Important**: literal paths (`unread-count`, `preferences`, `read-all`) are defined BEFORE `/:id` routes in the router to prevent Express treating them as an ID param.
+
+`GET /notifications/unread-count` returns `{ unread_count }` and nothing else — the badge is polled on every app resume and does not need the page of rows that `GET /notifications` returns alongside its own `unread_count`.
+
+`PATCH /notifications/preferences` patches per channel: each of `push_enabled`, `in_app_enabled`, `email_enabled` is optional, and omitting one leaves it as-is. Muting email must not silently re-enable in-app just because the client did not restate it.
 
 ---
 
@@ -870,7 +969,94 @@ Health check (`GET /health`) is always available regardless of mode, and include
 
 ---
 
-## 25. Reference Files
+## 26. Verification Ladder
+
+Capability is bought in rungs, so friction only lands on the users asking for the riskier thing.
+
+| Tier | Requirement | Unlocks | Guard |
+|---|---|---|---|
+| 0 | none | Browse groups and public events, view profiles | `authenticate` |
+| 1 | email verified + **phone OTP** | Join public groups, apply, accept invites, RSVP to events | `authenticateContactVerified` |
+| 2 | tier 1 + a non-empty `bio`, then **platform admin review** of the group | Create a group | `authenticateOrganiser` + the review queue (§27) |
+| 3 | tier 2 + `id_verification_status = 'verified'` (NIN / BVN / passport) | Host an event at a **physical street address** | `hasVerifiedId()` inside `EventService` |
+
+All three live in `shared/middleware/verification.middleware.ts`. Every tier also re-checks account health (not deleted, not suspended, not banned) before its own rule.
+
+Tier 3 is enforced **in the service, not as route middleware**, because it only applies when the request actually carries `venue_address` — an event with only a city and state needs no ID.
+
+`authenticateVerified` (the old blanket ID gate, still commented out internally) remains for routes not yet migrated. Prefer the tier guards.
+
+### Phone verification endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/auth/phone/send-otp` | Bearer | Body `{ phone? }`. Supplying a number sets/replaces it and clears any prior verification. 60-second resend cooldown (`429`). |
+| POST | `/auth/phone/verify` | Bearer | Body `{ otp }`. Sets `users.phone_verified_at`. |
+
+Plain `authenticate` on both — an unverified account is exactly who needs to reach them.
+
+Redis keys: `verify:phone:{userId}` (OTP, 10 min) and `verify:phone:cooldown:{userId}` (resend lock, 60 s, `SET NX`). Keyed by **user id, not phone number** — the number is stored encrypted, and a plaintext number in a Redis key would defeat that.
+
+Delivery goes through `SmsService` (`shared/queues/sms.service.ts`). `SMS_PROVIDER=log` (the default) writes the code to the application log instead of sending it, so the flow is exercisable before an SMS contract exists. Set `SMS_PROVIDER=termii` + `SMS_API_KEY` to send for real. Sent inline rather than queued — the user is staring at the code entry screen and a queue hop only adds latency.
+
+---
+
+## 27. Group Review Queue
+
+New groups go live for their organiser immediately but stay **out of Explore** until a platform admin approves them.
+
+- `groups.review_status`: `pending` (default) | `approved` | `rejected`, plus `reviewed_by`, `reviewed_at`, `review_notes`.
+- Rejection does **not** delete or suspend anything. The group keeps working for its members; it is simply unlisted. That is the point of letting groups go live immediately — review gates discovery, not existence.
+- On create, the organiser gets a `system` notification reading "Under review — usually within 24 hours" and every platform admin is notified.
+- `GET /groups/:slug` returns a `publishingChecklist` **to the group's own admins only**, listing every blocker (`reviewStatus`, `hasCoverImage`, `isDiscoverable`, `blockers[]`).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/groups/pending` | The queue. Oldest first (FIFO — the 24-hour promise is only keepable if the longest-waiting group is reviewed first). Each row carries the creator's `phoneVerified`, `emailVerified`, `idVerificationStatus`, `bio` and `groupsCreated` count. |
+| PATCH | `/admin/groups/:id/review` | Body `{ decision: 'approve' \| 'reject', notes? }`. Rejecting **requires** notes — the organiser is shown them verbatim. Approving a group with no cover image fails with 422 rather than leaving it approved-but-invisible. |
+
+`GET /admin/groups` also accepts `?review_status=`.
+
+---
+
+## 28. Reference Catalogues
+
+`GET /reference/*` — **unauthenticated**, because these populate the signup form, which runs before the user has a token. Static product configuration, not user data.
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/reference/onboarding` | Everything the signup form needs in one round-trip |
+| GET | `/reference/interests` | `{ interests: [{ value, label, group }], groups: string[] }` |
+| GET | `/reference/states` | 36 Nigerian states + FCT, each with its main cities |
+| GET | `/reference/categories` | Group category options |
+
+The catalogues live in `features/reference/reference.types.ts` as module constants, not in the database: they change at the pace of product decisions, not user actions, and shipping them as data would mean a seeder, a migration and an admin CRUD surface for a list edited twice a year.
+
+Interest `value`s are already normalised (lowercase, no whitespace) to match what `UserService.updateInterests` and `AuthService.register` write — if they diverged, a stored tag would never equal the option the user picked. `city` and `state` remain free text, so anything missing from the catalogue can still be typed in.
+
+---
+
+## 29. Testing
+
+| Command | What it runs | Needs a server? |
+|---|---|---|
+| `npm run test:unit` | `src/__tests__/unit.ts` — pure logic: iCalendar escaping/folding, venue labels, description bounds, the publish rule, the notification-type registry, catalogue integrity | no |
+| `npm test` | `src/__tests__/index.ts` — the full integration suite, 24 sections | yes, with `TEST_ROUTES_ENABLED=true` |
+
+Test-only helper routes (`/api/v1/test/*`, non-production only) that the suite depends on:
+
+| Route | Purpose |
+|---|---|
+| `GET /test/otp` | Read an email OTP out of Redis |
+| `GET /test/phone-otp/:userId` | Read a phone OTP out of Redis |
+| `PATCH /test/verify-phone/:userId` | Skip the SMS round-trip (tier 1) |
+| `PATCH /test/verify-user/:userId` | Set `id_verification_status = verified` (tier 3) |
+| `PATCH /test/approve-group/:groupId` | Move a group through the review queue |
+| `POST /test/reset-group-quota/:userId` | Back-date a user's groups so the 3-per-7-days allowance resets — the suite creates far more groups than a real account may |
+
+---
+
+## 30. Reference Files
 
 | File | Purpose |
 |---|---|

@@ -24,6 +24,8 @@ import {
     ResendVerificationDTO,
     SubmitIdVerificationDTO,
     KycWebhookDTO,
+    SendPhoneOtpDTO,
+    VerifyPhoneOtpDTO,
     AuthResult,
     RegisterResult,
     TokenPair,
@@ -31,10 +33,20 @@ import {
     userSafeSelect, VerifyForgotOtpDTO,
 } from './auth.types';
 import {EncryptionUtil} from "../../shared/utils/encryption";
+import { verifyAppleIdToken } from './apple.verifier';
+import { SmsService } from '../../shared/queues/sms.service';
 
 // ─── Google OAuth client ──────────────────────────────────────────────────────
 
 const googleClient = new OAuth2Client(config.oauth.googleClientId);
+
+/** The subset of Google's ID token payload this service reads. */
+type TokenPayloadFromGoogle = {
+    sub?: string;
+    email?: string;
+    email_verified?: boolean;
+    name?: string;
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -43,6 +55,12 @@ const REFRESH_TOKEN_EXPIRES_MS = config.jwt.refreshExpiresInMs; // 30 days
 function buildTokenPayload(userId: string, sessionId: string, role: string = 'user'): TokenPayload {
     const permissions = (PlatformRolePermissions[role] ?? []) as string[];
     return { userId, role, sessionId, permissions };
+}
+
+/** Interests are a free-text tag array — lowercase and dedupe so filters match. */
+function normalizeInterests(interests?: string[]): string[] {
+    if (!interests?.length) return [];
+    return [...new Set(interests.map((t) => t.toLowerCase().trim()))].filter(Boolean);
 }
 
 function stripSensitiveFields<T extends Record<string, unknown>>(user: T): SafeUser {
@@ -97,7 +115,19 @@ export class AuthService {
             const userId = randomUUID();
 
             const user = await prisma.user.create({
-                data: { id: userId, email, displayName: dto.display_name, passwordHash, phone, phoneIv, phoneHash },
+                data: {
+                    id: userId,
+                    email,
+                    displayName: dto.display_name.trim(),
+                    passwordHash,
+                    phone,
+                    phoneIv,
+                    phoneHash,
+                    city:    dto.city?.trim() ?? null,
+                    state:   dto.state?.trim() ?? null,
+                    country: dto.country?.trim() ?? 'NG',
+                    interests: normalizeInterests(dto.interests),
+                },
                 select: userSafeSelect,
             });
 
@@ -223,26 +253,51 @@ export class AuthService {
             let providerEmail: string | undefined;
             let providerId: string;
             let displayName: string;
+            let emailVerifiedByProvider = false;
 
             if (dto.provider === 'google') {
-                const ticket = await googleClient.verifyIdToken({
-                    idToken: dto.token,
-                    audience: config.oauth.googleClientId,
-                });
-                const payload = ticket.getPayload();
+                if (!config.oauth.googleClientId) {
+                    throw new ApiError(
+                        'Google Sign-In is not configured on this server (GOOGLE_CLIENT_ID is unset).',
+                        StatusCodes.NOT_IMPLEMENTED,
+                    );
+                }
+
+                // google-auth-library throws plain Errors for a malformed token, a wrong
+                // audience or an expired one. Left unmapped they hit the catch-all below
+                // and surface as a 500 — a client-side problem reported as a server fault,
+                // which is exactly the wrong thing to hand someone debugging their setup.
+                let payload: TokenPayloadFromGoogle;
+                try {
+                    const ticket = await googleClient.verifyIdToken({
+                        idToken: dto.token,
+                        audience: config.oauth.googleClientId,
+                    });
+                    payload = ticket.getPayload() as TokenPayloadFromGoogle;
+                } catch (verifyError: any) {
+                    asLogger.warn('Google ID token rejected', { reason: verifyError.message });
+                    throw new ApiError(
+                        `${Messages.SOCIAL_TOKEN_INVALID} (${verifyError.message})`,
+                        StatusCodes.UNAUTHORIZED,
+                    );
+                }
+
                 if (!payload || !payload.sub) {
                     throw new ApiError(Messages.SOCIAL_TOKEN_INVALID, StatusCodes.UNAUTHORIZED);
                 }
                 providerId = payload.sub;
                 providerEmail = payload.email;
-                displayName = payload.name ?? payload.email ?? 'User';
+                displayName = payload.name ?? dto.display_name ?? payload.email ?? 'User';
+                emailVerifiedByProvider = payload.email_verified === true;
             } else {
-                // Apple: requires JWK verification against Apple's public keys.
-                // Implement using 'apple-signin-auth' package when Apple sign-in is required.
-                throw new ApiError(
-                    'Apple Sign-In is not yet configured on this server.',
-                    StatusCodes.NOT_IMPLEMENTED,
-                );
+                const identity = await verifyAppleIdToken(dto.token);
+                providerId = identity.providerId;
+                providerEmail = identity.email;
+                // Apple never puts the name in the identity token — the client forwards it on
+                // first authorisation. Private-relay addresses make a poor fallback name, so
+                // 'User' is preferable to showing someone @privaterelay.appleid.com.
+                displayName = dto.display_name?.trim() || 'User';
+                emailVerifiedByProvider = identity.emailVerified;
             }
 
             let isNewUser = false;
@@ -262,7 +317,7 @@ export class AuthService {
                 // Check if an account with this email exists (link the provider)
                 const existingUser = await prisma.user.findUnique({
                     where: { email: providerEmail.toLowerCase() },
-                    select: { id: true },
+                    select: { id: true, emailVerifiedAt: true },
                 });
 
                 if (existingUser) {
@@ -276,6 +331,15 @@ export class AuthService {
                         },
                     });
                     userId = existingUser.id;
+
+                    // An account created with email+password that never confirmed its address
+                    // is confirmed by the provider vouching for the same address.
+                    if (emailVerifiedByProvider && !existingUser.emailVerifiedAt) {
+                        await prisma.user.update({
+                            where: { id: existingUser.id },
+                            data: { emailVerifiedAt: new Date() },
+                        });
+                    }
                 } else {
                     // Create new user + provider link
                     isNewUser = true;
@@ -287,6 +351,9 @@ export class AuthService {
                                 id: userId,
                                 email: providerEmail!.toLowerCase(),
                                 displayName,
+                                // Google and Apple have already proven ownership of the address.
+                                // Re-challenging with our own OTP would be pure friction.
+                                emailVerifiedAt: emailVerifiedByProvider ? new Date() : null,
                             },
                         });
                         await tx.userProvider.create({
@@ -712,6 +779,152 @@ export class AuthService {
         } catch (error: any) {
             if (error instanceof ApiError) throw error;
             asLogger.error('AuthService.resendVerification:', error);
+            throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ── sendPhoneOtp ──────────────────────────────────────────────────────────────
+    // Tier 1 of the verification ladder. The caller may supply a new number, which
+    // replaces whatever is on file — useful when a social sign-up had no phone at all.
+
+    async sendPhoneOtp(
+        dto: SendPhoneOtpDTO,
+        actor: TokenPayload,
+        ipAddress: string,
+    ): Promise<{ phoneVerified: boolean }> {
+        try {
+            const user = await prisma.user.findUnique({
+                where: { id: actor.userId },
+                select: {
+                    id: true,
+                    displayName: true,
+                    phone: true,
+                    phoneIv: true,
+                    phoneVerifiedAt: true,
+                    deletedAt: true,
+                },
+            });
+
+            if (!user || user.deletedAt) {
+                throw new ApiError(Messages.RESOURCE_NOT_FOUND('User'), StatusCodes.NOT_FOUND);
+            }
+
+            let targetPhone: string;
+
+            if (dto.phone) {
+                const rawPhoneHash = EncryptionUtil.hashPhone(dto.phone);
+                const taken = await prisma.user.findFirst({
+                    where: { phoneHash: rawPhoneHash, id: { not: user.id } },
+                    select: { id: true },
+                });
+                if (taken) {
+                    throw new ApiError('Phone number is already in use.', StatusCodes.CONFLICT);
+                }
+
+                const encrypted = EncryptionUtil.encryptField(dto.phone);
+                await prisma.user.update({
+                    where: { id: user.id },
+                    data: {
+                        phone: encrypted.ciphertext,
+                        phoneIv: encrypted.iv,
+                        phoneHash: rawPhoneHash,
+                        // Changing the number invalidates any prior verification.
+                        phoneVerifiedAt: null,
+                    },
+                });
+                targetPhone = dto.phone;
+            } else {
+                if (user.phoneVerifiedAt) {
+                    throw new ApiError(Messages.PHONE_ALREADY_VERIFIED, StatusCodes.CONFLICT);
+                }
+                if (!user.phone || !user.phoneIv) {
+                    throw new ApiError(Messages.PHONE_REQUIRED, StatusCodes.BAD_REQUEST);
+                }
+                targetPhone = EncryptionUtil.decryptField(user.phone, user.phoneIv);
+            }
+
+            const canSend = await SessionService.claimPhoneOtpSend(user.id);
+            if (!canSend) {
+                throw new ApiError(
+                    'A verification code was just sent. Please wait a minute before requesting another.',
+                    StatusCodes.TOO_MANY_REQUESTS,
+                );
+            }
+
+            const otp = EncryptionUtil.generateOTP();
+            await SessionService.setPhoneVerificationOTP(user.id, otp);
+
+            // Sent inline rather than queued: SmsService is a single outbound call and the
+            // user is staring at the code entry screen. A queue hop only adds latency here.
+            await SmsService.send({
+                to: targetPhone,
+                message: `${otp} is your GroupSync verification code. It expires in 10 minutes.`,
+            });
+
+            AuditLogger.log(
+                actor, LogActions.AUTH_SEND_PHONE_OTP, ResourceTypes.USER, user.id, 1,
+                { replacedNumber: Boolean(dto.phone) }, ipAddress,
+            );
+
+            return { phoneVerified: false };
+        } catch (error: any) {
+            AuditLogger.log(
+                actor, LogActions.AUTH_SEND_PHONE_OTP, ResourceTypes.USER, actor.userId, 0,
+                { error: error.message }, ipAddress,
+            );
+            if (error instanceof ApiError) throw error;
+            asLogger.error('AuthService.sendPhoneOtp:', error);
+            throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ── verifyPhoneOtp ────────────────────────────────────────────────────────────
+
+    async verifyPhoneOtp(
+        dto: VerifyPhoneOtpDTO,
+        actor: TokenPayload,
+        ipAddress: string,
+    ): Promise<{ phoneVerified: boolean; phoneVerifiedAt: Date }> {
+        try {
+            const storedOtp = await SessionService.getPhoneVerificationOTP(actor.userId);
+
+            if (!storedOtp || storedOtp !== dto.otp) {
+                throw new ApiError(Messages.INVALID_VERIFICATION_CODE, StatusCodes.BAD_REQUEST);
+            }
+
+            const user = await prisma.user.findUnique({
+                where: { id: actor.userId },
+                select: { id: true, deletedAt: true, phone: true },
+            });
+
+            if (!user || user.deletedAt) {
+                throw new ApiError(Messages.RESOURCE_NOT_FOUND('User'), StatusCodes.NOT_FOUND);
+            }
+
+            if (!user.phone) {
+                throw new ApiError(Messages.PHONE_REQUIRED, StatusCodes.BAD_REQUEST);
+            }
+
+            const phoneVerifiedAt = new Date();
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { phoneVerifiedAt },
+            });
+
+            await SessionService.deletePhoneVerificationOTP(user.id);
+
+            AuditLogger.log(
+                actor, LogActions.AUTH_VERIFY_PHONE, ResourceTypes.USER, user.id, 1, {}, ipAddress,
+            );
+
+            return { phoneVerified: true, phoneVerifiedAt };
+        } catch (error: any) {
+            AuditLogger.log(
+                actor, LogActions.AUTH_VERIFY_PHONE, ResourceTypes.USER, actor.userId, 0,
+                { error: error.message }, ipAddress,
+            );
+            if (error instanceof ApiError) throw error;
+            asLogger.error('AuthService.verifyPhoneOtp:', error);
             throw new ApiError(Messages.SERVER_ERROR, StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }

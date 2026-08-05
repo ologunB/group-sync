@@ -1,9 +1,32 @@
 
 import { body, param, query, ValidationChain } from 'express-validator';
+import { GROUP_DESCRIPTION_MIN, GROUP_DESCRIPTION_MAX } from './group.types';
 
 const MEMBERSHIP_TYPES  = ['open', 'application', 'invite_only']       as const;
 const FEE_FREQUENCIES   = ['one_time', 'monthly', 'yearly']            as const;
 const SORT_OPTIONS      = ['relevance', 'distance', 'newest', 'most_members'] as const;
+
+/**
+ * Description rules, shared by create and update.
+ *
+ * The length bounds are measured after trimming, and a separate check requires at least
+ * one non-whitespace character — a 40-character run of spaces would otherwise satisfy
+ * `isLength` on the untrimmed value and produce a blank card in Explore.
+ */
+const descriptionRules = (chain: ValidationChain): ValidationChain =>
+    chain
+        .isString().withMessage('Description must be a string')
+        .trim()
+        .custom((value: string) => {
+            if (!value.replace(/\s/g, '').length) {
+                throw new Error('Description cannot be only whitespace');
+            }
+            return true;
+        })
+        .isLength({ min: GROUP_DESCRIPTION_MIN, max: GROUP_DESCRIPTION_MAX })
+        .withMessage(
+            `Description must be between ${GROUP_DESCRIPTION_MIN} and ${GROUP_DESCRIPTION_MAX} characters`,
+        );
 
 // ─── Create group ─────────────────────────────────────────────────────────────
 
@@ -26,10 +49,9 @@ export const createGroupValidator: ValidationChain[] = [
         .trim()
         .isLength({ max: 80 }).withMessage('Subcategory must not exceed 80 characters'),
 
-    body('description')
-        .optional({ nullable: true, checkFalsy: true })
-        .isString().withMessage('Description must be a string')
-        .trim(),
+    descriptionRules(
+        body('description').exists({ checkFalsy: true }).withMessage('Description is required'),
+    ),
 
     body('city')
         .optional({ nullable: true, checkFalsy: true })
@@ -126,10 +148,7 @@ export const updateGroupValidator: ValidationChain[] = [
         .trim()
         .isLength({ max: 80 }).withMessage('Subcategory must not exceed 80 characters'),
 
-    body('description')
-        .optional({ nullable: true, checkFalsy: true })
-        .isString().withMessage('Description must be a string')
-        .trim(),
+    descriptionRules(body('description').optional({ nullable: true, checkFalsy: true })),
 
     body('city')
         .optional({ nullable: true, checkFalsy: true })

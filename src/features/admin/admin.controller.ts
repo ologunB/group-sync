@@ -12,6 +12,7 @@ import {
     AdminResolveReportDTO,
     AdminListAuditLogsQuery,
     AdminChangeRoleDTO,
+    AdminReviewGroupDTO,
 } from './admin.types';
 
 export class AdminController {
@@ -68,9 +69,40 @@ export class AdminController {
                 limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
                 status: req.query.status as string | undefined,
                 search: req.query.search as string | undefined,
+                review_status: req.query.review_status as AdminListGroupsQuery['review_status'],
             };
             const result = await adminService.listGroups(q);
             ResponseHelper.success(res, result.data, 'Groups retrieved.', 200, result.pagination);
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    // GET /admin/groups/pending — the review queue.
+    listPendingGroups = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const q: AdminListGroupsQuery = {
+                page: req.query.page ? parseInt(req.query.page as string, 10) : undefined,
+                limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
+                search: req.query.search as string | undefined,
+                review_status: req.query.review_status as AdminListGroupsQuery['review_status'],
+            };
+            const result = await adminService.listPendingGroups(q);
+            ResponseHelper.success(res, result.data, 'Pending groups retrieved.', 200, result.pagination);
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    // PATCH /admin/groups/:id/review
+    reviewGroup = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const group = await adminService.reviewGroup(
+                req.params.id,
+                req.body as AdminReviewGroupDTO,
+                req.user!,
+            );
+            ResponseHelper.success(res, group, 'Group review recorded.');
         } catch (error) {
             next(error);
         }
