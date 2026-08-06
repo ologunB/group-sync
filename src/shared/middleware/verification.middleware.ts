@@ -4,6 +4,7 @@ import { ApiError } from './error.middleware';
 import { Messages } from '../utils/response.constants';
 import { asLogger } from '../utils/asLogger';
 import { prisma } from '../../database/connection';
+import { config } from '../config/app.config';
 import { AuthenticatedRequest, authenticate } from './auth.middleware';
 
 /**
@@ -17,6 +18,9 @@ import { AuthenticatedRequest, authenticate } from './auth.middleware';
  *
  * Tier 3 is enforced inside EventService rather than as route middleware, because it
  * only applies when the request actually carries a street address.
+ *
+ * The contact rungs are individually switchable via config.verification. Phone ships
+ * un-enforced because there is no SMS contract yet — see the note in app.config.ts.
  */
 
 interface VerificationSnapshot {
@@ -81,19 +85,22 @@ function buildGate(
     };
 }
 
-/**
- * Tier 1 — email + phone verified. Guards joining groups, applying, RSVPing and
- * anything else that puts the account in front of other members.
- */
-export const authenticateContactVerified = buildGate((user) => {
-    if (!user.emailVerifiedAt) {
+/** The tier-1 contact rungs, shared by every gate above tier 1. */
+function checkContact(user: VerificationSnapshot): ApiError | null {
+    if (config.verification.requireEmail && !user.emailVerifiedAt) {
         return new ApiError(Messages.EMAIL_NOT_VERIFIED, StatusCodes.FORBIDDEN);
     }
-    if (!user.phoneVerifiedAt) {
+    if (config.verification.requirePhone && !user.phoneVerifiedAt) {
         return new ApiError(Messages.PHONE_NOT_VERIFIED, StatusCodes.FORBIDDEN);
     }
     return null;
-});
+}
+
+/**
+ * Tier 1 — verified contact details. Guards joining groups, applying, RSVPing and
+ * anything else that puts the account in front of other members.
+ */
+export const authenticateContactVerified = buildGate(checkContact);
 
 /**
  * Tier 2 — tier 1 plus a bio. Guards group creation. The manual-approval half of tier 2
@@ -101,12 +108,9 @@ export const authenticateContactVerified = buildGate((user) => {
  * a platform admin approves it.
  */
 export const authenticateOrganiser = buildGate((user) => {
-    if (!user.emailVerifiedAt) {
-        return new ApiError(Messages.EMAIL_NOT_VERIFIED, StatusCodes.FORBIDDEN);
-    }
-    if (!user.phoneVerifiedAt) {
-        return new ApiError(Messages.PHONE_NOT_VERIFIED, StatusCodes.FORBIDDEN);
-    }
+    const contactError = checkContact(user);
+    if (contactError) return contactError;
+
     if (!user.bio?.trim()) {
         return new ApiError(Messages.BIO_REQUIRED_FOR_GROUP, StatusCodes.FORBIDDEN);
     }

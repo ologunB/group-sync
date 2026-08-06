@@ -105,6 +105,17 @@ export const config = {
         baseUrl:    optional_env('SMS_BASE_URL', 'https://api.ng.termii.com'),
     },
 
+    verification: {
+        // Phone OTP is built and exercisable (SMS_PROVIDER=log prints the code), but no
+        // SMS contract exists yet, so requiring a verified phone would lock every real
+        // user out of joining a group. The check stays wired and merely un-enforced —
+        // flip this to 'true' once the SMS provider is live to turn the ladder back on.
+        requirePhone: optional_env('REQUIRE_PHONE_VERIFICATION', 'false') === 'true',
+        // Same treatment for the email rung, so a single switch can gate each contact
+        // channel independently rather than an all-or-nothing tier.
+        requireEmail: optional_env('REQUIRE_EMAIL_VERIFICATION', 'true') === 'true',
+    },
+
     groups: {
         // Abuse control: a single account may not spin up more than this many groups
         // inside a rolling 7-day window.

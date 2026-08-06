@@ -119,21 +119,30 @@
 
     <hr style="border:0;border-top:1px solid #E5E7EB;margin:22px 0;" />
 
-    <p style="margin:0 0 10px;font-size:13px;font-weight:600;">Fallback: redirect flow</p>
-    <p class="hint" style="margin:0 0 12px;">
-      The button above uses Google Identity Services, which exchanges the credential inside a
-      hidden iframe. If third-party cookies are blocked, that stalls at
-      <code>accounts.google.com/gsi/transform</code> after you grant permission and never calls
-      back — the flow looks frozen.
-      <br /><br />
-      This fallback uses a plain full-page redirect instead: no iframe, no third-party cookies.
-      It needs <strong>Authorised redirect URIs</strong> to contain
-      <code id="redirectUriHint"></code> (a different console field from JavaScript origins).
-    </p>
-    <div class="row">
-      <button id="redirectFlow" class="secondary">Sign in via redirect</button>
-      <button id="copyRedirect" class="secondary">Copy redirect URI</button>
-    </div>
+    <!-- Collapsed by default. This path needs a console entry the button path does not,
+         so leaving it out in the open just invites a redirect_uri_mismatch from someone
+         whose button was working fine. -->
+    <details>
+      <summary style="cursor:pointer;font-size:13px;font-weight:600;">
+        Button not working? Open the redirect fallback — needs extra console setup
+      </summary>
+      <p class="hint" style="margin:12px 0;">
+        The button above uses Google Identity Services, which exchanges the credential inside a
+        hidden iframe. If third-party cookies are blocked, that stalls at
+        <code>accounts.google.com/gsi/transform</code> after you grant permission and never calls
+        back — the flow looks frozen.
+        <br /><br />
+        This fallback uses a plain full-page redirect instead: no iframe, no third-party cookies.
+        <strong>It will fail with <code>redirect_uri_mismatch</code> until you add</strong>
+        <code id="redirectUriHint"></code> under <em>Authorised redirect URIs</em> — the section
+        below <em>Authorised JavaScript origins</em>, and a separate field from it. Origins are
+        scheme + host + port only, so the full path has to go in the second field.
+      </p>
+      <div class="row">
+        <button id="redirectFlow" class="secondary">Sign in via redirect</button>
+        <button id="copyRedirect" class="secondary">Copy redirect URI</button>
+      </div>
+    </details>
   </div>
 
   <!-- ── Exchange ────────────────────────────────────────────────────────── -->
@@ -188,6 +197,45 @@
   // ?client_id=... wins over the saved value, so a link can carry the config.
   const paramId = new URLSearchParams(window.location.search).get('client_id');
   if (paramId) $('clientId').value = paramId;
+
+  // The server's own GOOGLE_CLIENT_ID is the authority — it is what the token gets
+  // verified against. Prefill from it so the page cannot be pointed at a different
+  // client than the one that will accept the result, which is the single most
+  // common way this flow dies with an unreadable error.
+  fetch('/dev/config')
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (cfg) {
+      if (!cfg || !cfg.googleClientId) return;
+
+      const field = $('clientId');
+      if (!field.value.trim()) {
+        field.value = cfg.googleClientId;
+        setStatus('ok', 'Client ID loaded from the server config.');
+      } else if (field.value.trim() !== cfg.googleClientId) {
+        setStatus(
+          'err',
+          'This page is set to a different client ID than the server verifies against. ' +
+          'The server expects ' + cfg.googleClientId + ' — sign-in will fail until they match.',
+        );
+      }
+    })
+    .catch(function () { /* /dev/config is dev-only; ignore when absent */ });
+
+  // Google compares origins as exact strings. http://127.0.0.1:3000 and
+  // http://localhost:3000 are the same machine but two different origins, and only
+  // the registered one works — the other reaches the consent screen (the client ID
+  // is valid, so your app name renders) and then dies silently at /gsi/transform,
+  // because the credential has nowhere it is allowed to be posted back to.
+  if (window.location.protocol === 'file:') {
+    setStatus('err',
+      'This page is open as a file:// URL, which has no origin Google can authorise. ' +
+      'Serve it from the API instead: http://localhost:3000/dev/google-signin.html');
+  } else if (window.location.hostname === '127.0.0.1') {
+    setStatus('err',
+      'You are on 127.0.0.1. Google treats that as a different origin from localhost. ' +
+      'If you registered http://localhost:' + (window.location.port || '80') +
+      ', open this page there instead — otherwise sign-in stalls at /gsi/transform.');
+  }
 
   function setStatus(kind, message) {
     statusEl.className = 'status show ' + kind;
@@ -356,7 +404,12 @@
       });
 
       const body = await res.json().catch(() => ({ raw: 'non-JSON response' }));
-      show({ status: res.status, body: body });
+
+      // Show the response exactly as the API sends it. Wrapping it in { status, body }
+      // made the envelope look like it had an extra layer the server never emits, which
+      // is a misleading thing for a debugging tool to do. The HTTP status goes in the
+      // status line above instead.
+      show(body);
 
       if (res.ok) {
         const isNew = body && body.data && body.data.isNewUser;

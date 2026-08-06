@@ -49,8 +49,9 @@ router.patch('/verify-user/:userId', async (req: Request, res: Response) => {
 });
 
 // PATCH /test/verify-phone/:userId
-// Shortcut past the SMS round-trip. Joining a group, applying and RSVPing are all
-// gated on a verified phone, so almost every integration test needs this.
+// Shortcut past the SMS round-trip. The phone rung of the ladder is un-enforced by
+// default (REQUIRE_PHONE_VERIFICATION=false), so this is only load-bearing for the
+// tests that flip it on — the rest keep calling it so they still pass once it does.
 router.patch('/verify-phone/:userId', async (req: Request, res: Response) => {
     const { userId } = req.params;
     await prisma.user.update({

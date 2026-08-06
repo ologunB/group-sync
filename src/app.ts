@@ -1,4 +1,4 @@
-import express, { Application } from "express";
+import express, { Application, Request, Response } from "express";
 import http from "http";
 import path from "path";
 import cookieParser from "cookie-parser";
@@ -79,6 +79,16 @@ export class App {
     // Dev-only static tooling (Google Sign-In test harness). Never mounted in
     // production — it is a debugging surface, not part of the product.
     if (!config.server.isProduction) {
+      // The harness reads its client ID from here rather than carrying its own copy.
+      // A page configured with a different client than the server verifies against
+      // fails deep inside Google's iframe with no usable error, so the two must not
+      // be independently settable.
+      this.app.get('/dev/config', (_req: Request, res: Response) => {
+        res.json({
+          googleClientId: config.oauth.googleClientId,
+          appleClientIds: config.oauth.appleClientIds,
+        });
+      });
       this.app.use('/dev', express.static(path.join(process.cwd(), 'public', 'dev')));
     }
 

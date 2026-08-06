@@ -26,7 +26,18 @@ class Database {
             connectionTimeoutMillis: 5_000,
         });
         const adapter = new PrismaPg(this.pool);
-        this._client = new PrismaClient({ adapter });
+        this._client = new PrismaClient({
+            adapter,
+            // Prisma aborts an interactive transaction after 5s by default, measured from
+            // the moment it opens. That budget is spent on network round-trips, not work:
+            // a three-write transaction against a pooler on a slow link took 8s and 500'd
+            // a sign-up that would otherwise have succeeded. Round-trips are the cost, so
+            // the ceiling has to be generous enough to absorb a bad link.
+            transactionOptions: {
+                timeout: parseInt(process.env.DB_TRANSACTION_TIMEOUT_MS ?? '20000', 10),
+                maxWait: parseInt(process.env.DB_TRANSACTION_MAX_WAIT_MS ?? '10000', 10),
+            },
+        });
     }
 
     static getInstance(): Database {

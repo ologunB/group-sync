@@ -4035,10 +4035,20 @@ async function runFeaturesSuite(): Promise<void> {
         assert((data.data as Record<string, unknown>).phoneVerifiedAt !== null, 'phoneVerifiedAt should be set');
     });
 
-    await test('joining a group without a verified phone returns 403 (tier 1)', async () => {
+    // REQUIRE_PHONE_VERIFICATION defaults to false — there is no SMS contract yet, so
+    // requiring a verified phone would lock every real user out of joining anything.
+    // This asserts the shipped default; flip the env var and the expectation inverts.
+    await test('joining without a verified phone succeeds while the phone rung is off', async () => {
         const u = await registerAndLogin(`nojoin${ts}@test.io`, 'NoJoin123!', 'No Phone Join');
+
+        const me = await get('/users/me', u.token);
+        assert(
+            (me.data.data as Record<string, unknown>).phoneVerifiedAt === null,
+            'precondition: this account must not have a verified phone',
+        );
+
         const { status } = await post(`/groups/${openGroupId}/join`, {}, u.token);
-        assertStatus(status, 403);
+        assertStatus(status, 201, 'the phone rung is un-enforced, so the join should go through');
     });
 
     // ── 19. Group description rules ───────────────────────────────────────────
