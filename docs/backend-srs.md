@@ -801,16 +801,22 @@ Rules:
 | POST | `/groups/:id/apply` | ✓ verified | Submit application (application-based) |
 | DELETE | `/groups/:id/leave` | ✓ member | Leave a group |
 | GET | `/groups/:id/applications` | ✓ admin | List applications (filterable by status) |
-| PATCH | `/applications/:id` | ✓ admin | Approve or reject application |
-| DELETE | `/applications/:id` | ✓ owner | Withdraw own pending application |
+| PATCH | `/groups/applications/:id` | ✓ admin | Approve or reject application |
+| DELETE | `/groups/applications/:id` | ✓ owner | Withdraw own pending application |
 | GET | `/groups/:id/form` | optional | Get application form schema |
 | PUT | `/groups/:id/form` | ✓ admin | Create or replace application form |
 | PATCH | `/groups/:id/members/:userId` | ✓ admin | Update member role/status (promote, suspend, ban) |
 | DELETE | `/groups/:id/members/:userId` | ✓ admin | Remove member |
 | POST | `/groups/:id/invite` | ✓ admin | Generate invite link |
 | GET | `/groups/:id/invites` | ✓ admin | List active invite links |
-| DELETE | `/invites/:id` | ✓ admin | Revoke invite link |
-| POST | `/invites/:token/accept` | ✓ verified | Join group via invite link |
+| DELETE | `/groups/invites/:id` | ✓ admin | Revoke invite link |
+| POST | `/groups/invites/:token/accept` | ✓ verified | Join group via invite link |
+
+> **Mount note.** The membership router is mounted at `/api/v1/groups`, so the four
+> routes above that read as top-level (`applications/:id`, `invites/:id`,
+> `invites/:token/accept`) are actually served under `/groups`. Earlier revisions of
+> this table documented them without the prefix; those URLs were never served, and the
+> paths here now match the implementation.
 
 **POST `/groups/:id/join`**
 ```
@@ -835,7 +841,7 @@ Rules:
   - Notify group admins: 'application_submitted'
 ```
 
-**PATCH `/applications/:id`**
+**PATCH `/groups/applications/:id`**
 ```
 Body: { action: 'approve'|'reject', rejection_reason?: string }
 Rules:
@@ -866,7 +872,7 @@ Rules:
   - Cache token → group_id mapping in Redis (5 min TTL for fast validation)
 ```
 
-**POST `/invites/:token/accept`**
+**POST `/groups/invites/:token/accept`**
 ```
 Rules:
   - Lookup token in Redis cache, fallback to DB
@@ -1443,13 +1449,20 @@ API_PREFIX=/api/v1
 
 # Database
 DATABASE_URL=postgresql://user:pass@host:5432/groupsync
+DB_POOL_MAX=10                  # pg pool size
+DB_CONNECT_TIMEOUT_MS=15000     # time to acquire a connection. 5s is fine same-region
+                                # and too tight across one — a distant pooler fails
+                                # writes with "Connection terminated due to connection
+                                # timeout", which surfaces as a 500 on a valid request.
+DB_TRANSACTION_TIMEOUT_MS=20000 # Prisma interactive-transaction ceiling
+DB_TRANSACTION_MAX_WAIT_MS=10000
 
 # Redis
 REDIS_URL=redis://localhost:6379
 
 # JWT
 JWT_SECRET=
-JWT_EXPIRES_IN=15m
+JWT_EXPIRES_IN=15m              # accepts 15m / 2h / 30d / raw seconds
 JWT_REFRESH_EXPIRES_IN=30d
 
 # Encryption (AES-256)
@@ -1498,6 +1511,12 @@ CLIENT_URL=https://groupsync.app
 
 # Feature flags
 ENABLE_AUTO_KYC=false    # false = manual review, true = KYC provider API
+
+# Verification ladder — each contact rung is enforced only when its flag is on.
+# Phone ships off: the OTP flow is built and exercisable, but with no SMS contract
+# yet, requiring a verified phone would lock every real user out of joining a group.
+REQUIRE_EMAIL_VERIFICATION=true
+REQUIRE_PHONE_VERIFICATION=false
 ```
 
 ---

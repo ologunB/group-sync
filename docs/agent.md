@@ -721,6 +721,15 @@ Every event payload carries a `calendar` block:
 ### Route mounting
 Event routes are mounted at `/api/v1` (not `/api/v1/events`) because the router handles both `/groups/:id/events` and `/events/:id` paths.
 
+> **Membership is the opposite case, and it is a trap.** That router mounts at
+> `/api/v1/groups`, and it contains routes written as if they were top-level. The real
+> URLs are `/groups/applications/:id`, `/groups/invites/:id` and
+> `/groups/invites/:token/accept` — a request to `/api/v1/applications/:id` gets
+> Express's 404 catch-all ("Cannot PATCH"), which reads like a broken handler rather
+> than a wrong path. Earlier revisions of `backend-srs.md § 4.4` documented the
+> unprefixed forms; they were never served. The mounted paths are the contract —
+> the Postman collection and the clients both use them.
+
 ---
 
 ## 19. Notifications
@@ -976,11 +985,20 @@ Capability is bought in rungs, so friction only lands on the users asking for th
 | Tier | Requirement | Unlocks | Guard |
 |---|---|---|---|
 | 0 | none | Browse groups and public events, view profiles | `authenticate` |
-| 1 | email verified + **phone OTP** | Join public groups, apply, accept invites, RSVP to events | `authenticateContactVerified` |
+| 1 | email verified + **phone OTP** (phone rung off by default — see note below) | Join public groups, apply, accept invites, RSVP to events | `authenticateContactVerified` |
 | 2 | tier 1 + a non-empty `bio`, then **platform admin review** of the group | Create a group | `authenticateOrganiser` + the review queue (§27) |
 | 3 | tier 2 + `id_verification_status = 'verified'` (NIN / BVN / passport) | Host an event at a **physical street address** | `hasVerifiedId()` inside `EventService` |
 
 All three live in `shared/middleware/verification.middleware.ts`. Every tier also re-checks account health (not deleted, not suspended, not banned) before its own rule.
+
+> **The phone rung is currently un-enforced.** Each contact rung has its own switch —
+> `REQUIRE_EMAIL_VERIFICATION` (default `true`) and `REQUIRE_PHONE_VERIFICATION`
+> (default **`false`**) — read via `config.verification`. The OTP endpoints, the
+> `SmsService` and the ladder are all built and exercisable, but there is no SMS
+> contract yet, so requiring a verified phone would lock every real user out of
+> joining a group. The check stays wired rather than commented out: flip the env var
+> once the provider is live and tier 1 tightens with no code change. This is why
+> `POST /events/:id/rsvp` succeeds for an account with `phone_verified_at = null`.
 
 Tier 3 is enforced **in the service, not as route middleware**, because it only applies when the request actually carries `venue_address` — an event with only a city and state needs no ID.
 

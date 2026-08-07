@@ -2618,7 +2618,13 @@ async function runFeaturesSuite(): Promise<void> {
         const applicant = await registerAndLogin(`applicant${ts}@test.io`, 'Applies123!', 'Applicant');
         await setPhoneVerified(applicant.userId);
 
-        const applied = await post(`/groups/${appGroupId}/apply`, { form_responses: {} }, applicant.token);
+        // By the time this section runs, § 4 has installed a form on appGroupId whose
+        // `q1` is required, so an empty response body is a 422 rather than an apply.
+        const applied = await post(
+            `/groups/${appGroupId}/apply`,
+            { form_responses: { q1: 'Because I want to join.' } },
+            applicant.token,
+        );
         assertStatus(applied.status, 201);
 
         const list = await get(`/groups/${appGroupId}/applications?status=pending`, creatorToken);
