@@ -261,8 +261,13 @@ class AuthService {
                     // Create new user + provider link
                     isNewUser = true;
                     userId = (0, crypto_1.randomUUID)();
-                    await connection_1.prisma.$transaction(async (tx) => {
-                        await tx.user.create({
+                    // Batched rather than interactive. The user ID is generated up front, so
+                    // the second write never needs the first one's result — and an interactive
+                    // transaction would hold a connection open across two sequential
+                    // round-trips, which blows Prisma's 5s ceiling on a slow link to the
+                    // database and 500s a sign-up that was otherwise fine.
+                    await connection_1.prisma.$transaction([
+                        connection_1.prisma.user.create({
                             data: {
                                 id: userId,
                                 email: providerEmail.toLowerCase(),
@@ -271,11 +276,11 @@ class AuthService {
                                 // Re-challenging with our own OTP would be pure friction.
                                 emailVerifiedAt: emailVerifiedByProvider ? new Date() : null,
                             },
-                        });
-                        await tx.userProvider.create({
+                        }),
+                        connection_1.prisma.userProvider.create({
                             data: { userId, provider: dto.provider, providerId, email: providerEmail.toLowerCase() },
-                        });
-                    });
+                        }),
+                    ]);
                 }
             }
             else {
@@ -290,15 +295,17 @@ class AuthService {
             const tokenPayload = buildTokenPayload(userId, sessionId, user.role);
             const tokens = encryption_1.EncryptionUtil.generateTokens(tokenPayload, ipAddress);
             const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_MS);
-            await connection_1.prisma.$transaction(async (tx) => {
-                await tx.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
-                await tx.refreshToken.create({
+            // Three independent writes keyed on an ID we already hold — batched for the same
+            // reason as the sign-up transaction above.
+            await connection_1.prisma.$transaction([
+                connection_1.prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } }),
+                connection_1.prisma.refreshToken.create({
                     data: { userId, token: tokens.refreshToken, expiresAt: refreshExpiresAt, createdByIp: ipAddress },
-                });
-                await tx.session.create({
+                }),
+                connection_1.prisma.session.create({
                     data: { userId, ipAddress, expiresAt: refreshExpiresAt },
-                });
-            });
+                }),
+            ]);
             audit_logger_1.AuditLogger.log(tokenPayload, audit_logger_1.LogActions.AUTH_SOCIAL_LOGIN, audit_logger_1.ResourceTypes.USER, userId, 1, { provider: dto.provider, isNewUser }, ipAddress);
             return { user, tokens, isNewUser };
         }

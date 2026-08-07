@@ -13,6 +13,20 @@ function optional_env(key: string, fallback: string): string {
     return process.env[key] ?? fallback;
 }
 
+/**
+ * Parse a `jsonwebtoken`-style duration ('15m', '2h', '30d', '900') into seconds.
+ * Falls back rather than throwing: a malformed value should not stop the process from
+ * booting, and a silently wrong token lifetime is worse than a documented default.
+ */
+function parseDuration(value: string, fallbackSeconds: number): number {
+    const match = /^(\d+)\s*([smhd])?$/.exec(value.trim());
+    if (!match) return fallbackSeconds;
+
+    const amount = parseInt(match[1], 10);
+    const unitSeconds: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
+    return amount * (unitSeconds[match[2] ?? 's'] ?? 1);
+}
+
 // SERVICE_MODE controls what this process serves:
 //   'api'    — REST API only (no Socket.io)
 //   'socket' — Socket.io only (no REST routes)
@@ -42,7 +56,10 @@ export const config = {
     jwt: {
         secret: require_env('JWT_SECRET'),
         expiresIn: optional_env('JWT_EXPIRES_IN', '15m'),
-        expiresInSeconds: 15 * 60, // 15 minutes
+        // Derived from JWT_EXPIRES_IN rather than hardcoded. Token signing reads this
+        // field, not `expiresIn`, so the documented env var used to be inert: setting
+        // JWT_EXPIRES_IN changed nothing and every token lived exactly 15 minutes.
+        expiresInSeconds: parseDuration(optional_env('JWT_EXPIRES_IN', '15m'), 15 * 60),
         refreshExpiresInMs: 30 * 24 * 60 * 60 * 1000, // 30 days
     },
 

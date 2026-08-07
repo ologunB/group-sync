@@ -26,10 +26,26 @@ class Database {
             // pooler, which multiplexes, so this is well within budget.
             max: parseInt(process.env.DB_POOL_MAX ?? '10', 10),
             idleTimeoutMillis: 30_000,
-            connectionTimeoutMillis: 5_000,
+            // Time allowed to *acquire* a connection — establishing a new one to the pooler
+            // plus any wait for a free slot. 5s is comfortable same-region and far too tight
+            // across regions: a link that needed longer failed roughly one write in three
+            // with "Connection terminated due to connection timeout", surfacing as a 500 on
+            // an otherwise valid request. Overridable so a distant deployment can raise it.
+            connectionTimeoutMillis: parseInt(process.env.DB_CONNECT_TIMEOUT_MS ?? '15000', 10),
         });
         const adapter = new adapter_pg_1.PrismaPg(this.pool);
-        this._client = new client_1.PrismaClient({ adapter });
+        this._client = new client_1.PrismaClient({
+            adapter,
+            // Prisma aborts an interactive transaction after 5s by default, measured from
+            // the moment it opens. That budget is spent on network round-trips, not work:
+            // a three-write transaction against a pooler on a slow link took 8s and 500'd
+            // a sign-up that would otherwise have succeeded. Round-trips are the cost, so
+            // the ceiling has to be generous enough to absorb a bad link.
+            transactionOptions: {
+                timeout: parseInt(process.env.DB_TRANSACTION_TIMEOUT_MS ?? '20000', 10),
+                maxWait: parseInt(process.env.DB_TRANSACTION_MAX_WAIT_MS ?? '10000', 10),
+            },
+        });
     }
     static getInstance() {
         if (!Database.instance) {

@@ -16,6 +16,19 @@ function require_env(key) {
 function optional_env(key, fallback) {
     return process.env[key] ?? fallback;
 }
+/**
+ * Parse a `jsonwebtoken`-style duration ('15m', '2h', '30d', '900') into seconds.
+ * Falls back rather than throwing: a malformed value should not stop the process from
+ * booting, and a silently wrong token lifetime is worse than a documented default.
+ */
+function parseDuration(value, fallbackSeconds) {
+    const match = /^(\d+)\s*([smhd])?$/.exec(value.trim());
+    if (!match)
+        return fallbackSeconds;
+    const amount = parseInt(match[1], 10);
+    const unitSeconds = { s: 1, m: 60, h: 3600, d: 86400 };
+    return amount * (unitSeconds[match[2] ?? 's'] ?? 1);
+}
 exports.config = {
     server: {
         port: parseInt(optional_env('PORT', '3000'), 10),
@@ -36,7 +49,10 @@ exports.config = {
     jwt: {
         secret: require_env('JWT_SECRET'),
         expiresIn: optional_env('JWT_EXPIRES_IN', '15m'),
-        expiresInSeconds: 15 * 60, // 15 minutes
+        // Derived from JWT_EXPIRES_IN rather than hardcoded. Token signing reads this
+        // field, not `expiresIn`, so the documented env var used to be inert: setting
+        // JWT_EXPIRES_IN changed nothing and every token lived exactly 15 minutes.
+        expiresInSeconds: parseDuration(optional_env('JWT_EXPIRES_IN', '15m'), 15 * 60),
         refreshExpiresInMs: 30 * 24 * 60 * 60 * 1000, // 30 days
     },
     encryption: {
@@ -88,6 +104,16 @@ exports.config = {
         apiKey: optional_env('SMS_API_KEY', ''),
         senderId: optional_env('SMS_SENDER_ID', 'GroupSync'),
         baseUrl: optional_env('SMS_BASE_URL', 'https://api.ng.termii.com'),
+    },
+    verification: {
+        // Phone OTP is built and exercisable (SMS_PROVIDER=log prints the code), but no
+        // SMS contract exists yet, so requiring a verified phone would lock every real
+        // user out of joining a group. The check stays wired and merely un-enforced —
+        // flip this to 'true' once the SMS provider is live to turn the ladder back on.
+        requirePhone: optional_env('REQUIRE_PHONE_VERIFICATION', 'false') === 'true',
+        // Same treatment for the email rung, so a single switch can gate each contact
+        // channel independently rather than an all-or-nothing tier.
+        requireEmail: optional_env('REQUIRE_EMAIL_VERIFICATION', 'true') === 'true',
     },
     groups: {
         // Abuse control: a single account may not spin up more than this many groups

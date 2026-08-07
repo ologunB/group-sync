@@ -1243,14 +1243,17 @@ async function runFeaturesSuite(): Promise<void> {
     });
 
     await test('PATCH /groups/:id updates description only (200, creator = super_admin)', async () => {
+        // Descriptions have a 40-character floor, so the update has to clear it too —
+        // the old 28-character string now fails validation rather than the route.
+        const updated = 'Updated via integration test — long enough to clear the minimum.';
         const { status, data } = await patch(
             `/groups/${openGroupId}`,
-            { description: 'Updated via integration test' },
+            { description: updated },
             creatorToken,
         );
         assertStatus(status, 200);
         const group = data.data as Record<string, unknown>;
-        assert(group.description === 'Updated via integration test', `description not updated: ${group.description}`);
+        assert(group.description === updated, `description not updated: ${group.description}`);
     });
 
     await test('PATCH /groups/:id without auth returns 401', async () => {
@@ -2308,10 +2311,14 @@ async function runFeaturesSuite(): Promise<void> {
         assert(d.rsvpCount === 0, `expected 0 after switching to not_going, got ${d.rsvpCount}`);
     });
 
-    await test('RSVPing requires a verified phone (tier 1)', async () => {
+    await test('RSVPing does not require a verified phone while the rung is off', async () => {
+        // Tier 1 gates on email and phone independently, and the phone half ships
+        // un-enforced (REQUIRE_PHONE_VERIFICATION=false) because there is no SMS
+        // contract yet. An unverified phone must therefore not block an RSVP; flipping
+        // the env var back on is what restores the 403.
         const u = await registerAndLogin(`norsvp${ts}@test.io`, 'NoRsvp123!', 'No Phone');
         const { status } = await post(`/events/${eventId}/rsvp`, { status: 'going' }, u.token);
-        assertStatus(status, 403);
+        assertStatus(status, 201);
     });
 
     await test('PATCH /events/:id/rsvp updates RSVP status (200)', async () => {
@@ -2621,7 +2628,9 @@ async function runFeaturesSuite(): Promise<void> {
         ) as Record<string, unknown>;
         assert(Boolean(pending), 'the application was not found');
 
-        const review = await patch(`/applications/${pending.id}`, { action: 'approve' }, creatorToken);
+        // Mounted under /groups, not at the top level the SRS shows — see the note in
+        // membership.routes.ts. The rest of the suite already uses this path.
+        const review = await patch(`/groups/applications/${pending.id}`, { action: 'approve' }, creatorToken);
         assertStatus(review.status, 200);
 
         await new Promise((r) => setTimeout(r, 800));
@@ -4002,9 +4011,13 @@ async function runFeaturesSuite(): Promise<void> {
     });
 
     await test('POST /auth/phone/send-otp with a number stores it and sends a code', async () => {
+        // Deliberately on the 07 range. The registration test above claims
+        // `+2348${ts.slice(-9)}`, and the `+23480${ts.slice(-8)}` this used to build
+        // renders to the byte-identical string — so this number was already taken, and
+        // the 409 cascaded through every phone test after it.
         const { status } = await post(
             '/auth/phone/send-otp',
-            { phone: `+23480${String(ts).slice(-8)}` },
+            { phone: `+2347${String(ts).slice(-9)}` },
             phoneToken,
         );
         assertStatus(status, 200);

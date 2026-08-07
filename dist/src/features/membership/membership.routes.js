@@ -16,6 +16,13 @@ router.post('/:id/apply', verification_middleware_1.authenticateContactVerified,
 // Leave a group — any authenticated member
 router.delete('/:id/leave', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(membership_validator_1.groupIdParamValidator), controller.leaveGroup);
 // ─── Application management ───────────────────────────────────────────────────
+//
+// NOTE: this router is mounted at `/api/v1/groups`, so the paths below resolve to
+// `/api/v1/groups/applications/:id` — not the `/api/v1/applications/:id` that
+// backend-srs.md § 4.4 and agent.md both document. The same applies to the invite
+// routes at the bottom of this file. Clients are built against the mounted paths, so
+// the URLs are the source of truth and the docs are wrong; changing them would be a
+// breaking API change, not a fix.
 // List applications — admin only
 router.get('/:id/applications', auth_middleware_1.authenticate, (0, validators_1.validateRequest)(membership_validator_1.listApplicationsValidator), (0, auth_middleware_1.authorizeGroupRole)('super_admin', 'admin'), controller.getApplications);
 // Approve or reject application — admin only

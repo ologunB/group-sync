@@ -70,6 +70,16 @@ class App {
         // Dev-only static tooling (Google Sign-In test harness). Never mounted in
         // production — it is a debugging surface, not part of the product.
         if (!app_config_1.config.server.isProduction) {
+            // The harness reads its client ID from here rather than carrying its own copy.
+            // A page configured with a different client than the server verifies against
+            // fails deep inside Google's iframe with no usable error, so the two must not
+            // be independently settable.
+            this.app.get('/dev/config', (_req, res) => {
+                res.json({
+                    googleClientId: app_config_1.config.oauth.googleClientId,
+                    appleClientIds: app_config_1.config.oauth.appleClientIds,
+                });
+            });
             this.app.use('/dev', express_1.default.static(path_1.default.join(process.cwd(), 'public', 'dev')));
         }
         // REST routes are only mounted when mode is 'api' or 'both'

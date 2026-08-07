@@ -23,7 +23,12 @@ class Database {
             // pooler, which multiplexes, so this is well within budget.
             max: parseInt(process.env.DB_POOL_MAX ?? '10', 10),
             idleTimeoutMillis: 30_000,
-            connectionTimeoutMillis: 5_000,
+            // Time allowed to *acquire* a connection — establishing a new one to the pooler
+            // plus any wait for a free slot. 5s is comfortable same-region and far too tight
+            // across regions: a link that needed longer failed roughly one write in three
+            // with "Connection terminated due to connection timeout", surfacing as a 500 on
+            // an otherwise valid request. Overridable so a distant deployment can raise it.
+            connectionTimeoutMillis: parseInt(process.env.DB_CONNECT_TIMEOUT_MS ?? '15000', 10),
         });
         const adapter = new PrismaPg(this.pool);
         this._client = new PrismaClient({
