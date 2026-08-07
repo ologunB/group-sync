@@ -3726,12 +3726,35 @@ async function runFeaturesSuite(): Promise<void> {
     });
 
     await test('dm_send via socket delivers dm_received to receiver', async () => {
-        const dmPromise = waitForEvent(memberSocket!, SocketEvents.DM_RECEIVED);
+        // Race the delivery against the server's own rejection. dm_send answers a refusal
+        // (no shared group, blocked, write failed) with an `error` event to the *sender*,
+        // so watching only the receiver turns every refusal into an indistinguishable
+        // timeout. The echo to the sender is a third outcome worth telling apart: it means
+        // the row was written and the fan-out reached the sender but not the receiver's
+        // personal room.
+        const delivered = waitForEvent(memberSocket!, SocketEvents.DM_RECEIVED);
+        const refused   = waitForEvent(creatorSocket!, SocketEvents.ERROR).then(
+            (e) => { throw new Error(`server refused the DM: ${(e as Record<string, string>)?.message}`); },
+            () => new Promise(() => {}), // its own timeout is not the failure we report
+        );
+        const echoed    = waitForEvent(creatorSocket!, SocketEvents.DM_RECEIVED).then(
+            () => 'echo-only',
+            () => new Promise(() => {}),
+        );
+
         creatorSocket!.emit(SocketEvents.DM_SEND, {
             receiver_id: memberId,
             content: 'Socket DM hello',
         });
-        const data = await dmPromise as { message: Record<string, unknown> };
+
+        const outcome = await Promise.race([delivered, refused, echoed]);
+        assert(
+            outcome !== 'echo-only',
+            'the sender got its echo but the receiver never did — the DM was written, so the ' +
+            'break is the emit to the receiver\'s user:{id} room, not authorisation',
+        );
+
+        const data = outcome as { message: Record<string, unknown> };
         assert(data?.message?.content === 'Socket DM hello', `DM content mismatch: ${data?.message?.content}`);
     });
 
