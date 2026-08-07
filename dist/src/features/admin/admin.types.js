@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.adminAuditSelect = exports.adminReportSelect = exports.adminPendingGroupSelect = exports.adminGroupSelect = exports.adminUserSelect = void 0;
+exports.adminEventSelect = exports.adminInterestSelect = exports.adminCategorySelect = exports.adminAuditSelect = exports.adminReportSelect = exports.adminPendingGroupSelect = exports.adminGroupSelect = exports.adminUserSelect = void 0;
 exports.adminUserSelect = {
     id: true,
     email: true,
@@ -80,5 +80,40 @@ exports.adminAuditSelect = {
     ipAddress: true,
     metadata: true,
     createdAt: true,
+};
+exports.adminCategorySelect = {
+    id: true,
+    value: true,
+    label: true,
+    isActive: true,
+    sortOrder: true,
+    createdAt: true,
+    updatedAt: true,
+};
+exports.adminInterestSelect = {
+    id: true,
+    value: true,
+    label: true,
+    group: true,
+    isActive: true,
+    sortOrder: true,
+    createdAt: true,
+    updatedAt: true,
+};
+exports.adminEventSelect = {
+    id: true,
+    title: true,
+    description: true,
+    startsAt: true,
+    endsAt: true,
+    status: true,
+    visibility: true,
+    rsvpCount: true,
+    rsvpLimit: true,
+    venueCity: true,
+    venueState: true,
+    createdAt: true,
+    group: { select: { id: true, name: true, slug: true, category: true } },
+    creator: { select: { id: true, displayName: true, email: true } },
 };
 //# sourceMappingURL=admin.types.js.map

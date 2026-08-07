@@ -62,6 +62,13 @@ export const LogActions = {
     ADMIN_GROUP_UPDATE:       'admin.group_update',
     ADMIN_GROUP_REVIEW:       'admin.group_review',
     ADMIN_REPORT_RESOLVE:     'admin.report_resolve',
+    ADMIN_CATEGORY_CREATE:    'admin.category_create',
+    ADMIN_CATEGORY_UPDATE:    'admin.category_update',
+    ADMIN_CATEGORY_DELETE:    'admin.category_delete',
+    ADMIN_INTEREST_CREATE:    'admin.interest_create',
+    ADMIN_INTEREST_UPDATE:    'admin.interest_update',
+    ADMIN_INTEREST_DELETE:    'admin.interest_delete',
+    ADMIN_EVENT_CANCEL:       'admin.event_cancel',
     // Messages
     MESSAGE_SEND:             'message.send',
     MESSAGE_DELETE:           'message.delete',
@@ -105,6 +112,8 @@ export const ResourceTypes = {
     GROUP_FORM:   'group_form',
     DM:           'dm',
     FEED_POST:    'feed_post',
+    CATEGORY:     'category',
+    INTEREST:     'interest',
     FEED_COMMENT: 'feed_comment',
 } as const;
 

@@ -161,6 +161,105 @@ class AdminController {
             next(error);
         }
     };
+    // ─── Taxonomy: categories ─────────────────────────────────────────────────
+    listCategories = async (req, res, next) => {
+        try {
+            const data = await admin_service_1.adminService.listCategories({ include_inactive: req.query.include_inactive === 'true' });
+            response_helper_1.ResponseHelper.success(res, data);
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    createCategory = async (req, res, next) => {
+        try {
+            const data = await admin_service_1.adminService.createCategory(req.body, req.user);
+            response_helper_1.ResponseHelper.success(res, data, 'Category created.', 201);
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    updateCategory = async (req, res, next) => {
+        try {
+            const data = await admin_service_1.adminService.updateCategory(req.params.id, req.body, req.user);
+            response_helper_1.ResponseHelper.success(res, data, 'Category updated.');
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    deleteCategory = async (req, res, next) => {
+        try {
+            const data = await admin_service_1.adminService.deleteCategory(req.params.id, req.user);
+            response_helper_1.ResponseHelper.success(res, data, 'Category removed.');
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    // ─── Taxonomy: interests ──────────────────────────────────────────────────
+    listInterests = async (req, res, next) => {
+        try {
+            const data = await admin_service_1.adminService.listInterests({ include_inactive: req.query.include_inactive === 'true' });
+            response_helper_1.ResponseHelper.success(res, data);
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    createInterest = async (req, res, next) => {
+        try {
+            const data = await admin_service_1.adminService.createInterest(req.body, req.user);
+            response_helper_1.ResponseHelper.success(res, data, 'Interest created.', 201);
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    updateInterest = async (req, res, next) => {
+        try {
+            const data = await admin_service_1.adminService.updateInterest(req.params.id, req.body, req.user);
+            response_helper_1.ResponseHelper.success(res, data, 'Interest updated.');
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    deleteInterest = async (req, res, next) => {
+        try {
+            const data = await admin_service_1.adminService.deleteInterest(req.params.id, req.user);
+            response_helper_1.ResponseHelper.success(res, data, 'Interest removed.');
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    // ─── Event moderation ─────────────────────────────────────────────────────
+    listEvents = async (req, res, next) => {
+        try {
+            const result = await admin_service_1.adminService.listEvents({
+                page: req.query.page ? parseInt(req.query.page, 10) : undefined,
+                limit: req.query.limit ? parseInt(req.query.limit, 10) : undefined,
+                status: req.query.status,
+                search: req.query.search,
+                when: req.query.when,
+            });
+            response_helper_1.ResponseHelper.success(res, result.data, 'Events retrieved.', 200, result.pagination);
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    cancelEvent = async (req, res, next) => {
+        try {
+            const data = await admin_service_1.adminService.cancelEvent(req.params.id, req.body, req.user);
+            response_helper_1.ResponseHelper.success(res, data, 'Event cancelled.');
+        }
+        catch (error) {
+            next(error);
+        }
+    };
 }
 exports.AdminController = AdminController;
 exports.adminController = new AdminController();

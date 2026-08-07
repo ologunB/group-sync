@@ -20,6 +20,8 @@ router.get('/me', authenticate, controller.getMe);
 router.patch('/me', authenticate, validateRequest(updateProfileValidator), controller.updateMe);
 router.post('/me/photo', authenticate, uploadImage('photo'), controller.uploadPhoto);
 router.delete('/me', authenticate, controller.deleteMe);
+// Ask before deleting: which groups would be left without an admin.
+router.get('/me/deletion-blockers', authenticate, controller.getDeletionBlockers);
 router.get('/me/groups', authenticate, validateRequest(paginationValidator), controller.getMyGroups);
 router.get('/me/applications', authenticate, validateRequest(myApplicationsValidator), controller.getMyApplications);
 router.post('/me/interests', authenticate, validateRequest(updateInterestsValidator), controller.updateInterests);

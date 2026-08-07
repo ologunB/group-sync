@@ -563,6 +563,8 @@ AuditLogger.log(
 
 7. **Leaving as super_admin**: Block `DELETE /groups/:id/leave` if caller is the `super_admin` and there are other members. Must transfer ownership first via `PATCH /groups/:id/members/:userId` (promote target to super_admin, caller becomes admin).
 
+7a. **Deleting the account as sole admin**: the same trap one level up. `DELETE /users/me` returns **409** when the caller is the only active `super_admin`/`admin` of a group that still has other active members. Account deletion is a *soft* delete, so the membership row survives — leaving a group owned by someone who can never sign in, with no way to approve applications, post events, or promote a replacement. Groups where the caller is the last member do not block. Cleared by promoting another admin. `GET /users/me/deletion-blockers` returns `{ can_delete, blocking_groups }` so the client can warn up front instead of dead-ending on the 409.
+
 8. **Application uniqueness**: One pending/approved application per user per group (DB unique constraint). If a rejected application exists, allow reapplication (delete old record or allow new insert — decide per product requirement).
 
 9. **KYC webhook**: Always verify HMAC signature from KYC provider. Store idempotency key in Redis. After decision: delete document from S3, null out `id_document_url` and `id_document_iv` in DB.
@@ -864,12 +866,42 @@ All admin routes use `authorize('platform.admin')` — this checks `req.user.per
 | GET | `/admin/reports` | List reports (filterable: status) |
 | PATCH | `/admin/reports/:id` | Resolve or dismiss report |
 | GET | `/admin/audit-logs` | Query audit log |
+| GET | `/admin/categories` | List group categories. `?include_inactive=true` to see deactivated ones |
+| POST | `/admin/categories` | Create a category. Body `{ value, label?, sort_order?, is_active? }` |
+| PATCH | `/admin/categories/:id` | Edit `label` / `sort_order` / `is_active`. **`value` is not editable** |
+| DELETE | `/admin/categories/:id` | Delete if unused, otherwise deactivate (see below) |
+| GET | `/admin/interests` | List interests. `?include_inactive=true` |
+| POST | `/admin/interests` | Create an interest. Body `{ value, group, label?, sort_order?, is_active? }` |
+| PATCH | `/admin/interests/:id` | Edit `label` / `group` / `sort_order` / `is_active` |
+| DELETE | `/admin/interests/:id` | Delete if unused, otherwise deactivate |
+| GET | `/admin/events` | Moderation list. Filters: `status`, `when=upcoming\|past`, `search`, `page`, `limit` |
+| PATCH | `/admin/events/:id/cancel` | Cancel an event. Body `{ reason }` — required, shown to attendees |
 
 ### Notes
 - ID verification: on approval, `idDocumentUrl` and `idDocumentIv` are cleared (document deleted from storage).
 - Group verify: `PATCH /admin/groups/:id` with `{ is_verified: true }`.
 - Report resolution: body `{ action: "resolved" | "dismissed" }`.
 - Audit log query supports: `user_id`, `action`, `entity_type`, `date_from`, `date_to`.
+
+### Taxonomy (§28)
+Categories and interests used to be module constants in `reference.types.ts`; they are rows
+now so an admin can edit them without a deploy. Three rules matter:
+
+1. **`value` is immutable.** It is the exact string stored in `groups.category` and in the
+   `users.interests` array, and there is no foreign key behind either — renaming it orphans
+   every record pointing at it. The API rejects `value` on update; edit `label`, which is
+   the only field a client renders.
+2. **Delete degrades to deactivate when the row is in use.** `DELETE` counts the groups
+   (or users) referencing the value first; if any exist it flips `is_active` to false and
+   responds with `deactivatedInsteadOfDeleted: true` plus the count. Deactivated rows vanish
+   from `/reference/*` but stay visible to admins and keep existing records readable.
+3. **Interest values are lowercased on write**, because `UserService` lowercases interests
+   on the way in — a capitalised value would silently match nobody.
+
+`/reference/*` falls back to the module constants if the query fails or the table is empty:
+these endpoints sit in front of the signup form, and a DB blip should degrade to a stale
+list rather than an empty picker nobody can register through. States stay in code — they
+are geography, not product taxonomy.
 
 ---
 
@@ -946,6 +978,18 @@ Returns `ConversationItem[]` sorted by `last_message.created_at DESC`. Each item
 Group conversations use Prisma with nested `messages` (take: 1) and a batch raw-SQL unread count query.
 
 DM conversations use a single raw SQL `DISTINCT ON (LEAST(sender_id, receiver_id), GREATEST(...))` query to get the latest message per unique conversation partner, plus inline unread count subquery.
+
+**Unread cutoff.** A group's unread count is messages newer than
+`GREATEST(memberships.joined_at, COALESCE(chat_read_receipts.last_read_at, joined_at))`.
+The `joined_at` floor is load-bearing: the cutoff used to fall back to epoch when no read
+receipt existed, so joining a group with history greeted the new member with every message
+ever posted marked unread. Flooring at join time also means a stale receipt from an earlier
+stint cannot resurrect pre-rejoin messages. `last_read_at` is upserted on every
+`GET /groups/:id/messages`.
+
+**Not paginated.** `GET /conversations` returns every group and DM thread in one response
+— fine at current scale, but it grows linearly with membership count and will eventually
+need a cursor. Messages *within* a thread are cursor-paginated.
 
 ### Socket events (DMs)
 | Event (client→server) | Payload | Description |

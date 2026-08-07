@@ -11,7 +11,7 @@ export class ReferenceController {
         next: NextFunction,
     ): Promise<void> => {
         try {
-            ResponseHelper.success(res, referenceService.getOnboardingOptions());
+            ResponseHelper.success(res, await referenceService.getOnboardingOptions());
         } catch (error) {
             next(error);
         }
@@ -21,7 +21,7 @@ export class ReferenceController {
 
     getInterests = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            ResponseHelper.success(res, referenceService.getInterests());
+            ResponseHelper.success(res, await referenceService.getInterests());
         } catch (error) {
             next(error);
         }
@@ -41,7 +41,7 @@ export class ReferenceController {
 
     getCategories = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            ResponseHelper.success(res, referenceService.getCategories());
+            ResponseHelper.success(res, await referenceService.getCategories());
         } catch (error) {
             next(error);
         }

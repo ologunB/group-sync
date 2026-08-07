@@ -43,6 +43,21 @@ class UserController {
             next(error);
         }
     };
+    // ─── GET /users/me/deletion-blockers ───────────────────────────────────────
+    // Lets the client warn before the user commits to deleting, instead of surfacing a
+    // 409 at the final step with no indication of which groups are at fault.
+    getDeletionBlockers = async (req, res, next) => {
+        try {
+            const groups = await userService.groupsBlockingDeletion(req.user.userId);
+            response_helper_1.ResponseHelper.success(res, {
+                can_delete: groups.length === 0,
+                blocking_groups: groups,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    };
     // ─── GET /users/me/groups ──────────────────────────────────────────────────
     getMyGroups = async (req, res, next) => {
         try {

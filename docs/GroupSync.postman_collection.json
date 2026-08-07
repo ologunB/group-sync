@@ -2068,6 +2068,31 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"User unblocked successfully.\",\n  \"data\": null\n}"
             }
           ]
+        },
+        {
+          "name": "Get Deletion Blockers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/deletion-blockers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "deletion-blockers"
+              ]
+            },
+            "description": "Returns { can_delete, blocking_groups }. A group blocks deletion when the caller is its only active admin AND other active members remain — the delete is soft, so the group would keep an owner who can never sign in. Call this before offering \"Delete account\" so the user sees which groups need an admin handed over first."
+          },
+          "response": []
         }
       ]
     },
@@ -5575,6 +5600,356 @@
                 }
               ]
             }
+          },
+          "response": []
+        },
+        {
+          "name": "List Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/categories?include_inactive=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "categories"
+              ],
+              "query": [
+                {
+                  "key": "include_inactive",
+                  "value": "true",
+                  "description": "Include deactivated categories (admin-only view)"
+                }
+              ]
+            },
+            "description": "Group categories an admin can edit. Deactivated rows are hidden from /reference/categories but still returned here with include_inactive=true."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": \"Sports & Fitness\",\n  \"label\": \"Sports & Fitness\",\n  \"sort_order\": 1,\n  \"is_active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "categories"
+              ]
+            },
+            "description": "`value` is the literal string stored on groups.category and is NEVER editable afterwards — renaming it would orphan every group filed under it. `label` defaults to `value` when omitted."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Category",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Sports and Fitness\",\n  \"sort_order\": 2,\n  \"is_active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/categories/{{categoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "categories",
+                "{{categoryId}}"
+              ]
+            },
+            "description": "Edits label / sort_order / is_active. `value` is rejected — see Create Category."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Category",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/categories/{{categoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "categories",
+                "{{categoryId}}"
+              ]
+            },
+            "description": "Hard-deletes only when no group uses the category. If any do, the row is deactivated instead and the response carries deactivatedInsteadOfDeleted:true plus groupsUsingIt."
+          },
+          "response": []
+        },
+        {
+          "name": "List Interests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/interests?include_inactive=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "interests"
+              ],
+              "query": [
+                {
+                  "key": "include_inactive",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Interests offered in the signup multi-select."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Interest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": \"padel\",\n  \"label\": \"Padel\",\n  \"group\": \"Sports & Fitness\",\n  \"sort_order\": 8,\n  \"is_active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/interests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "interests"
+              ]
+            },
+            "description": "`value` is lowercased on write to match how UserService normalises users.interests — a capitalised value would match nobody. `group` is the display grouping and is free text."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Interest",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Padel Tennis\",\n  \"group\": \"Sports & Fitness\",\n  \"sort_order\": 9,\n  \"is_active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/interests/{{interestId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "interests",
+                "{{interestId}}"
+              ]
+            },
+            "description": "Edits label / group / sort_order / is_active. `value` is immutable."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Interest",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/interests/{{interestId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "interests",
+                "{{interestId}}"
+              ]
+            },
+            "description": "Hard-deletes only when no user has the interest saved; otherwise deactivates and returns usersUsingIt."
+          },
+          "response": []
+        },
+        {
+          "name": "List Events (moderation)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/events?page=1&limit=20&status=scheduled&when=upcoming&search=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "events"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "max 50"
+                },
+                {
+                  "key": "status",
+                  "value": "scheduled",
+                  "description": "scheduled | cancelled | completed"
+                },
+                {
+                  "key": "when",
+                  "value": "upcoming",
+                  "description": "upcoming | past"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "matches event title or group name"
+                }
+              ]
+            },
+            "description": "Platform-wide event list for moderation. Not scoped to any group."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Event",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Cancelled by the platform team — venue is no longer available.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/events/{{eventId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "events",
+                "{{eventId}}",
+                "cancel"
+              ]
+            },
+            "description": "Sets status=cancelled (never a hard delete) and fans a notification out to every going/maybe RSVP with the reason verbatim. 409 if already cancelled."
           },
           "response": []
         }

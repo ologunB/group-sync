@@ -1,0 +1,44 @@
+// ─── Taxonomy ─────────────────────────────────────────────────────────────────
+//
+// Group categories and user interests used to live as module constants in
+// reference.types.ts, on the reasoning that they change twice a year and did not
+// justify a migration plus an admin CRUD surface. They now need editing without a
+// deploy, so they are rows.
+//
+// `value` is the contract: it is the string already stored on `groups.category` and
+// inside the `users.interests` array, and existing rows carry the seeded values. Renaming
+// a `value` orphans the records pointing at it — change `label` instead, which is the
+// only field the client displays.
+
+model Category {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Canonical string stored on groups.category. Immutable in practice — see above.
+  value     String   @unique @db.VarChar(80)
+  label     String   @db.VarChar(80)
+  /// Hidden from the pickers without breaking groups already filed under it.
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([isActive, sortOrder], map: "idx_categories_active_order")
+  @@map("categories")
+}
+
+model Interest {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Canonical lowercase tag stored in users.interests[].
+  value     String   @unique @db.VarChar(80)
+  label     String   @db.VarChar(80)
+  /// Display grouping in the signup multi-select ("Sports & Fitness"). Free text so a
+  /// new grouping does not need its own table.
+  group     String   @map("group_name") @db.VarChar(80)
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([isActive, sortOrder], map: "idx_interests_active_order")
+  @@index([group], map: "idx_interests_group")
+  @@map("interests")
+}

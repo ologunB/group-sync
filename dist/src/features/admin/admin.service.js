@@ -515,6 +515,280 @@ class AdminService {
             throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
         }
     }
+    // ─── Taxonomy: categories ─────────────────────────────────────────────────
+    async listCategories(query) {
+        try {
+            return await connection_1.prisma.category.findMany({
+                where: query.include_inactive ? {} : { isActive: true },
+                orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+                select: admin_types_1.adminCategorySelect,
+            });
+        }
+        catch (error) {
+            asLogger_1.asLogger.error('AdminService.listCategories error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    async createCategory(dto, actor) {
+        const value = dto.value.trim();
+        try {
+            const existing = await connection_1.prisma.category.findUnique({ where: { value }, select: { id: true } });
+            if (existing) {
+                throw new error_middleware_1.ApiError('A category with this value already exists.', http_status_codes_1.StatusCodes.CONFLICT);
+            }
+            const created = await connection_1.prisma.category.create({
+                data: {
+                    value,
+                    label: dto.label?.trim() || value,
+                    sortOrder: dto.sort_order ?? 0,
+                    isActive: dto.is_active ?? true,
+                },
+                select: admin_types_1.adminCategorySelect,
+            });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_CATEGORY_CREATE, audit_logger_1.ResourceTypes.CATEGORY, created.id, 1, { value });
+            return created;
+        }
+        catch (error) {
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_CATEGORY_CREATE, audit_logger_1.ResourceTypes.CATEGORY, null, 0, { value, error: error.message });
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('AdminService.createCategory error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    async updateCategory(id, dto, actor) {
+        try {
+            const existing = await connection_1.prisma.category.findUnique({ where: { id }, select: { id: true } });
+            if (!existing) {
+                throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('Category'), http_status_codes_1.StatusCodes.NOT_FOUND);
+            }
+            // `value` is deliberately not updatable: it is the string already written to
+            // groups.category, and renaming it would orphan every group filed under it.
+            const updated = await connection_1.prisma.category.update({
+                where: { id },
+                data: {
+                    ...(dto.label !== undefined ? { label: dto.label.trim() } : {}),
+                    ...(dto.sort_order !== undefined ? { sortOrder: dto.sort_order } : {}),
+                    ...(dto.is_active !== undefined ? { isActive: dto.is_active } : {}),
+                },
+                select: admin_types_1.adminCategorySelect,
+            });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_CATEGORY_UPDATE, audit_logger_1.ResourceTypes.CATEGORY, id, 1, { ...dto });
+            return updated;
+        }
+        catch (error) {
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_CATEGORY_UPDATE, audit_logger_1.ResourceTypes.CATEGORY, id, 0, { error: error.message });
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('AdminService.updateCategory error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    async deleteCategory(id, actor) {
+        try {
+            const category = await connection_1.prisma.category.findUnique({ where: { id }, select: { id: true, value: true } });
+            if (!category) {
+                throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('Category'), http_status_codes_1.StatusCodes.NOT_FOUND);
+            }
+            // Groups store the category as a string with no foreign key, so deleting a
+            // category in use would leave those groups pointing at a label that no longer
+            // resolves. Deactivating hides it from the pickers and keeps them readable.
+            const inUse = await connection_1.prisma.group.count({ where: { category: category.value, deletedAt: null } });
+            if (inUse > 0) {
+                const deactivated = await connection_1.prisma.category.update({
+                    where: { id },
+                    data: { isActive: false },
+                    select: admin_types_1.adminCategorySelect,
+                });
+                audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_CATEGORY_DELETE, audit_logger_1.ResourceTypes.CATEGORY, id, 1, { deactivatedInstead: true, inUse });
+                return { ...deactivated, deactivatedInsteadOfDeleted: true, groupsUsingIt: inUse };
+            }
+            await connection_1.prisma.category.delete({ where: { id } });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_CATEGORY_DELETE, audit_logger_1.ResourceTypes.CATEGORY, id, 1, { value: category.value });
+            return { id, deleted: true };
+        }
+        catch (error) {
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_CATEGORY_DELETE, audit_logger_1.ResourceTypes.CATEGORY, id, 0, { error: error.message });
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('AdminService.deleteCategory error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    // ─── Taxonomy: interests ──────────────────────────────────────────────────
+    async listInterests(query) {
+        try {
+            return await connection_1.prisma.interest.findMany({
+                where: query.include_inactive ? {} : { isActive: true },
+                orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+                select: admin_types_1.adminInterestSelect,
+            });
+        }
+        catch (error) {
+            asLogger_1.asLogger.error('AdminService.listInterests error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    async createInterest(dto, actor) {
+        // Interests are matched against users.interests, which UserService lowercases on
+        // write — a capitalised value here would simply never match anyone.
+        const value = dto.value.trim().toLowerCase();
+        try {
+            const existing = await connection_1.prisma.interest.findUnique({ where: { value }, select: { id: true } });
+            if (existing) {
+                throw new error_middleware_1.ApiError('An interest with this value already exists.', http_status_codes_1.StatusCodes.CONFLICT);
+            }
+            const created = await connection_1.prisma.interest.create({
+                data: {
+                    value,
+                    label: dto.label?.trim() || value,
+                    group: dto.group.trim(),
+                    sortOrder: dto.sort_order ?? 0,
+                    isActive: dto.is_active ?? true,
+                },
+                select: admin_types_1.adminInterestSelect,
+            });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_INTEREST_CREATE, audit_logger_1.ResourceTypes.INTEREST, created.id, 1, { value });
+            return created;
+        }
+        catch (error) {
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_INTEREST_CREATE, audit_logger_1.ResourceTypes.INTEREST, null, 0, { value, error: error.message });
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('AdminService.createInterest error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    async updateInterest(id, dto, actor) {
+        try {
+            const existing = await connection_1.prisma.interest.findUnique({ where: { id }, select: { id: true } });
+            if (!existing) {
+                throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('Interest'), http_status_codes_1.StatusCodes.NOT_FOUND);
+            }
+            const updated = await connection_1.prisma.interest.update({
+                where: { id },
+                data: {
+                    ...(dto.label !== undefined ? { label: dto.label.trim() } : {}),
+                    ...(dto.group !== undefined ? { group: dto.group.trim() } : {}),
+                    ...(dto.sort_order !== undefined ? { sortOrder: dto.sort_order } : {}),
+                    ...(dto.is_active !== undefined ? { isActive: dto.is_active } : {}),
+                },
+                select: admin_types_1.adminInterestSelect,
+            });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_INTEREST_UPDATE, audit_logger_1.ResourceTypes.INTEREST, id, 1, { ...dto });
+            return updated;
+        }
+        catch (error) {
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_INTEREST_UPDATE, audit_logger_1.ResourceTypes.INTEREST, id, 0, { error: error.message });
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('AdminService.updateInterest error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    async deleteInterest(id, actor) {
+        try {
+            const interest = await connection_1.prisma.interest.findUnique({ where: { id }, select: { id: true, value: true } });
+            if (!interest) {
+                throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('Interest'), http_status_codes_1.StatusCodes.NOT_FOUND);
+            }
+            const inUse = await connection_1.prisma.user.count({ where: { interests: { has: interest.value }, deletedAt: null } });
+            if (inUse > 0) {
+                const deactivated = await connection_1.prisma.interest.update({
+                    where: { id },
+                    data: { isActive: false },
+                    select: admin_types_1.adminInterestSelect,
+                });
+                audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_INTEREST_DELETE, audit_logger_1.ResourceTypes.INTEREST, id, 1, { deactivatedInstead: true, inUse });
+                return { ...deactivated, deactivatedInsteadOfDeleted: true, usersUsingIt: inUse };
+            }
+            await connection_1.prisma.interest.delete({ where: { id } });
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_INTEREST_DELETE, audit_logger_1.ResourceTypes.INTEREST, id, 1, { value: interest.value });
+            return { id, deleted: true };
+        }
+        catch (error) {
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_INTEREST_DELETE, audit_logger_1.ResourceTypes.INTEREST, id, 0, { error: error.message });
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('AdminService.deleteInterest error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    // ─── Event moderation ─────────────────────────────────────────────────────
+    async listEvents(query) {
+        try {
+            const page = query.page && query.page > 0 ? query.page : 1;
+            const limit = Math.min(query.limit && query.limit > 0 ? query.limit : 20, 50);
+            const skip = (page - 1) * limit;
+            const where = {
+                ...(query.status ? { status: query.status } : {}),
+                ...(query.when === 'upcoming' ? { startsAt: { gte: new Date() } } : {}),
+                ...(query.when === 'past' ? { startsAt: { lt: new Date() } } : {}),
+                ...(query.search
+                    ? {
+                        OR: [
+                            { title: { contains: query.search, mode: 'insensitive' } },
+                            { group: { name: { contains: query.search, mode: 'insensitive' } } },
+                        ],
+                    }
+                    : {}),
+            };
+            const [data, total] = await Promise.all([
+                connection_1.prisma.event.findMany({ where, skip, take: limit, orderBy: { startsAt: 'desc' }, select: admin_types_1.adminEventSelect }),
+                connection_1.prisma.event.count({ where }),
+            ]);
+            return { data, pagination: { page, limit, total } };
+        }
+        catch (error) {
+            asLogger_1.asLogger.error('AdminService.listEvents error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
+    async cancelEvent(eventId, dto, actor) {
+        try {
+            const event = await connection_1.prisma.event.findUnique({
+                where: { id: eventId },
+                select: { id: true, title: true, status: true, groupId: true },
+            });
+            if (!event) {
+                throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('Event'), http_status_codes_1.StatusCodes.NOT_FOUND);
+            }
+            if (event.status === 'cancelled') {
+                throw new error_middleware_1.ApiError('This event is already cancelled.', http_status_codes_1.StatusCodes.CONFLICT);
+            }
+            const updated = await connection_1.prisma.event.update({
+                where: { id: eventId },
+                data: { status: 'cancelled' },
+                select: admin_types_1.adminEventSelect,
+            });
+            // Everyone who said they were going planned around this. Tell them, and say
+            // why — a silently vanishing event is worse than a cancelled one.
+            const rsvps = await connection_1.prisma.eventRsvp.findMany({
+                where: { eventId, status: { in: ['going', 'maybe'] } },
+                select: { userId: true },
+            });
+            if (rsvps.length) {
+                await notification_dispatcher_1.NotificationDispatcher.dispatch({
+                    userIds: rsvps.map((r) => r.userId),
+                    groupId: event.groupId,
+                    type: 'system',
+                    title: `Cancelled: ${event.title}`,
+                    body: dto.reason.trim(),
+                    referenceType: 'event',
+                    referenceId: eventId,
+                });
+            }
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_EVENT_CANCEL, audit_logger_1.ResourceTypes.EVENT, eventId, 1, { reason: dto.reason, notified: rsvps.length });
+            return updated;
+        }
+        catch (error) {
+            audit_logger_1.AuditLogger.log(actor, audit_logger_1.LogActions.ADMIN_EVENT_CANCEL, audit_logger_1.ResourceTypes.EVENT, eventId, 0, { error: error.message });
+            if (error instanceof error_middleware_1.ApiError)
+                throw error;
+            asLogger_1.asLogger.error('AdminService.cancelEvent error:', error);
+            throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
+        }
+    }
 }
 exports.AdminService = AdminService;
 exports.adminService = new AdminService();

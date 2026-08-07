@@ -12,7 +12,19 @@ import { EncryptionUtil } from '../shared/utils/encryption';
 import { io as ioClient, Socket as ClientSocket } from 'socket.io-client';
 import { SocketEvents } from '../shared/socket/socket.events';
 
-const BASE = Boolean(true) ? 'https://group-sync-ovzh.onrender.com/api/v1' : 'http://localhost:3000/api/v1';
+/**
+ * Where the suite points. Defaults to the local server so a run exercises the code in
+ * the working tree; set API_BASE to aim it somewhere else.
+ *
+ *   API_BASE=https://api.bondbloc.com/api/v1 node dist/src/__tests__/index.js
+ *
+ * This used to be a hardcoded `Boolean(true) ? <render url> : <localhost>`, which meant
+ * every run tested the *deployed* build no matter what you had just changed — new
+ * endpoints came back 404 until they were pushed, and the suite silently graded the wrong
+ * commit. Note that either target still writes to the same Supabase database, so a run is
+ * never free of side effects on real data.
+ */
+const BASE = process.env.API_BASE ?? 'http://localhost:3000/api/v1';
 const ts = Date.now();
 
 // ─── Shared assertion helpers ─────────────────────────────────────────────────
@@ -2861,6 +2873,158 @@ async function runFeaturesSuite(): Promise<void> {
         assertStatus(status, 403);
     });
 
+    // ── Taxonomy: categories and interests are rows an admin can edit ─────────
+
+    let testCategoryId = '';
+
+    await test('GET /admin/categories returns the seeded catalogue (200)', async () => {
+        const { status, data } = await get('/admin/categories', adminToken);
+        assertStatus(status, 200);
+        const rows = data.data as Record<string, unknown>[];
+        assert(Array.isArray(rows) && rows.length > 0, 'expected seeded categories');
+        assertHas(rows[0], 'value');
+        assertHas(rows[0], 'label');
+        assertHas(rows[0], 'isActive');
+    });
+
+    await test('GET /admin/categories without auth returns 401', async () => {
+        const { status } = await get('/admin/categories');
+        assertStatus(status, 401);
+    });
+
+    await test('POST /admin/categories creates a category (201)', async () => {
+        const { status, data } = await post(
+            '/admin/categories',
+            { value: `Test Category ${ts}`, label: `Test Category ${ts}`, sort_order: 99 },
+            adminToken,
+        );
+        assertStatus(status, 201);
+        testCategoryId = (data.data as Record<string, unknown>).id as string;
+        assert(Boolean(testCategoryId), 'no category id returned');
+    });
+
+    await test('POST /admin/categories with a duplicate value returns 409', async () => {
+        const { status } = await post('/admin/categories', { value: `Test Category ${ts}` }, adminToken);
+        assertStatus(status, 409);
+    });
+
+    await test('a new category shows up on the public /reference/categories', async () => {
+        const { data } = await get('/reference/categories');
+        assert(
+            (data.data as string[]).includes(`Test Category ${ts}`),
+            'the category an admin created is not offered to clients',
+        );
+    });
+
+    await test('PATCH /admin/categories/:id renames the label (200)', async () => {
+        const { status, data } = await patch(
+            `/admin/categories/${testCategoryId}`,
+            { label: 'Renamed By Test' },
+            adminToken,
+        );
+        assertStatus(status, 200);
+        const row = data.data as Record<string, unknown>;
+        assert(row.label === 'Renamed By Test', `label not updated: ${row.label}`);
+        // `value` is the string stored on groups.category — renaming it would orphan them.
+        assert(row.value === `Test Category ${ts}`, 'value must not change on update');
+    });
+
+    await test('deactivating a category hides it from clients but not from admins', async () => {
+        const off = await patch(`/admin/categories/${testCategoryId}`, { is_active: false }, adminToken);
+        assertStatus(off.status, 200);
+
+        const pub = await get('/reference/categories');
+        assert(
+            !(pub.data.data as string[]).includes(`Test Category ${ts}`),
+            'a deactivated category is still offered to clients',
+        );
+
+        const adm = await get('/admin/categories?include_inactive=true', adminToken);
+        assert(
+            (adm.data.data as Record<string, unknown>[]).some((c) => c.id === testCategoryId),
+            'a deactivated category vanished from the admin list',
+        );
+    });
+
+    await test('DELETE /admin/categories/:id removes an unused category (200)', async () => {
+        const { status, data } = await del(`/admin/categories/${testCategoryId}`, adminToken);
+        assertStatus(status, 200);
+        const row = data.data as Record<string, unknown>;
+        assert(row.deleted === true, `expected a hard delete for an unused category: ${JSON.stringify(row)}`);
+    });
+
+    await test('a category in use is deactivated rather than deleted', async () => {
+        // groups.category is free text with no foreign key, so hard-deleting a category
+        // that groups point at would leave them referencing something unresolvable.
+        const inUse = await post(
+            '/admin/categories',
+            { value: `InUse ${ts}`, label: `InUse ${ts}` },
+            adminToken,
+        );
+        assertStatus(inUse.status, 201);
+        const id = (inUse.data.data as Record<string, unknown>).id as string;
+
+        const g = await post('/groups', {
+            name: `Category User ${ts}`,
+            category: `InUse ${ts}`,
+            description: 'A group whose only job is to keep a category from being deleted.',
+            city: 'Ibadan', state: 'Oyo', membership_type: 'open',
+            cover_image_url: 'https://img.dev/c.jpg',
+        }, creatorToken);
+        assertStatus(g.status, 201);
+
+        const { status, data } = await del(`/admin/categories/${id}`, adminToken);
+        assertStatus(status, 200);
+        const row = data.data as Record<string, unknown>;
+        assert(row.deactivatedInsteadOfDeleted === true, 'a category in use was hard-deleted');
+        assert(row.isActive === false, 'the in-use category should be deactivated');
+    });
+
+    await test('POST /admin/interests lowercases the value (201)', async () => {
+        // users.interests is written lowercase, so a capitalised value would match nobody.
+        const { status, data } = await post(
+            '/admin/interests',
+            { value: `TestInterest${ts}`, label: 'Test Interest', group: 'Lifestyle' },
+            adminToken,
+        );
+        assertStatus(status, 201);
+        const row = data.data as Record<string, unknown>;
+        assert(row.value === `testinterest${ts}`, `value not lowercased: ${row.value}`);
+        await del(`/admin/interests/${row.id}`, adminToken);
+    });
+
+    await test('POST /admin/interests without a group returns 422', async () => {
+        const { status } = await post('/admin/interests', { value: `nogroup${ts}` }, adminToken);
+        assertStatus(status, 422);
+    });
+
+    // ── Event moderation ──────────────────────────────────────────────────────
+
+    await test('GET /admin/events returns a paginated list (200)', async () => {
+        const { status, data } = await get('/admin/events?limit=5', adminToken);
+        assertStatus(status, 200);
+        assert(Array.isArray(data.data), 'expected an array of events');
+        assertHas(data as unknown as Record<string, unknown>, 'pagination');
+    });
+
+    await test('GET /admin/events filters by when=upcoming (200)', async () => {
+        const { status, data } = await get('/admin/events?when=upcoming&limit=5', adminToken);
+        assertStatus(status, 200);
+        for (const e of data.data as Record<string, unknown>[]) {
+            assert(new Date(e.startsAt as string) >= new Date(Date.now() - 60_000), 'a past event came back as upcoming');
+        }
+    });
+
+    await test('GET /admin/events with a bad status returns 422', async () => {
+        const { status } = await get('/admin/events?status=bogus', adminToken);
+        assertStatus(status, 422);
+    });
+
+    await test('PATCH /admin/events/:id/cancel without a reason returns 422', async () => {
+        const { status } = await patch(`/admin/events/${eventId}/cancel`, {}, adminToken);
+        assertStatus(status, 422);
+    });
+
     await test('PATCH /admin/users/:id/role with super_admin changes role (200)', async () => {
         const { status, data } = await patch(`/admin/users/${memberId}/role`, { role: 'admin' }, superAdminToken);
         assertStatus(status, 200);
@@ -3283,6 +3447,55 @@ async function runFeaturesSuite(): Promise<void> {
         assertStatus(status, 200);
     });
 
+    await test('a new member does not inherit the group backlog as unread', async () => {
+        // The unread cutoff used to fall back to epoch when no read receipt existed, so
+        // joining a busy group greeted you with every message ever posted marked unread.
+        // It is floored at joined_at now: only what arrives after you join counts.
+        const owner = await registerAndLogin(`backlog${ts}@test.io`, 'Backlog1!', 'Backlog Owner');
+        await setPhoneVerified(owner.userId);
+        await setOrganiserBio(owner.token);
+
+        const g = await post('/groups', {
+            name: `Backlog Group ${ts}`,
+            category: 'Community',
+            description: 'Has history before the new member arrives, to test the unread cutoff.',
+            city: 'Ibadan', state: 'Oyo', membership_type: 'open',
+            cover_image_url: 'https://img.dev/c.jpg',
+        }, owner.token);
+        assertStatus(g.status, 201);
+        const gid = (g.data.data as Record<string, unknown>).id as string;
+        await approveGroup(gid);
+
+        // Three messages exist before anyone else joins.
+        for (const body of ['history one', 'history two', 'history three']) {
+            const m = await post(`/groups/${gid}/messages`, { content: body }, owner.token);
+            assertStatus(m.status, 201);
+        }
+
+        const latecomer = await registerAndLogin(`latecomer${ts}@test.io`, 'Latecom1!', 'Latecomer');
+        await setPhoneVerified(latecomer.userId);
+        assertStatus((await post(`/groups/${gid}/join`, {}, latecomer.token)).status, 201);
+
+        const fresh = await get('/conversations?type=group', latecomer.token);
+        assertStatus(fresh.status, 200);
+        const onJoin = (fresh.data.data as Record<string, unknown>[]).find((c) => c.id === gid);
+        assert(Boolean(onJoin), 'the joined group is missing from /conversations');
+        assert(
+            onJoin!.unread_count === 0,
+            `a new member inherited ${onJoin!.unread_count} unread messages from before they joined`,
+        );
+
+        // A message sent after joining does count.
+        assertStatus((await post(`/groups/${gid}/messages`, { content: 'after you joined' }, owner.token)).status, 201);
+
+        const later = await get('/conversations?type=group', latecomer.token);
+        const afterJoin = (later.data.data as Record<string, unknown>[]).find((c) => c.id === gid);
+        assert(
+            afterJoin!.unread_count === 1,
+            `expected exactly 1 unread after joining, got ${afterJoin!.unread_count}`,
+        );
+    });
+
     // ── DM reply_to ───────────────────────────────────────────────────────────
 
     let replyDmId = '';
@@ -3401,7 +3614,12 @@ async function runFeaturesSuite(): Promise<void> {
         });
     }
 
-    function waitForEvent(s: ClientSocket | null, event: string, timeoutMs = 3000): Promise<unknown> {
+    // 3s was too tight for a cross-region database. `send_message` does a Redis INCR, two
+    // membership/group reads and a message INSERT before it broadcasts — three round-trips,
+    // and a single write against the Supabase pooler can take seconds on its own. The test
+    // asserts that delivery happens, not that it is fast, so the ceiling is generous.
+    // Tests that expect an immediate `error` event still resolve in milliseconds.
+    function waitForEvent(s: ClientSocket | null, event: string, timeoutMs = 15_000): Promise<unknown> {
         if (!s) return Promise.reject(new Error('Socket is not connected'));
         return new Promise((resolve, reject) => {
             const timer = setTimeout(
@@ -3446,8 +3664,8 @@ async function runFeaturesSuite(): Promise<void> {
     await test('join_group as active member receives no error', async () => {
         // Wait for GROUP_JOINED confirmation on both sockets — guarantees socket.join()
         // completed before subsequent tests rely on room membership.
-        const creatorJoined = waitForEvent(creatorSocket!, SocketEvents.GROUP_JOINED, 5000);
-        const memberJoined  = waitForEvent(memberSocket!,  SocketEvents.GROUP_JOINED, 5000);
+        const creatorJoined = waitForEvent(creatorSocket!, SocketEvents.GROUP_JOINED);
+        const memberJoined  = waitForEvent(memberSocket!,  SocketEvents.GROUP_JOINED);
         creatorSocket!.emit(SocketEvents.JOIN_GROUP, { group_id: openGroupId });
         memberSocket!.emit(SocketEvents.JOIN_GROUP, { group_id: openGroupId });
         await Promise.all([creatorJoined, memberJoined]);
@@ -4428,6 +4646,70 @@ async function runFeaturesSuite(): Promise<void> {
     await test('POST /groups after account deletion returns 404 (authenticateVerified: user.deletedAt set)', async () => {
         const { status } = await post('/groups', { name: 'Ghost Group', category: 'Tech' }, outsiderToken);
         assertStatus(status, 404);
+    });
+
+    // ── Sole admins cannot abandon a populated group ──────────────────────────
+    // Deleting is a soft delete, so the membership row survives: the group would keep an
+    // owner who can never sign in, and nobody could approve applications or promote a
+    // replacement. Blocked until they hand over or empty the group.
+
+    await test('GET /users/me/deletion-blockers reports a clean account as deletable', async () => {
+        const solo = await registerAndLogin(`solo${ts}@test.io`, 'Solo1234!', 'Solo User');
+        const { status, data } = await get('/users/me/deletion-blockers', solo.token);
+        assertStatus(status, 200);
+        const d = data.data as Record<string, unknown>;
+        assert(d.can_delete === true, 'an account in no groups should be deletable');
+        assert(Array.isArray(d.blocking_groups) && (d.blocking_groups as unknown[]).length === 0, 'expected no blockers');
+    });
+
+    await test('the sole admin of a populated group cannot delete their account (409)', async () => {
+        const owner = await registerAndLogin(`soleadmin${ts}@test.io`, 'SoleAdm1!', 'Sole Admin');
+        await setPhoneVerified(owner.userId);
+        await setOrganiserBio(owner.token);
+
+        const g = await post('/groups', {
+            name: `Sole Admin Group ${ts}`,
+            category: 'Community',
+            description: 'Exists to prove its only admin cannot walk away while members remain.',
+            city: 'Ibadan', state: 'Oyo', membership_type: 'open',
+            cover_image_url: 'https://img.dev/c.jpg',
+        }, owner.token);
+        assertStatus(g.status, 201);
+        const gid = (g.data.data as Record<string, unknown>).id as string;
+        await approveGroup(gid);
+
+        // Alone in the group — nobody to strand, so deletion is still allowed.
+        const alone = await get('/users/me/deletion-blockers', owner.token);
+        assert((alone.data.data as Record<string, unknown>).can_delete === true,
+            'a group with only its owner should not block deletion');
+
+        // Now somebody joins, and the owner becomes load-bearing.
+        const joiner = await registerAndLogin(`solejoin${ts}@test.io`, 'SoleJoin1!', 'Sole Joiner');
+        await setPhoneVerified(joiner.userId);
+        const joined = await post(`/groups/${gid}/join`, {}, joiner.token);
+        assertStatus(joined.status, 201);
+
+        const blockers = await get('/users/me/deletion-blockers', owner.token);
+        const bd = blockers.data.data as Record<string, unknown>;
+        assert(bd.can_delete === false, 'the sole admin of a populated group should be blocked');
+        assert(
+            (bd.blocking_groups as Record<string, unknown>[]).some((b) => b.id === gid),
+            'the blocking group is not named in the response',
+        );
+
+        const del1 = await del('/users/me', owner.token);
+        assertStatus(del1.status, 409);
+
+        // Promoting the joiner to admin removes the blocker.
+        const promoted = await patch(`/groups/${gid}/members/${joiner.userId}`, { role: 'admin' }, owner.token);
+        assertStatus(promoted.status, 200);
+
+        const after = await get('/users/me/deletion-blockers', owner.token);
+        assert((after.data.data as Record<string, unknown>).can_delete === true,
+            'promoting a second admin should unblock deletion');
+
+        const del2 = await del('/users/me', owner.token);
+        assertStatus(del2.status, 200);
     });
 }
 

@@ -504,7 +504,52 @@ CREATE INDEX idx_reports_target ON reports (target_type, target_id);
 
 ---
 
-### 2.14 Audit Log
+### 2.14 Taxonomy (admin-managed)
+
+```sql
+-- Group categories and user interests. Previously module constants in
+-- reference.types.ts; now rows so a platform admin can edit them without a deploy.
+--
+-- `value` is the contract: it holds the exact strings already written to
+-- groups.category and to the users.interests array. There is deliberately NO foreign
+-- key from either — groups.category is free text and always has been, so a constraint
+-- would reject rows for any category the catalogue never contained.
+
+CREATE TABLE categories (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    value       VARCHAR(80) NOT NULL UNIQUE,   -- stored on groups.category; never updated
+    label       VARCHAR(80) NOT NULL,          -- the display string; safe to rename
+    is_active   BOOLEAN NOT NULL DEFAULT TRUE, -- hides from pickers without breaking groups
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_categories_active_order ON categories (is_active, sort_order);
+
+CREATE TABLE interests (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    value       VARCHAR(80) NOT NULL UNIQUE,   -- lowercase; matches users.interests[]
+    label       VARCHAR(80) NOT NULL,
+    group_name  VARCHAR(80) NOT NULL,          -- display grouping in the signup multi-select
+    is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_interests_active_order ON interests (is_active, sort_order);
+CREATE INDEX idx_interests_group ON interests (group_name);
+```
+
+Both tables are seeded by the `20260807000000_admin_taxonomy` migration with the previous
+constants verbatim (8 categories, 35 interests), so existing groups and saved interests
+still resolve after it runs. The seed uses `ON CONFLICT DO NOTHING`, so re-applying never
+reverts an admin's later edits.
+
+---
+
+### 2.15 Audit Log
 
 ```sql
 CREATE TABLE audit_logs (
@@ -661,7 +706,8 @@ Rules:
 |---|---|---|---|
 | GET | `/users/me` | ✓ | Get own full profile |
 | PATCH | `/users/me` | ✓ | Update profile fields |
-| DELETE | `/users/me` | ✓ | Soft-delete own account (GDPR) |
+| DELETE | `/users/me` | ✓ | Soft-delete own account (GDPR). 409 while sole admin — see below |
+| GET | `/users/me/deletion-blockers` | ✓ | Groups that would be left without an admin |
 | GET | `/users/me/groups` | ✓ | List groups the user belongs to |
 | GET | `/users/me/applications` | ✓ | List own applications |
 | GET | `/users/me/notifications` | ✓ | See alias — redirects to `/notifications` |
@@ -684,6 +730,31 @@ Body (all optional): { display_name, username, bio, city, state, country,
 Rules:
   - username: unique, lowercase, alphanumeric + underscore only, 3–50 chars
   - lat/lng: converted to PostGIS Point and stored in location column
+```
+
+**DELETE `/users/me`**
+```
+Rules:
+  - Soft delete: sets deleted_at, status = 'banned', and rewrites email to
+    deleted_{id}@deleted.groupsync so the address can be reused. Revokes all refresh
+    tokens and sessions.
+  - 409 when the caller is the ONLY active super_admin/admin of a group that still has
+    other active members. Because the delete is soft, the membership row survives — the
+    group would keep an owner who can never sign in, so applications could not be
+    approved, events could not be posted, and no replacement admin could be promoted.
+    The group would be permanently unadministrable.
+  - Groups where the caller is the last remaining member do NOT block: there is nobody
+    left to strand.
+  - To clear the block: promote another member to admin (PATCH
+    /groups/:id/members/:userId with { role: 'admin' }) or remove the other members.
+  - The 409 body lists the blocking group names in `error`.
+```
+
+**GET `/users/me/deletion-blockers`**
+```
+Returns: { can_delete: boolean, blocking_groups: [{ id, name, slug, memberCount, role }] }
+Purpose: let the client warn before the user commits, rather than dead-ending them on a
+         409 at the confirmation step with no indication of which groups are at fault.
 ```
 
 **GET `/users/:id`**
@@ -1076,6 +1147,25 @@ Rules:
 | POST | `/dm/:userId` | ✓ verified | Send a DM |
 | PATCH | `/dm/:userId/read` | ✓ | Mark thread as read |
 
+**Group unread counts (`GET /conversations`)**
+```
+unread = messages in the group newer than
+         GREATEST(memberships.joined_at,
+                  COALESCE(chat_read_receipts.last_read_at, memberships.joined_at))
+         AND sender_id != caller AND is_deleted = FALSE
+
+Rules:
+  - The joined_at floor is required. Falling back to epoch when no read receipt exists
+    made a new member inherit the group's entire history as unread on the moment they
+    joined.
+  - It also guards rejoining: a read receipt left over from a previous membership must
+    not resurrect messages sent before the new one started.
+  - last_read_at is upserted on every GET /groups/:id/messages.
+
+Note: /conversations itself is NOT paginated — it returns every group and DM thread in
+one response. Acceptable at current scale; it grows with membership count.
+```
+
 **POST `/dm/:userId`**
 ```
 Body: { content, media_url? }
@@ -1219,6 +1309,52 @@ Rules:
 | GET | `/admin/reports` | List open reports |
 | PATCH | `/admin/reports/:id` | Resolve or dismiss report |
 | GET | `/admin/audit-logs` | Query audit log |
+| GET | `/admin/categories` | List group categories (`?include_inactive=true`) |
+| POST | `/admin/categories` | Create a category |
+| PATCH | `/admin/categories/:id` | Update label / sort order / active flag |
+| DELETE | `/admin/categories/:id` | Delete when unused, deactivate when in use |
+| GET | `/admin/interests` | List interests (`?include_inactive=true`) |
+| POST | `/admin/interests` | Create an interest |
+| PATCH | `/admin/interests/:id` | Update label / group / sort order / active flag |
+| DELETE | `/admin/interests/:id` | Delete when unused, deactivate when in use |
+| GET | `/admin/events` | Event moderation list |
+| PATCH | `/admin/events/:id/cancel` | Cancel an event and notify attendees |
+
+**Taxonomy CRUD (`/admin/categories`, `/admin/interests`)**
+```
+POST body (category): { value, label?, sort_order?, is_active? }
+POST body (interest): { value, group, label?, sort_order?, is_active? }
+PATCH body:           same fields minus `value`
+
+Rules:
+  - `value` is set once and never updated. It is the literal string stored in
+    groups.category and in the users.interests array, neither of which is a foreign
+    key — renaming it would orphan every record referencing it. Edit `label`.
+  - Interest `value` is lowercased on write to match UserService's normalisation.
+  - DELETE counts referencing records first. If any exist the row is deactivated
+    instead, and the response carries `deactivatedInsteadOfDeleted: true` with the
+    count. Deactivated rows disappear from /reference/* but stay readable.
+  - /reference/* falls back to the module constants in reference.types.ts if the
+    query fails or the table is empty, so a DB blip degrades signup to a stale list
+    rather than an empty one.
+```
+
+**PATCH `/admin/events/:id/cancel`**
+```
+Body: { reason }        — required, 5–500 chars
+Rules:
+  - Sets status = 'cancelled'; never hard-deletes.
+  - 409 if the event is already cancelled.
+  - Fans a 'system' notification out to every 'going' and 'maybe' RSVP with the
+    reason verbatim — people planned around this, so a silent disappearance is worse
+    than a cancellation.
+```
+
+**GET `/admin/events`**
+```
+Query: page, limit (max 50), status=scheduled|cancelled|completed,
+       when=upcoming|past, search (matches event title or group name)
+```
 
 **GET `/admin/groups/pending`**
 ```

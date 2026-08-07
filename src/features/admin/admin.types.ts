@@ -203,3 +203,91 @@ export const adminAuditSelect = {
     metadata: true,
     createdAt: true,
 } as const satisfies Prisma.AuditLogSelect;
+
+// ─── Taxonomy (admin-managed categories and interests) ────────────────────────
+
+export interface AdminListTaxonomyQuery {
+    /** Admin views default to showing deactivated rows too — that is the point of the screen. */
+    include_inactive?: boolean;
+}
+
+export interface AdminCreateCategoryDTO {
+    value: string;
+    label?: string;
+    sort_order?: number;
+    is_active?: boolean;
+}
+
+export interface AdminUpdateCategoryDTO {
+    label?: string;
+    sort_order?: number;
+    is_active?: boolean;
+}
+
+export interface AdminCreateInterestDTO {
+    value: string;
+    label?: string;
+    group: string;
+    sort_order?: number;
+    is_active?: boolean;
+}
+
+export interface AdminUpdateInterestDTO {
+    label?: string;
+    group?: string;
+    sort_order?: number;
+    is_active?: boolean;
+}
+
+export const adminCategorySelect = {
+    id: true,
+    value: true,
+    label: true,
+    isActive: true,
+    sortOrder: true,
+    createdAt: true,
+    updatedAt: true,
+} as const satisfies Prisma.CategorySelect;
+
+export const adminInterestSelect = {
+    id: true,
+    value: true,
+    label: true,
+    group: true,
+    isActive: true,
+    sortOrder: true,
+    createdAt: true,
+    updatedAt: true,
+} as const satisfies Prisma.InterestSelect;
+
+// ─── Event moderation ─────────────────────────────────────────────────────────
+
+export interface AdminListEventsQuery {
+    page?: number;
+    limit?: number;
+    status?: 'scheduled' | 'cancelled' | 'completed';
+    search?: string;
+    /** 'upcoming' | 'past' — filters on starts_at relative to now. */
+    when?: 'upcoming' | 'past';
+}
+
+export interface AdminCancelEventDTO {
+    reason: string;
+}
+
+export const adminEventSelect = {
+    id: true,
+    title: true,
+    description: true,
+    startsAt: true,
+    endsAt: true,
+    status: true,
+    visibility: true,
+    rsvpCount: true,
+    rsvpLimit: true,
+    venueCity: true,
+    venueState: true,
+    createdAt: true,
+    group: { select: { id: true, name: true, slug: true, category: true } },
+    creator: { select: { id: true, displayName: true, email: true } },
+} as const satisfies Prisma.EventSelect;

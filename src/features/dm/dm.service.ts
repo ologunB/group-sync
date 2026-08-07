@@ -47,7 +47,14 @@ export class DmService {
                 })
                 : [];
 
-            // Count unread per group in one batch query
+            // Count unread per group in one batch query.
+            //
+            // The cutoff is the later of "when you last read" and "when you joined". The
+            // join floor is what stops a brand-new member inheriting the group's entire
+            // back catalogue as unread: with no read receipt yet, falling back to epoch
+            // counted every message ever posted. It also handles rejoining — a stale
+            // receipt from a previous stint must not resurrect messages from before the
+            // new membership started.
             const groupIds = memberships.map((m) => m.group.id);
             const unreadCounts = groupIds.length > 0
                 ? await prisma.$queryRaw<{ group_id: string; count: bigint }[]>`
@@ -60,7 +67,10 @@ export class DmService {
                       AND mem.status = 'active'
                       AND msg.is_deleted = FALSE
                       AND msg.sender_id != ${userId}::uuid
-                      AND msg.created_at > COALESCE(crt.last_read_at, '1970-01-01'::timestamptz)
+                      AND msg.created_at > GREATEST(
+                              mem.joined_at,
+                              COALESCE(crt.last_read_at, mem.joined_at)
+                          )
                       AND mem.group_id = ANY(${groupIds}::uuid[])
                     GROUP BY mem.group_id
                 `

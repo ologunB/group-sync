@@ -126,6 +126,12 @@ class UserService {
     // Soft-deletes the authenticated user's account (GDPR compliance).
     // Sets deletedAt to now. The user record is retained but inaccessible via API.
     // All refresh tokens are revoked to force sign-out everywhere.
+    //
+    // Blocked while the caller is the only super_admin of a group that still has other
+    // members: soft-deleting leaves the memberships row intact, so the group would keep
+    // an owner who can never sign in — nobody could approve applications, post events or
+    // promote a replacement, and the group would be quietly unadministrable forever.
+    // Groups where they are the last member are fine; there is nobody left to strand.
     async deleteMe(actor) {
         try {
             const user = await connection_1.prisma.user.findUnique({
@@ -134,6 +140,13 @@ class UserService {
             });
             if (!user || user.deletedAt) {
                 throw new error_middleware_1.ApiError(response_constants_1.Messages.RESOURCE_NOT_FOUND('User'), http_status_codes_1.StatusCodes.NOT_FOUND);
+            }
+            const blocking = await this.groupsBlockingDeletion(actor.userId);
+            if (blocking.length > 0) {
+                const names = blocking.map((g) => g.name);
+                throw new error_middleware_1.ApiError(`You are the only admin of ${blocking.length === 1 ? 'a group' : 'groups'} with other members (${names.join(', ')}). ` +
+                    'Promote another member to admin, or remove the remaining members, before deleting your account. ' +
+                    'GET /users/me/deletion-blockers lists them.', http_status_codes_1.StatusCodes.CONFLICT, names);
             }
             await connection_1.prisma.$transaction(async (tx) => {
                 // Soft-delete the user
@@ -165,6 +178,49 @@ class UserService {
             asLogger_1.asLogger.error('UserService.deleteMe:', error);
             throw new error_middleware_1.ApiError(response_constants_1.Messages.SERVER_ERROR, http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR);
         }
+    }
+    /**
+     * Groups this user cannot walk away from: they hold the only super_admin or admin
+     * seat, and somebody else is still an active member.
+     *
+     * Exposed so the client can show the blocker before the user commits to deleting —
+     * a 409 at the final step, with no way to see which groups are at fault, is a dead
+     * end. `GET /users/me/deletion-blockers` returns the same list.
+     */
+    async groupsBlockingDeletion(userId) {
+        const rows = await connection_1.prisma.$queryRaw `
+            SELECT g.id, g.name, g.slug, g.member_count, mine.role
+            FROM memberships mine
+            JOIN groups g ON g.id = mine.group_id
+            WHERE mine.user_id = ${userId}::uuid
+              AND mine.status = 'active'
+              AND mine.role IN ('super_admin', 'admin')
+              AND g.deleted_at IS NULL
+              AND g.status != 'deleted'
+              -- somebody else is still here
+              AND EXISTS (
+                  SELECT 1 FROM memberships other
+                  WHERE other.group_id = g.id
+                    AND other.user_id != ${userId}::uuid
+                    AND other.status = 'active'
+              )
+              -- and nobody else can administer it
+              AND NOT EXISTS (
+                  SELECT 1 FROM memberships admins
+                  WHERE admins.group_id = g.id
+                    AND admins.user_id != ${userId}::uuid
+                    AND admins.status = 'active'
+                    AND admins.role IN ('super_admin', 'admin')
+              )
+            ORDER BY g.name
+        `;
+        return rows.map((r) => ({
+            id: r.id,
+            name: r.name,
+            slug: r.slug,
+            memberCount: Number(r.member_count),
+            role: r.role,
+        }));
     }
     // ── getMyGroups ────────────────────────────────────────────────────────────
     // Returns all groups the authenticated user is an active member of.

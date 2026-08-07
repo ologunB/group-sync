@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.adminChangeRoleValidator = exports.adminAuditLogsValidator = exports.adminListReportsValidator = exports.adminReviewGroupValidator = exports.adminListGroupsValidator = exports.adminListUsersValidator = exports.adminResolveReportValidator = exports.adminUpdateGroupValidator = exports.adminVerifyIdValidator = exports.adminUpdateUserValidator = exports.reportIdParamValidator = exports.groupIdParamValidator = exports.userIdParamValidator = void 0;
+exports.adminCancelEventValidator = exports.adminListEventsValidator = exports.eventIdParamValidator = exports.adminUpdateInterestValidator = exports.adminCreateInterestValidator = exports.adminUpdateCategoryValidator = exports.adminCreateCategoryValidator = exports.adminListTaxonomyValidator = exports.taxonomyIdParamValidator = exports.adminChangeRoleValidator = exports.adminAuditLogsValidator = exports.adminListReportsValidator = exports.adminReviewGroupValidator = exports.adminListGroupsValidator = exports.adminListUsersValidator = exports.adminResolveReportValidator = exports.adminUpdateGroupValidator = exports.adminVerifyIdValidator = exports.adminUpdateUserValidator = exports.reportIdParamValidator = exports.groupIdParamValidator = exports.userIdParamValidator = void 0;
 const express_validator_1 = require("express-validator");
 exports.userIdParamValidator = [
     (0, express_validator_1.param)('id').isUUID().withMessage('User ID must be a valid UUID'),
@@ -83,5 +83,113 @@ exports.adminChangeRoleValidator = [
     (0, express_validator_1.body)('role')
         .exists().withMessage('role is required')
         .isIn(['user', 'admin', 'super_admin']).withMessage('role must be user, admin, or super_admin'),
+];
+// ─── Taxonomy ─────────────────────────────────────────────────────────────────
+exports.taxonomyIdParamValidator = [
+    (0, express_validator_1.param)('id').isUUID().withMessage('ID must be a valid UUID'),
+];
+exports.adminListTaxonomyValidator = [
+    (0, express_validator_1.query)('include_inactive')
+        .optional()
+        .isBoolean().withMessage('include_inactive must be a boolean'),
+];
+exports.adminCreateCategoryValidator = [
+    // `value` is what gets written to groups.category, so it is the one field that must
+    // be present and is never editable afterwards.
+    (0, express_validator_1.body)('value')
+        .exists({ checkFalsy: true }).withMessage('value is required')
+        .isString().withMessage('value must be a string')
+        .trim()
+        .isLength({ min: 2, max: 80 }).withMessage('value must be between 2 and 80 characters'),
+    (0, express_validator_1.body)('label')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('label must be a string')
+        .trim()
+        .isLength({ max: 80 }).withMessage('label must be 80 characters or fewer'),
+    (0, express_validator_1.body)('sort_order')
+        .optional()
+        .isInt({ min: 0 }).withMessage('sort_order must be a non-negative integer'),
+    (0, express_validator_1.body)('is_active')
+        .optional()
+        .isBoolean().withMessage('is_active must be a boolean'),
+];
+exports.adminUpdateCategoryValidator = [
+    (0, express_validator_1.body)('label')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('label must be a string')
+        .trim()
+        .isLength({ min: 1, max: 80 }).withMessage('label must be between 1 and 80 characters'),
+    (0, express_validator_1.body)('sort_order')
+        .optional()
+        .isInt({ min: 0 }).withMessage('sort_order must be a non-negative integer'),
+    (0, express_validator_1.body)('is_active')
+        .optional()
+        .isBoolean().withMessage('is_active must be a boolean'),
+];
+exports.adminCreateInterestValidator = [
+    (0, express_validator_1.body)('value')
+        .exists({ checkFalsy: true }).withMessage('value is required')
+        .isString().withMessage('value must be a string')
+        .trim()
+        .isLength({ min: 2, max: 80 }).withMessage('value must be between 2 and 80 characters'),
+    (0, express_validator_1.body)('group')
+        .exists({ checkFalsy: true }).withMessage('group is required')
+        .isString().withMessage('group must be a string')
+        .trim()
+        .isLength({ min: 2, max: 80 }).withMessage('group must be between 2 and 80 characters'),
+    (0, express_validator_1.body)('label')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('label must be a string')
+        .trim()
+        .isLength({ max: 80 }).withMessage('label must be 80 characters or fewer'),
+    (0, express_validator_1.body)('sort_order')
+        .optional()
+        .isInt({ min: 0 }).withMessage('sort_order must be a non-negative integer'),
+    (0, express_validator_1.body)('is_active')
+        .optional()
+        .isBoolean().withMessage('is_active must be a boolean'),
+];
+exports.adminUpdateInterestValidator = [
+    (0, express_validator_1.body)('label')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('label must be a string')
+        .trim()
+        .isLength({ min: 1, max: 80 }).withMessage('label must be between 1 and 80 characters'),
+    (0, express_validator_1.body)('group')
+        .optional({ nullable: true, checkFalsy: true })
+        .isString().withMessage('group must be a string')
+        .trim()
+        .isLength({ min: 2, max: 80 }).withMessage('group must be between 2 and 80 characters'),
+    (0, express_validator_1.body)('sort_order')
+        .optional()
+        .isInt({ min: 0 }).withMessage('sort_order must be a non-negative integer'),
+    (0, express_validator_1.body)('is_active')
+        .optional()
+        .isBoolean().withMessage('is_active must be a boolean'),
+];
+// ─── Event moderation ─────────────────────────────────────────────────────────
+exports.eventIdParamValidator = [
+    (0, express_validator_1.param)('id').isUUID().withMessage('Event ID must be a valid UUID'),
+];
+exports.adminListEventsValidator = [
+    (0, express_validator_1.query)('page').optional().isInt({ min: 1 }).withMessage('page must be a positive integer'),
+    (0, express_validator_1.query)('limit').optional().isInt({ min: 1, max: 50 }).withMessage('limit must be between 1 and 50'),
+    (0, express_validator_1.query)('status')
+        .optional()
+        .isIn(['scheduled', 'cancelled', 'completed'])
+        .withMessage('status must be scheduled, cancelled or completed'),
+    (0, express_validator_1.query)('when')
+        .optional()
+        .isIn(['upcoming', 'past']).withMessage('when must be upcoming or past'),
+    (0, express_validator_1.query)('search').optional().isString().withMessage('search must be a string'),
+];
+exports.adminCancelEventValidator = [
+    // Cancelling fans a notification out to everyone who RSVP'd, and they are shown this
+    // verbatim — an unexplained cancellation is worse than none.
+    (0, express_validator_1.body)('reason')
+        .exists({ checkFalsy: true }).withMessage('reason is required')
+        .isString().withMessage('reason must be a string')
+        .trim()
+        .isLength({ min: 5, max: 500 }).withMessage('reason must be between 5 and 500 characters'),
 ];
 //# sourceMappingURL=admin.validator.js.map

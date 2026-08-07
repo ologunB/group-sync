@@ -16,6 +16,15 @@ import {
     adminAuditLogsValidator,
     adminChangeRoleValidator,
     adminReviewGroupValidator,
+    taxonomyIdParamValidator,
+    adminListTaxonomyValidator,
+    adminCreateCategoryValidator,
+    adminUpdateCategoryValidator,
+    adminCreateInterestValidator,
+    adminUpdateInterestValidator,
+    eventIdParamValidator,
+    adminListEventsValidator,
+    adminCancelEventValidator,
 } from './admin.validator';
 
 const router = Router();
@@ -50,5 +59,23 @@ router.patch('/reports/:id', validateRequest([...reportIdParamValidator, ...admi
 
 // ── Audit logs ────────────────────────────────────────────────────────────────
 router.get('/audit-logs', validateRequest(adminAuditLogsValidator), adminController.listAuditLogs);
+
+// ── Taxonomy: group categories ───────────────────────────────────────────────
+// `value` is fixed at creation — it is the string stored on groups.category, so
+// renaming it would orphan every group filed under it. Edit `label` instead.
+router.get('/categories', validateRequest(adminListTaxonomyValidator), adminController.listCategories);
+router.post('/categories', validateRequest(adminCreateCategoryValidator), adminController.createCategory);
+router.patch('/categories/:id', validateRequest([...taxonomyIdParamValidator, ...adminUpdateCategoryValidator]), adminController.updateCategory);
+router.delete('/categories/:id', validateRequest(taxonomyIdParamValidator), adminController.deleteCategory);
+
+// ── Taxonomy: user interests ─────────────────────────────────────────────────
+router.get('/interests', validateRequest(adminListTaxonomyValidator), adminController.listInterests);
+router.post('/interests', validateRequest(adminCreateInterestValidator), adminController.createInterest);
+router.patch('/interests/:id', validateRequest([...taxonomyIdParamValidator, ...adminUpdateInterestValidator]), adminController.updateInterest);
+router.delete('/interests/:id', validateRequest(taxonomyIdParamValidator), adminController.deleteInterest);
+
+// ── Event moderation ─────────────────────────────────────────────────────────
+router.get('/events', validateRequest(adminListEventsValidator), adminController.listEvents);
+router.patch('/events/:id/cancel', validateRequest([...eventIdParamValidator, ...adminCancelEventValidator]), adminController.cancelEvent);
 
 export default router;

@@ -10,6 +10,11 @@ import {
     AdminUpdateGroupDTO,
     AdminListReportsQuery,
     AdminResolveReportDTO,
+    AdminCreateCategoryDTO,
+    AdminUpdateCategoryDTO,
+    AdminCreateInterestDTO,
+    AdminUpdateInterestDTO,
+    AdminCancelEventDTO,
     AdminListAuditLogsQuery,
     AdminChangeRoleDTO,
     AdminReviewGroupDTO,
@@ -177,6 +182,108 @@ export class AdminController {
             };
             const result = await adminService.listAuditLogs(q);
             ResponseHelper.success(res, result.data, 'Audit logs retrieved.', 200, result.pagination);
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    // ─── Taxonomy: categories ─────────────────────────────────────────────────
+
+    listCategories = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const data = await adminService.listCategories({ include_inactive: req.query.include_inactive === 'true' });
+            ResponseHelper.success(res, data);
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    createCategory = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const data = await adminService.createCategory(req.body as AdminCreateCategoryDTO, req.user!);
+            ResponseHelper.success(res, data, 'Category created.', 201);
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    updateCategory = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const data = await adminService.updateCategory(req.params.id, req.body as AdminUpdateCategoryDTO, req.user!);
+            ResponseHelper.success(res, data, 'Category updated.');
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    deleteCategory = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const data = await adminService.deleteCategory(req.params.id, req.user!);
+            ResponseHelper.success(res, data, 'Category removed.');
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    // ─── Taxonomy: interests ──────────────────────────────────────────────────
+
+    listInterests = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const data = await adminService.listInterests({ include_inactive: req.query.include_inactive === 'true' });
+            ResponseHelper.success(res, data);
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    createInterest = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const data = await adminService.createInterest(req.body as AdminCreateInterestDTO, req.user!);
+            ResponseHelper.success(res, data, 'Interest created.', 201);
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    updateInterest = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const data = await adminService.updateInterest(req.params.id, req.body as AdminUpdateInterestDTO, req.user!);
+            ResponseHelper.success(res, data, 'Interest updated.');
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    deleteInterest = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const data = await adminService.deleteInterest(req.params.id, req.user!);
+            ResponseHelper.success(res, data, 'Interest removed.');
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    // ─── Event moderation ─────────────────────────────────────────────────────
+
+    listEvents = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const result = await adminService.listEvents({
+                page:   req.query.page   ? parseInt(req.query.page as string, 10)   : undefined,
+                limit:  req.query.limit  ? parseInt(req.query.limit as string, 10)  : undefined,
+                status: req.query.status as 'scheduled' | 'cancelled' | 'completed' | undefined,
+                search: req.query.search as string | undefined,
+                when:   req.query.when   as 'upcoming' | 'past' | undefined,
+            });
+            ResponseHelper.success(res, result.data, 'Events retrieved.', 200, result.pagination);
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    cancelEvent = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const data = await adminService.cancelEvent(req.params.id, req.body as AdminCancelEventDTO, req.user!);
+            ResponseHelper.success(res, data, 'Event cancelled.');
         } catch (error) {
             next(error);
         }
